@@ -4,6 +4,7 @@ import { NFC } from '@exxili/capacitor-nfc';
 import { api } from '../services/api';
 import { useAuthStore } from './auth';
 import { useChantiersStore } from './chantiers';
+import { showClockedInNotification, clearClockedInNotification } from '../services/notifications';
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -36,6 +37,27 @@ export const usePointageStore = defineStore('pointage', {
   }),
   getters: {
     lastEntry: (state) => state.entries[state.entries.length - 1],
+
+    // Départ estimé pour une vacation : l'horaire de fin planifié décalé du
+    // même écart que celui constaté entre l'arrivée réelle et le début prévu.
+    estimatedDepartureFor() {
+      return (shift) => {
+        if (!this.lastEntry) return null;
+        const delayMs = new Date(this.lastEntry.recorded_at) - new Date(shift.start_at);
+        return new Date(new Date(shift.end_at).getTime() + delayMs);
+      };
+    },
+
+    // Prochaine vacation du jour qui démarre après celle donnée, tous
+    // chantiers confondus.
+    nextShiftAfter() {
+      return (shift) => {
+        const upcoming = this.todayShifts
+          .filter((s) => new Date(s.start_at) > new Date(shift.start_at))
+          .sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
+        return upcoming[0] || null;
+      };
+    },
   },
   actions: {
     async load() {
@@ -64,14 +86,27 @@ export const usePointageStore = defineStore('pointage', {
       const position = await getPosition();
       const lastForChantier = [...this.entries].reverse().find((e) => e.chantier_id === chantier.id);
       const shift = this.todayShifts.find((s) => s.chantier_id === chantier.id);
+      const type = lastForChantier?.type === 'in' ? 'out' : 'in';
 
       await api.post('/time-entries', {
         chantierId: chantier.id,
         shiftId: shift?.id,
-        type: lastForChantier?.type === 'in' ? 'out' : 'in',
+        type,
         ...position,
       });
       await this.load();
+
+      if (type === 'in' && shift) {
+        const next = this.nextShiftAfter(shift);
+        await showClockedInNotification({
+          chantierName: chantier.name,
+          arrivalAt: this.lastEntry.recorded_at,
+          estimatedDeparture: this.estimatedDepartureFor(shift),
+          next: next ? { chantierName: next.chantier_name, startAt: next.start_at } : null,
+        });
+      } else {
+        await clearClockedInNotification();
+      }
     },
 
     initGlobalListener(router) {

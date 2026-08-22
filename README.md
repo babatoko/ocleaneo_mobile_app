@@ -95,6 +95,20 @@ L'app ne demande pas d'ouvrir l'écran Pointage avant de scanner : **un badge lu
 
 **Permissions natives** : `android.permission.NFC` + `<uses-feature android:required="false">` ajoutés à `AndroidManifest.xml` (l'app reste installable sur un appareil sans NFC). Côté iOS : `NFCReaderUsageDescription` dans `Info.plist`, et un fichier `App.entitlements` avec `com.apple.developer.nfc.readersession.formats` — ce dernier nécessite en plus d'activer la capacité « Near Field Communication Tag Reading » dans Xcode (Signing & Capabilities) sur un compte développeur Apple payant, étape qui ne peut se faire que sur un Mac.
 
+### Notification « chantier en cours »
+
+Dès qu'un pointage d'arrivée réussit, `frontend/src/services/notifications.js` affiche une notification locale ([`@capacitor/local-notifications`](https://capacitorjs.com/docs/apis/local-notifications)) tant que le salarié est présent :
+
+- **Titre** : nom du chantier (« Cegetel Macon — en cours »).
+- **Corps** : heure d'arrivée réelle + départ estimé (même calcul retard/avance que l'écran Pointage, via `pointage.estimatedDepartureFor()`).
+- **Corps étendu** (`largeBody`, vue développée Android) : ajoute la prochaine vacation du jour si le salarié en a une (`pointage.nextShiftAfter()`), en plus petit dans la maquette — le rendu réel dépend du template de notification du système.
+- **`ongoing: true`** (Android) : la notification ne peut pas être balayée tant que le salarié est pointé présent, pour rappeler l'état en cours.
+- Elle est annulée (`clearClockedInNotification()`) dès le pointage de départ.
+
+La permission est demandée au premier pointage (`ensurePermission()`), pas au démarrage de l'app. Le canal Android (`pointage`, importance par défaut) est créé une fois au boot (`main.js`).
+
+**Limite honnête** : la notification native ne reproduit pas exactement la maquette (carte à deux colonnes, badge « En cours », ligne « Prochain » en transparence) — c'est le système (iOS/Android) qui gère la mise en page réelle d'une notification, avec un gabarit beaucoup plus limité (titre/corps/corps étendu). Non testable dans ce bac à sable (pas de matériel Android/iOS) : à valider sur device.
+
 ## Planning — vue Tournée (itinéraire optimisé OSRM)
 
 Le Planning a trois onglets : Jour, Semaine, et **Tournée**. La Tournée calcule l'ordre de passage optimal sur les chantiers du jour et l'itinéraire associé via [OSRM](http://project-osrm.org/) (Open Source Routing Machine), affiché sur une carte [Leaflet](https://leafletjs.com/) / tuiles OpenStreetMap :

@@ -33,13 +33,9 @@ const displayEntries = computed(() => {
   if (pointage.status !== 'in' || !pointage.lastEntry) return pointage.entries;
   const shift = pointage.todayShifts.find((s) => s.chantier_id === pointage.lastEntry.chantier_id);
   if (!shift) return pointage.entries;
-  // Le départ affiché suit le retard ou l'avance pris à l'arrivée : un salarié
-  // arrivé en retard qui fait sa vacation complète part en retard d'autant.
-  const delayMs = new Date(pointage.lastEntry.recorded_at) - new Date(shift.start_at);
-  const estimatedDeparture = new Date(new Date(shift.end_at).getTime() + delayMs);
   return [
     ...pointage.entries,
-    { id: 'planned-departure', type: 'out', planned: true, plannedTime: estimatedDeparture },
+    { id: 'planned-departure', type: 'out', planned: true, plannedTime: pointage.estimatedDepartureFor(shift) },
   ];
 });
 
