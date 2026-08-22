@@ -69,7 +69,7 @@ function addToCart() {
   </div>
 
   <button v-if="cart.totalItems" class="cart-fab" @click="router.push('/commande/panier')">
-    🛒 Panier ({{ cart.totalItems }})
+    <i class="ti ti-shopping-cart"></i> Panier ({{ cart.totalItems }})
   </button>
 
   <div v-if="selected" class="sheet-backdrop" @click.self="selected = null">
@@ -129,6 +129,9 @@ function addToCart() {
   border-radius: 999px;
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .sheet-backdrop {

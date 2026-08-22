@@ -19,13 +19,13 @@ function downloadPdf() {
 <template>
   <AppHeader title="Commande confirmée" />
   <div v-if="order" class="recap">
-    <p class="success">✅ Commande n°{{ order.id }} envoyée pour {{ order.chantier_name }}</p>
+    <p class="success"><i class="ti ti-circle-check"></i> Commande n°{{ order.id }} envoyée pour {{ order.chantier_name }}</p>
     <ul>
       <li v-for="item in order.items" :key="item.id">
         {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
       </li>
     </ul>
-    <button class="pdf" @click="downloadPdf">📄 Télécharger le récapitulatif PDF</button>
+    <button class="pdf" @click="downloadPdf"><i class="ti ti-file-download"></i> Télécharger le récapitulatif PDF</button>
     <RouterLink to="/" class="home-link">Retour à l'accueil</RouterLink>
   </div>
 </template>
@@ -40,6 +40,13 @@ function downloadPdf() {
 
 .success {
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.success i {
+  color: var(--success-text);
 }
 
 ul {
@@ -59,11 +66,15 @@ li {
 
 .pdf {
   padding: 12px;
-  border: 1px solid var(--primary);
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: white;
-  color: var(--primary);
+  background: var(--surface);
+  color: var(--accent-text);
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .home-link {

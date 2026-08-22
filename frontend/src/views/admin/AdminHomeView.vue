@@ -5,28 +5,17 @@ import AppHeader from '../../components/AppHeader.vue';
 <template>
   <AppHeader title="Administration" />
   <div class="menu">
-    <RouterLink to="/admin/planning" class="item">📅 Gérer le planning</RouterLink>
-    <RouterLink to="/admin/salaries" class="item">👥 Gérer les salariés</RouterLink>
-    <RouterLink to="/admin/chantiers" class="item">🏗️ Gérer les chantiers</RouterLink>
-    <RouterLink to="/admin/produits" class="item">🧴 Gérer les produits</RouterLink>
+    <RouterLink to="/admin/planning" class="menu-item">
+      <i class="ti ti-calendar"></i><span>Gérer le planning</span><i class="ti ti-chevron-right chev"></i>
+    </RouterLink>
+    <RouterLink to="/admin/salaries" class="menu-item">
+      <i class="ti ti-users"></i><span>Gérer les salariés</span><i class="ti ti-chevron-right chev"></i>
+    </RouterLink>
+    <RouterLink to="/admin/chantiers" class="menu-item">
+      <i class="ti ti-building"></i><span>Gérer les chantiers</span><i class="ti ti-chevron-right chev"></i>
+    </RouterLink>
+    <RouterLink to="/admin/produits" class="menu-item">
+      <i class="ti ti-spray"></i><span>Gérer les produits</span><i class="ti ti-chevron-right chev"></i>
+    </RouterLink>
   </div>
 </template>
-
-<style scoped>
-.menu {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.item {
-  padding: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  text-decoration: none;
-  color: var(--text);
-  font-weight: 600;
-}
-</style>

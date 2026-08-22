@@ -43,7 +43,7 @@ async function submit(chantierId) {
 
 <template>
   <AppHeader title="Inventaire" />
-  <div v-if="done" class="done">✅ Inventaire enregistré, merci !</div>
+  <div v-if="done" class="done"><i class="ti ti-circle-check"></i> Inventaire enregistré, merci !</div>
   <div v-else class="inventory">
     <p class="hint">Saisissez le stock restant pour chaque produit avant de valider.</p>
     <div v-for="p in products" :key="p.id" class="product">

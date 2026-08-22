@@ -76,169 +76,85 @@ function fmtTime(iso) {
 </script>
 
 <template>
-  <div class="pointage">
-    <h1>Pointage</h1>
-    <p class="date">{{ now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
+  <div class="header">
+    <div>
+      <p class="hello">Pointage</p>
+      <p class="name sub-name">{{ now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
+    </div>
+    <div class="avatar status-avatar" :class="{ active: status === 'in' }">
+      <i class="ti ti-shield-check"></i>
+    </div>
+  </div>
 
-    <select v-if="chantiers.list.length > 1" v-model="selectedChantierId" class="chantier-select">
+  <div class="chantier-select-wrap" v-if="chantiers.list.length > 1">
+    <select v-model="selectedChantierId" class="chantier-select">
       <option v-for="c in chantiers.list" :key="c.id" :value="c.id">{{ c.name }}</option>
     </select>
+  </div>
 
-    <div class="clock-wrap">
-      <button class="clock-circle" :class="status" :disabled="submitting || !selectedChantierId" @click="clock">
-        <span class="icon">{{ status === 'in' ? '⏸' : '▶' }}</span>
-        <span class="hint">{{ status === 'in' ? 'Pointer le départ' : "Pointer l'arrivée" }}</span>
-      </button>
-      <p class="big-time">{{ now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</p>
-      <p class="status-line" v-if="currentChantierName">
-        {{ status === 'in' ? 'Présent' : 'Absent' }} — {{ currentChantierName }}
-      </p>
-    </div>
+  <div class="clock-wrap">
+    <button class="nfc-circle" :class="{ active: status === 'in' }" :disabled="submitting || !selectedChantierId" @click="clock">
+      <i class="ti" :class="status === 'in' ? 'ti-player-pause' : 'ti-player-play'"></i>
+      <p>{{ status === 'in' ? 'Pointer le départ' : "Pointer l'arrivée" }}</p>
+    </button>
+    <p class="big-time">{{ now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</p>
+    <p class="status-line" v-if="currentChantierName">
+      {{ status === 'in' ? 'Présent' : 'Absent' }} — {{ currentChantierName }}
+    </p>
+  </div>
 
-    <div class="history">
-      <p class="history-title">Historique du jour</p>
-      <div v-for="e in entries" :key="e.id" class="hist-row">
-        <div class="hist-icon" :class="e.type">{{ e.type === 'in' ? '→' : '←' }}</div>
-        <div class="hist-text">
-          <p class="lbl">{{ e.type === 'in' ? 'Arrivée' : 'Départ' }}</p>
-          <p class="sub">{{ e.chantier_name }}</p>
-        </div>
-        <span class="hist-time">{{ fmtTime(e.recorded_at) }}</span>
+  <div class="history">
+    <p class="history-title">Historique du jour</p>
+    <div v-for="e in entries" :key="e.id" class="hist-row">
+      <div class="hist-icon" :class="e.type">
+        <i class="ti" :class="e.type === 'in' ? 'ti-login-2' : 'ti-logout-2'"></i>
       </div>
-      <p v-if="!entries.length" class="empty">Aucun pointage aujourd'hui.</p>
+      <div class="hist-text">
+        <p class="lbl">{{ e.type === 'in' ? 'Arrivée' : 'Départ' }}</p>
+        <p class="sub">{{ e.chantier_name }}</p>
+      </div>
+      <span class="hist-time">{{ fmtTime(e.recorded_at) }}</span>
     </div>
+    <p v-if="!entries.length" class="empty">Aucun pointage aujourd'hui.</p>
   </div>
 </template>
 
 <style scoped>
-.pointage {
-  padding: 16px;
-}
-
-h1 {
-  font-size: 18px;
-  margin: 0;
-}
-
-.date {
+.sub-name {
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  font-weight: 400;
   text-transform: capitalize;
-  margin: 2px 0 14px;
+}
+
+.status-avatar {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.status-avatar.active {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.status-avatar i {
+  font-size: 16px;
+}
+
+.chantier-select-wrap {
+  padding: 0 18px 10px;
 }
 
 .chantier-select {
   width: 100%;
-  padding: 10px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--surface-1);
 }
 
-.clock-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 0 16px;
-}
-
-.clock-circle {
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  border: 2px solid var(--primary);
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.clock-circle.in {
-  border-color: var(--danger);
-}
-
-.clock-circle .icon {
-  font-size: 28px;
-  color: var(--primary);
-}
-
-.clock-circle.in .icon {
-  color: var(--danger);
-}
-
-.clock-circle .hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 0 20px;
-  text-align: center;
-}
-
-.big-time {
-  font-size: 22px;
-  font-weight: 600;
-  margin: 14px 0 0;
-}
-
-.status-line {
-  font-size: 12px;
-  color: var(--primary);
-  margin: 4px 0 0;
-}
-
-.history {
-  margin-top: 12px;
-}
-
-.history-title {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin: 0 0 8px;
-}
-
-.hist-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.hist-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: var(--surface-1, #f1f5f9);
-}
-
-.hist-icon.in {
-  background: #eaf3de;
-  color: #3b6d11;
-}
-
-.hist-text {
-  flex: 1;
-}
-
-.hist-text .lbl {
-  font-size: 13px;
-  margin: 0;
-}
-
-.hist-text .sub {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin: 1px 0 0;
-}
-
-.hist-time {
-  font-size: 13px;
-  font-weight: 600;
+.nfc-circle {
+  cursor: pointer;
 }
 
 .empty {

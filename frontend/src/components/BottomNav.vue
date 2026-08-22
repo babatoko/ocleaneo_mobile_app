@@ -6,41 +6,10 @@ const auth = useAuthStore();
 
 <template>
   <nav class="bottom-nav">
-    <RouterLink to="/planning" class="nav-item">📅<span>Planning</span></RouterLink>
-    <RouterLink to="/pointage" class="nav-item">⏱️<span>Pointage</span></RouterLink>
-    <RouterLink to="/commande/chantier" class="nav-item">🛒<span>Commande</span></RouterLink>
-    <RouterLink to="/historique" class="nav-item">🕓<span>Historique</span></RouterLink>
-    <RouterLink to="/" class="nav-item">🏠<span>Accueil</span></RouterLink>
+    <RouterLink to="/planning" class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></RouterLink>
+    <RouterLink to="/pointage" class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></RouterLink>
+    <RouterLink to="/commande/chantier" class="nav-item"><i class="ti ti-shopping-cart"></i><span class="lbl">Commande</span></RouterLink>
+    <RouterLink to="/historique" class="nav-item"><i class="ti ti-history"></i><span class="lbl">Historique</span></RouterLink>
+    <RouterLink to="/" class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></RouterLink>
   </nav>
 </template>
-
-<style scoped>
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  display: flex;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
-}
-
-.nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: 11px;
-  text-decoration: none;
-  color: var(--text-muted);
-  padding: 4px 0;
-}
-
-.nav-item.router-link-active {
-  color: var(--primary);
-}
-</style>

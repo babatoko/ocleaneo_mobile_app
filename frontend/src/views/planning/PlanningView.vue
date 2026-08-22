@@ -1,7 +1,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { api } from '../../services/api';
+import { useAuthStore } from '../../stores/auth';
 
+const auth = useAuthStore();
 const view = ref('jour'); // 'jour' | 'semaine'
 const selectedDate = ref(toIso(new Date()));
 const shifts = ref([]);
@@ -34,6 +36,15 @@ const selectedDateLabel = computed(() =>
     day: 'numeric',
     month: 'long',
   })
+);
+
+const initials = computed(() =>
+  (auth.employee?.name || '')
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
 );
 
 async function loadDay() {
@@ -83,224 +94,89 @@ function timeRange(shift) {
   return `${fmt(shift.start_at)} - ${fmt(shift.end_at)}`;
 }
 
+function mapLink(address) {
+  return `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+}
+
 watch(view, refresh);
-onMounted(refresh);
+onMounted(() => {
+  if (!auth.employee) auth.fetchMe();
+  refresh();
+});
 </script>
 
 <template>
-  <div class="planning">
-    <h1>Planning</h1>
+  <div class="header">
+    <div>
+      <p class="hello">Bonjour</p>
+      <p class="name">{{ auth.employee?.name || '' }}</p>
+    </div>
+    <div class="avatar">{{ initials }}</div>
+  </div>
 
-    <div class="view-toggle">
-      <button :class="{ active: view === 'jour' }" @click="view = 'jour'">Jour</button>
-      <button :class="{ active: view === 'semaine' }" @click="view = 'semaine'">Semaine</button>
+  <div class="view-toggle">
+    <button class="opt" :class="{ active: view === 'jour' }" @click="view = 'jour'">Jour</button>
+    <button class="opt" :class="{ active: view === 'semaine' }" @click="view = 'semaine'">Semaine</button>
+  </div>
+
+  <div v-if="view === 'jour'">
+    <div class="days">
+      <button
+        v-for="d in weekDays"
+        :key="toIso(d)"
+        class="day"
+        :class="{ active: toIso(d) === selectedDate }"
+        @click="pickDay(d)"
+      >
+        <span class="dname">{{ d.toLocaleDateString('fr-FR', { weekday: 'short' }) }}</span>
+        <span class="dnum">{{ d.getDate() }}</span>
+      </button>
     </div>
 
-    <div v-if="view === 'jour'">
-      <div class="days">
-        <button
-          v-for="d in weekDays"
-          :key="toIso(d)"
-          class="day"
-          :class="{ active: toIso(d) === selectedDate }"
-          @click="pickDay(d)"
-        >
-          <span class="dname">{{ d.toLocaleDateString('fr-FR', { weekday: 'short' }) }}</span>
-          <span class="dnum">{{ d.getDate() }}</span>
-        </button>
-      </div>
+    <p class="section-title">{{ selectedDateLabel }}</p>
 
-      <p class="section-title">{{ selectedDateLabel }}</p>
-
-      <div class="shift" v-for="s in shifts" :key="s.id">
-        <div class="bar" :class="s.status"></div>
-        <div class="card">
-          <div class="top">
-            <span class="time">{{ timeRange(s) }}</span>
-            <span class="badge" :class="s.status">{{ s.status }}</span>
-          </div>
-          <p class="client">{{ s.chantier_name }}</p>
-          <p class="place">📍 {{ s.chantier_address || s.chantier_name }}</p>
-          <p v-if="s.note" class="note">{{ s.note }}</p>
+    <div class="shift" v-for="s in shifts" :key="s.id">
+      <div class="bar" :class="s.status"></div>
+      <div class="card">
+        <div class="top">
+          <span class="time">{{ timeRange(s) }}</span>
+          <span class="badge" :class="s.status">{{
+            s.status === 'confirmed' ? 'confirmé' : s.status === 'modified' ? 'modifié' : s.status
+          }}</span>
+        </div>
+        <p class="client">{{ s.chantier_name }}</p>
+        <p class="place"><i class="ti ti-map-pin"></i> {{ s.chantier_address || s.chantier_name }}</p>
+        <p v-if="s.note" class="meta">{{ s.note }}</p>
+        <div class="card-actions">
+          <a :href="mapLink(s.chantier_address || s.chantier_name)" target="_blank" rel="noopener">
+            <i class="ti ti-map-2"></i> Itinéraire
+          </a>
         </div>
       </div>
-      <p v-if="!loading && !shifts.length" class="empty">Aucune vacation ce jour-là.</p>
     </div>
+    <p v-if="!loading && !shifts.length" class="empty">Aucune vacation ce jour-là.</p>
+  </div>
 
-    <div v-else class="week">
-      <div v-for="d in weekDays" :key="toIso(d)" class="week-day" @click="pickDay(d)">
-        <div class="week-day-head">
-          <strong>{{ d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) }}</strong>
-          <span class="count">{{ (weekShiftsByDay[toIso(d)] || []).length }}</span>
-        </div>
-        <div v-for="s in weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift">
-          {{ timeRange(s) }} · {{ s.chantier_name }}
-        </div>
+  <div v-else class="week">
+    <div v-for="d in weekDays" :key="toIso(d)" class="week-day" @click="pickDay(d)">
+      <div class="week-day-head">
+        <strong>{{ d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) }}</strong>
+        <span class="count">{{ (weekShiftsByDay[toIso(d)] || []).length }}</span>
+      </div>
+      <div v-for="s in weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift">
+        {{ timeRange(s) }} · {{ s.chantier_name }}
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.planning {
-  padding: 16px;
-}
-
-h1 {
-  font-size: 18px;
-  margin: 0 0 12px;
-}
-
-.view-toggle {
-  display: flex;
-  background: var(--surface-1, #f1f5f9);
-  border-radius: 10px;
-  padding: 3px;
-  margin-bottom: 14px;
-}
-
-.view-toggle button {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 8px 0;
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.view-toggle button.active {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.days {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  margin-bottom: 10px;
-}
-
-.day {
-  flex-shrink: 0;
-  min-width: 42px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  border: none;
-  background: transparent;
-  padding: 4px 0;
-}
-
-.day .dname {
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.day .dnum {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--text);
-}
-
-.day.active .dnum {
-  background: var(--primary);
-  color: white;
-  font-weight: 600;
-}
-
-.section-title {
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: capitalize;
-  margin: 12px 0 8px;
-}
-
-.shift {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.bar {
-  width: 3px;
-  border-radius: 2px;
-  flex-shrink: 0;
-  background: var(--border);
-}
-
-.bar.confirmed {
-  background: var(--primary);
-}
-
-.card {
-  flex: 1;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
-}
-
-.top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.time {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.badge {
-  font-size: 11px;
-  padding: 2px 9px;
-  border-radius: 8px;
-  background: var(--border);
-  color: var(--text-muted);
-}
-
-.badge.confirmed {
-  background: #eaf3de;
-  color: #3b6d11;
-}
-
-.badge.modified {
-  background: #faeeda;
-  color: #854f0b;
-}
-
-.client {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 4px 0 2px;
-}
-
-.place,
-.note {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin: 2px 0 0;
-}
-
-.empty {
-  text-align: center;
-  color: var(--text-muted);
-  margin-top: 32px;
+.week {
+  padding: 0 18px 18px;
 }
 
 .week-day {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 10px;
@@ -321,7 +197,13 @@ h1 {
 
 .week-shift {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-top: 6px;
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  margin-top: 32px;
 }
 </style>
