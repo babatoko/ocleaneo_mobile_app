@@ -14,12 +14,6 @@ const routes = [
 
   { path: '/inventaire', name: 'inventaire', component: () => import('../views/inventaire/InventaireView.vue') },
   { path: '/historique', name: 'historique', component: () => import('../views/historique/HistoriqueView.vue') },
-
-  { path: '/admin', name: 'admin', component: () => import('../views/admin/AdminHomeView.vue'), meta: { adminOnly: true } },
-  { path: '/admin/planning', name: 'admin-planning', component: () => import('../views/admin/AdminPlanningView.vue'), meta: { adminOnly: true } },
-  { path: '/admin/salaries', name: 'admin-salaries', component: () => import('../views/admin/AdminSalariesView.vue'), meta: { adminOnly: true } },
-  { path: '/admin/chantiers', name: 'admin-chantiers', component: () => import('../views/admin/AdminChantiersView.vue'), meta: { adminOnly: true } },
-  { path: '/admin/produits', name: 'admin-produits', component: () => import('../views/admin/AdminProduitsView.vue'), meta: { adminOnly: true } },
 ];
 
 const router = createRouter({
@@ -34,9 +28,6 @@ router.beforeEach(async (to) => {
   }
   if (auth.isAuthenticated && !auth.employee) {
     await auth.fetchMe();
-  }
-  if (to.meta.adminOnly && !auth.isAdmin) {
-    return { name: 'home' };
   }
   return true;
 });

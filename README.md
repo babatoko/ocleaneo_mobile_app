@@ -1,6 +1,8 @@
 # Ocleaneo Mobile App
 
-Application mobile **Android et iOS** (via Capacitor) Ocleaneo pour la gestion terrain : planning, pointage, commande de produits d'entretien, inventaire de chantier, historique et administration. Le même code Vue est aussi packagé en PWA pour un accès web.
+Application mobile **Android et iOS** (via Capacitor) Ocleaneo pour le terrain : planning, pointage, commande de produits d'entretien, inventaire de chantier, historique. Le même code Vue est aussi packagé en PWA pour un accès web.
+
+> Pas d'écran de gestion (salariés, chantiers, produits, planning) dans cette app : c'est un outil de terrain pour les salariés, pas un back-office. Toute la gestion se fait dans **Odoo**.
 
 ## Stack
 
@@ -23,8 +25,7 @@ ocleaneo_mobile_app/
 │   │   │   ├── pointage/       # Badge virtuel arrivée/départ
 │   │   │   ├── commande/       # Écran Stock (site + catalogue + panier) → récap
 │   │   │   ├── inventaire/    # Saisie du stock restant
-│   │   │   ├── historique/    # Historique des commandes
-│   │   │   └── admin/         # Gestion salariés / chantiers / produits / planning
+│   │   │   └── historique/    # Historique des commandes
 │   │   ├── components/        # BottomNav, QuantityStepper, AppHeader
 │   │   ├── stores/             # Pinia : auth, chantiers, panier
 │   │   ├── router/             # Vue Router + garde d'authentification
@@ -77,7 +78,7 @@ Le chantier n'est **pas choisi manuellement** : il est déterminé par la lectur
 3. L'UID est comparé au champ `nfc_tag_id` de chaque chantier (`chantiers.list`, renvoyé par `/api/chantiers/mine`). Un badge non reconnu affiche une erreur claire plutôt que d'échouer silencieusement.
 4. Une fois le chantier identifié, le type de pointage (arrivée/départ) est déduit du dernier pointage du jour **pour ce chantier précis** (un salarié peut visiter plusieurs sites dans la journée, chacun avec son propre badge).
 
-**Côté Odoo** : chaque chantier (`fsm.location` / partenaire associé) doit exposer un `nfc_tag_id` (UID du badge programmé sur site) dans la réponse de `/api/chantiers/mine` — à ajouter comme champ personnalisé si la suite Field Service ne l'a pas nativement.
+**Côté Odoo** : chaque chantier (`fsm.location` / partenaire associé) doit exposer un `nfc_tag_id` (UID du badge programmé sur site) dans la réponse de `/api/chantiers/mine` — à ajouter comme champ personnalisé si la suite Field Service ne l'a pas nativement. L'association badge ↔ chantier (programmation des tags NFC) se fait dans Odoo, pas dans cette app.
 
 **Permissions natives** : `android.permission.NFC` + `<uses-feature android:required="false">` ajoutés à `AndroidManifest.xml` (l'app reste installable sur un appareil sans NFC). Côté iOS : `NFCReaderUsageDescription` dans `Info.plist`, et un fichier `App.entitlements` avec `com.apple.developer.nfc.readersession.formats` — ce dernier nécessite en plus d'activer la capacité « Near Field Communication Tag Reading » dans Xcode (Signing & Capabilities) sur un compte développeur Apple payant, étape qui ne peut se faire que sur un Mac.
 
@@ -90,7 +91,7 @@ Le Planning a trois onglets : Jour, Semaine, et **Tournée**. La Tournée calcul
 3. Appelle le service `/trip` d'OSRM (résolution du voyageur de commerce) : `frontend/src/services/osrm.js`, fonction `getOptimizedTrip()`.
 4. Affiche la carte (marqueurs numérotés + tracé), la distance/durée totale, et la liste des arrêts avec horaires estimés (arrivée/départ cumulés à partir des temps de trajet OSRM et de la durée de chaque vacation).
 
-**Coordonnées GPS des chantiers** : champ obligatoire pour que la Tournée fonctionne, mais géré côté **Odoo**, pas dans cette app — `latitude`/`longitude` sont simplement consommées telles que renvoyées par `/api/chantiers`. Elles correspondent à `partner_latitude`/`partner_longitude` sur `res.partner` (géolocalisation native d'Odoo, ou module OCA `base_geolocalize`). L'admin app (Gérer les chantiers) n'a donc pas de champ de saisie GPS ; elle signale juste les chantiers sans coordonnées (« à corriger dans Odoo ») plutôt que d'ignorer silencieusement le problème.
+**Coordonnées GPS des chantiers** : champ obligatoire pour que la Tournée fonctionne, géré côté **Odoo**, pas dans cette app — `latitude`/`longitude` sont simplement consommées telles que renvoyées par `/api/chantiers`. Elles correspondent à `partner_latitude`/`partner_longitude` sur `res.partner` (géolocalisation native d'Odoo, ou module OCA `base_geolocalize`).
 
 **⚠️ Serveur OSRM** : `frontend/src/services/osrm.js` pointe par défaut vers le serveur de démo public `router.project-osrm.org`. Ce serveur est explicitement documenté par le projet OSRM comme **non destiné à la production** (pas de garantie de disponibilité, débit limité). Pour la prod, définir `VITE_OSRM_URL` vers une instance OSRM auto-hébergée (le binaire OSRM est open source, se déploie facilement en Docker avec un extrait OpenStreetMap de la région). Idem pour les tuiles de carte (`tile.openstreetmap.org`), à remplacer par un fournisseur de tuiles adapté à un usage production (la [politique d'usage OSM](https://operations.osmfoundation.org/policies/tiles/) interdit aussi l'usage intensif du serveur de tuiles public).
 
@@ -123,8 +124,9 @@ Une fois ces points tranchés, `frontend/src/services/api.js` et les stores Pini
 - **Stock** : sélecteur de site, statut par produit (rupture/faible/suffisant), stepper de quantité, commande groupée → récapitulatif + PDF
 - **Inventaire** : saisie du stock restant par produit/conditionnement
 - **Historique** : commandes passées par le salarié connecté
-- **Administration** : salariés (identifiant, droits admin), chantiers, produits, planning (création de vacations)
 - **PWA** : installable sur écran d'accueil mobile (manifest + service worker)
+
+Aucun écran de gestion (création/édition de salariés, chantiers, produits, planning) : c'est le rôle d'Odoo. Cette app ne fait que consommer ces données pour le salarié sur le terrain.
 
 ## Mockup de référence
 
