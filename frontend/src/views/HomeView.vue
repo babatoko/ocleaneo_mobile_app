@@ -30,7 +30,7 @@ const initials = computed(() =>
   <div class="menu-grid">
     <RouterLink to="/planning" class="tile"><i class="ti ti-calendar"></i><span>Planning</span></RouterLink>
     <RouterLink to="/pointage" class="tile"><i class="ti ti-clock"></i><span>Pointage</span></RouterLink>
-    <RouterLink to="/commande/chantier" class="tile"><i class="ti ti-shopping-cart"></i><span>Commander</span></RouterLink>
+    <RouterLink to="/commande/catalogue" class="tile"><i class="ti ti-shopping-cart"></i><span>Commander</span></RouterLink>
     <RouterLink to="/inventaire" class="tile"><i class="ti ti-package"></i><span>Inventaire</span></RouterLink>
     <RouterLink to="/historique" class="tile"><i class="ti ti-history"></i><span>Historique</span></RouterLink>
     <RouterLink v-if="auth.isAdmin" to="/admin" class="tile"><i class="ti ti-settings"></i><span>Admin</span></RouterLink>

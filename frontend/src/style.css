@@ -536,3 +536,146 @@ select {
   font-size: 16px;
   width: auto;
 }
+
+/* Stock screen (product ordering) */
+
+.site-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px 10px;
+  background: var(--surface-1);
+  border-radius: 10px;
+  padding: 9px 12px;
+  border: none;
+  width: calc(100% - 36px);
+}
+
+.site-select i {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.site-select select {
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+  color: var(--text-primary);
+  appearance: none;
+}
+
+.site-select .chev {
+  color: var(--text-muted);
+}
+
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 0 18px;
+}
+
+.stock-item {
+  background: var(--surface-1);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stock-item .icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stock-item .icon-wrap i {
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.stock-item .pname {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.stock-item .plevel {
+  font-size: 11px;
+  margin: 0;
+  min-height: 14px;
+}
+
+.plevel.ok {
+  color: var(--success-text);
+}
+
+.plevel.low {
+  color: var(--warn-text);
+}
+
+.plevel.out {
+  color: var(--danger);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin-top: 2px;
+}
+
+.stepper button {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: none;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper .qty {
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 18px;
+  text-align: center;
+}
+
+.stock-cart-bar {
+  margin: 14px 18px 0;
+  width: calc(100% - 36px);
+  background: var(--text-primary);
+  color: #fff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: none;
+}
+
+.stock-cart-bar span {
+  font-size: 13px;
+}
+
+.stock-cart-bar .cta {
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

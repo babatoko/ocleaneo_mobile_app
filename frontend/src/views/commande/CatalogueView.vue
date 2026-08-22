@@ -1,173 +1,150 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../../services/api';
 import { useCartStore } from '../../stores/cart';
-import AppHeader from '../../components/AppHeader.vue';
-import ProductCard from '../../components/ProductCard.vue';
+import { useChantiersStore } from '../../stores/chantiers';
 
-const products = ref([]);
-const categories = ref([]);
-const activeCategory = ref('');
-const selected = ref(null);
-const quantity = ref(1);
-const selectedPackagingId = ref(null);
+const CATEGORY_ICONS = {
+  Sol: 'ti-spray',
+  Vitres: 'ti-droplet',
+  Sanitaires: 'ti-toilet-paper',
+  Consommables: 'ti-package',
+};
 
+const chantiers = useChantiersStore();
 const cart = useCartStore();
 const router = useRouter();
 
-onMounted(async () => {
-  const [{ data: cats }, { data: prods }] = await Promise.all([
-    api.get('/products/categories'),
-    api.get('/products'),
-  ]);
-  categories.value = cats;
-  products.value = prods;
-  activeCategory.value = cats[0] || '';
-});
+const products = ref([]);
+const stockByProduct = reactive({}); // productId -> { status: 'ok'|'low'|'out', quantityRemaining }
+const orderQty = reactive({}); // productId -> quantity to order
 
-const filtered = computed(() =>
-  products.value.filter((p) => !activeCategory.value || p.category === activeCategory.value)
-);
-
-function openProduct(product) {
-  selected.value = product;
-  selectedPackagingId.value = product.packagings[0]?.id ?? null;
-  quantity.value = 1;
+function defaultPackaging(product) {
+  return product.packagings.find((pk) => pk.is_default) || product.packagings[0];
 }
 
-function addToCart() {
-  const packaging = selected.value.packagings.find((p) => p.id === selectedPackagingId.value);
-  cart.addItem({
-    productId: selected.value.id,
-    productName: selected.value.name,
-    productEmoji: selected.value.emoji,
-    packagingId: packaging.id,
-    packagingLabel: packaging.label,
-    quantity: quantity.value,
-  });
-  selected.value = null;
+function iconFor(product) {
+  return CATEGORY_ICONS[product.category] || 'ti-flask';
+}
+
+function statusLabel(status) {
+  if (status === 'out') return 'Rupture';
+  if (status === 'low') return 'Stock faible';
+  if (status === 'ok') return 'Stock suffisant';
+  return '';
+}
+
+function suggestedQty(status) {
+  if (status === 'out') return 2;
+  if (status === 'low') return 1;
+  return 0;
+}
+
+async function loadStock() {
+  if (!chantiers.selectedId) return;
+  try {
+    const { data } = await api.get(`/inventory/chantier/${chantiers.selectedId}/latest`);
+    const byProductPackaging = {};
+    for (const item of data.items) {
+      byProductPackaging[`${item.product_id}-${item.packaging_id}`] = item.quantity_remaining;
+    }
+    for (const p of products.value) {
+      const pkg = defaultPackaging(p);
+      const remaining = pkg ? byProductPackaging[`${p.id}-${pkg.id}`] : undefined;
+      const status = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
+      stockByProduct[p.id] = { status, quantityRemaining: remaining };
+      if (orderQty[p.id] === undefined) orderQty[p.id] = suggestedQty(status);
+    }
+  } catch {
+    // Pas d'inventaire enregistré pour ce chantier : aucun statut affiché.
+    for (const p of products.value) {
+      stockByProduct[p.id] = { status: null, quantityRemaining: undefined };
+      if (orderQty[p.id] === undefined) orderQty[p.id] = 0;
+    }
+  }
+}
+
+onMounted(async () => {
+  await chantiers.fetchMine();
+  if (!chantiers.selectedId) chantiers.select(chantiers.list[0]?.id ?? null);
+  const { data } = await api.get('/products');
+  products.value = data;
+  await loadStock();
+});
+
+watch(() => chantiers.selectedId, loadStock);
+
+const selectedCount = computed(() => Object.values(orderQty).filter((q) => q > 0).length);
+
+function step(productId, delta) {
+  orderQty[productId] = Math.max(0, (orderQty[productId] || 0) + delta);
+}
+
+function goToOrder() {
+  cart.clear();
+  for (const p of products.value) {
+    const qty = orderQty[p.id];
+    if (!qty) continue;
+    const pkg = defaultPackaging(p);
+    cart.addItem({
+      productId: p.id,
+      productName: p.name,
+      productEmoji: p.emoji,
+      packagingId: pkg.id,
+      packagingLabel: pkg.label,
+      quantity: qty,
+    });
+  }
+  router.push('/commande/panier');
 }
 </script>
 
 <template>
-  <AppHeader title="Catalogue produits" />
-
-  <div class="categories">
-    <button
-      v-for="cat in categories"
-      :key="cat"
-      :class="{ active: activeCategory === cat }"
-      @click="activeCategory = cat"
-    >
-      {{ cat }}
-    </button>
-  </div>
-
-  <div class="grid">
-    <ProductCard v-for="p in filtered" :key="p.id" :product="p" @select="openProduct" />
-  </div>
-
-  <button v-if="cart.totalItems" class="cart-fab" @click="router.push('/commande/panier')">
-    <i class="ti ti-shopping-cart"></i> Panier ({{ cart.totalItems }})
-  </button>
-
-  <div v-if="selected" class="sheet-backdrop" @click.self="selected = null">
-    <div class="sheet">
-      <h2>{{ selected.emoji }} {{ selected.name }}</h2>
-      <label>Conditionnement</label>
-      <select v-model="selectedPackagingId">
-        <option v-for="pk in selected.packagings" :key="pk.id" :value="pk.id">{{ pk.label }}</option>
-      </select>
-      <label>Quantité</label>
-      <input v-model.number="quantity" type="number" min="1" />
-      <button class="confirm" @click="addToCart">Ajouter au panier</button>
+  <div class="header">
+    <div>
+      <p class="hello">Stock</p>
+      <p class="name sub-name">Produits sur site</p>
     </div>
   </div>
+
+  <div class="site-select">
+    <i class="ti ti-building-warehouse"></i>
+    <select v-model="chantiers.selectedId">
+      <option v-for="c in chantiers.list" :key="c.id" :value="c.id">{{ c.name }}</option>
+    </select>
+    <i class="ti ti-chevron-down chev"></i>
+  </div>
+
+  <div class="stock-grid">
+    <div v-for="p in products" :key="p.id" class="stock-item">
+      <div class="icon-wrap"><i class="ti" :class="iconFor(p)"></i></div>
+      <p class="pname">{{ p.name }}</p>
+      <p class="plevel" :class="stockByProduct[p.id]?.status">
+        {{ statusLabel(stockByProduct[p.id]?.status) }}
+      </p>
+      <div class="stepper">
+        <button type="button" @click="step(p.id, -1)">−</button>
+        <span class="qty">{{ orderQty[p.id] || 0 }}</span>
+        <button type="button" @click="step(p.id, 1)">+</button>
+      </div>
+    </div>
+  </div>
+
+  <button v-if="selectedCount" class="stock-cart-bar" @click="goToOrder">
+    <span>{{ selectedCount }} produit{{ selectedCount > 1 ? 's' : '' }} sélectionné{{ selectedCount > 1 ? 's' : '' }}</span>
+    <span class="cta">Commander <i class="ti ti-arrow-right"></i></span>
+  </button>
 </template>
 
 <style scoped>
-.categories {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  overflow-x: auto;
-}
-
-.categories button {
-  flex-shrink: 0;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-muted);
+.sub-name {
   font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 400;
 }
 
-.categories button.active {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding: 8px 16px;
-}
-
-.cart-fab {
-  position: fixed;
-  bottom: 84px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 999px;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.sheet {
-  width: 100%;
-  max-width: 480px;
-  background: var(--surface);
-  border-radius: 16px 16px 0 0;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.sheet select,
-.sheet input {
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.confirm {
-  margin-top: 8px;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  background: var(--primary);
-  color: white;
-  font-weight: 600;
+.stock-grid {
+  padding-bottom: 16px;
 }
 </style>
