@@ -1,0 +1,20 @@
+{
+  "name": "ocleaneo-mobile-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "API backend de l'app mobile Ocleaneo (commande produits, inventaire, historique, admin)",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pdfkit": "^0.15.0"
+  }
+}
