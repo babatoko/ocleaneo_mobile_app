@@ -71,12 +71,25 @@ Identifiant + mot de passe, stockés sur la fiche employé (côté Odoo). L'empr
 
 ## Pointage — sélection du chantier par badge NFC
 
-Le chantier n'est **pas choisi manuellement** : il est déterminé par la lecture du badge NFC posé sur site, via [`@exxili/capacitor-nfc`](https://github.com/Exxili/capacitor-nfc) :
+Le chantier n'est **pas choisi manuellement** : il est déterminé par la lecture du badge NFC posé sur site, via [`@exxili/capacitor-nfc`](https://github.com/Exxili/capacitor-nfc). La logique de correspondance badge → chantier → type de pointage (arrivée/départ) vit dans **`frontend/src/stores/pointage.js`** (`clockWithTag(uid)`), pas dans l'écran, pour pouvoir être déclenchée depuis n'importe où dans l'app (voir ci-dessous).
 
-1. L'écran Pointage vérifie `isNfcSupported()` au chargement. Si l'appareil n'a pas de lecteur (web, ou matériel sans puce NFC), le cercle affiche « NFC non disponible sur cet appareil » et reste désactivé — pas de sélecteur de repli.
-2. Un tap sur le cercle lance `scanNfcTag()` (`frontend/src/services/nfc.js`), qui démarre une session de lecture et résout avec l'UID (identifiant matériel) du badge lu.
-3. L'UID est comparé au champ `nfc_tag_id` de chaque chantier (`chantiers.list`, renvoyé par `/api/chantiers/mine`). Un badge non reconnu affiche une erreur claire plutôt que d'échouer silencieusement.
-4. Une fois le chantier identifié, le type de pointage (arrivée/départ) est déduit du dernier pointage du jour **pour ce chantier précis** (un salarié peut visiter plusieurs sites dans la journée, chacun avec son propre badge).
+1. L'UID lu est comparé au champ `nfc_tag_id` de chaque chantier (`chantiers.list`, renvoyé par `/api/chantiers/mine`). Un badge non reconnu affiche une erreur claire plutôt que d'échouer silencieusement.
+2. Le type de pointage est déduit du dernier pointage du jour **pour ce chantier précis** (un salarié peut visiter plusieurs sites dans la journée, chacun avec son propre badge).
+3. L'écran Pointage vérifie `isNfcSupported()` au chargement ; si l'appareil n'a pas de lecteur (web, ou matériel sans puce NFC), le cercle affiche « NFC non disponible sur cet appareil » et reste désactivé — pas de sélecteur de repli.
+
+### Flux : ouvrir l'app → s'authentifier → lire le badge, dans n'importe quel ordre
+
+L'app ne demande pas d'ouvrir l'écran Pointage avant de scanner : **un badge lu n'importe quand déclenche le pointage**, où que soit le salarié dans l'app, y compris si l'app vient d'être relancée par ce même tap.
+
+- `pointage.initGlobalListener(router)` est enregistré une seule fois, dès `main.js` (avant même le montage de l'app), et écoute `NFC.onRead` pour toute la durée de vie du processus.
+- Badge lu **et** salarié déjà authentifié → `clockWithTag()` s'exécute immédiatement et l'app navigue vers `/pointage` pour montrer le résultat, quel que soit l'écran affiché au moment du tap.
+- Badge lu **et** salarié non authentifié (app tout juste relancée par le tap) → l'UID est gardé en attente (`pendingTagUid`) et l'app ouvre l'écran de connexion ; une fois authentifié, `LoginView.afterLogin()` traite ce badge en attente automatiquement — pas besoin de re-scanner.
+
+**Android** : `AndroidManifest.xml` déclare un `<intent-filter>` `TECH_DISCOVERED` (+ `res/xml/nfc_tech_filter.xml` couvrant les technologies NFC courantes) sur l'activité principale, donc **approcher le badge relance l'app si elle est fermée**, sans action préalable. Le plugin active de plus un `enableForegroundDispatch` permanent tant que l'app est au premier plan : toute lecture y est automatique, `NFC.startScan()` n'est jamais appelé côté Android (il échoue systématiquement par conception du plugin — « Android NFC scanning does not require 'startScan' »).
+
+**iOS** : Apple exige un geste explicite de l'utilisateur pour ouvrir une session de lecture NFC — impossible de relancer l'app silencieusement par un simple tap de badge brut (UID). Le bouton de l'écran Pointage appelle `startIosNfcSession()` (`frontend/src/services/nfc.js`) pour ouvrir cette session ; le tag lu remonte ensuite par le même écouteur global `onRead`. Un vrai lancement d'app par tap sur iOS demanderait de reformater les badges en NDEF avec un enregistrement d'URI pointant vers un Universal Link (domaine associé + `apple-app-site-association` hébergé), ce qui n'est pas en place ici.
+
+**Limite connue** : sur Android, l'événement de lecture au lancement à froid peut théoriquement arriver avant que le JS de l'app n'ait fini de s'initialiser et de s'abonner (le plugin ne fournit pas d'API de récupération a posteriori de l'intent de lancement) — le listener est enregistré le plus tôt possible dans `main.js` pour minimiser cette fenêtre, mais ce n'est pas une garantie à 100 % sur tous les appareils.
 
 **Côté Odoo** : chaque chantier (`fsm.location` / partenaire associé) doit exposer un `nfc_tag_id` (UID du badge programmé sur site) dans la réponse de `/api/chantiers/mine` — à ajouter comme champ personnalisé si la suite Field Service ne l'a pas nativement. L'association badge ↔ chantier (programmation des tags NFC) se fait dans Odoo, pas dans cette app.
 

@@ -1,92 +1,63 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { api } from '../../services/api';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { Capacitor } from '@capacitor/core';
+import { usePointageStore } from '../../stores/pointage';
 import { useChantiersStore } from '../../stores/chantiers';
-import { isNfcSupported, scanNfcTag } from '../../services/nfc';
+import { isNfcSupported, startIosNfcSession, cancelIosNfcSession } from '../../services/nfc';
 
+const router = useRouter();
+const pointage = usePointageStore();
 const chantiers = useChantiersStore();
-const todayShifts = ref([]);
-const entries = ref([]);
-const status = ref('out'); // 'in' | 'out', pour le dernier pointage du jour tous chantiers confondus
 const now = ref(new Date());
-
 const nfcSupported = ref(null); // null = vérification en cours
-const scanning = ref(false);
-const scanError = ref('');
+const isIos = Capacitor.getPlatform() === 'ios';
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-async function load() {
-  const [{ data: shiftsData }, { data: entriesData }] = await Promise.all([
-    api.get('/shifts/mine', { params: { from: todayIso(), to: todayIso() } }),
-    api.get('/time-entries/today'),
-  ]);
-  todayShifts.value = shiftsData;
-  entries.value = entriesData.entries;
-  status.value = entriesData.status;
-}
+let clockInterval;
+let scanTimeout;
 
 onMounted(async () => {
   nfcSupported.value = await isNfcSupported();
+  pointage.initGlobalListener(router);
   await chantiers.fetchMine();
-  await load();
-  setInterval(() => (now.value = new Date()), 1000);
+  await pointage.load();
+  clockInterval = setInterval(() => (now.value = new Date()), 1000);
 });
 
-const lastEntry = computed(() => entries.value[entries.value.length - 1]);
+onUnmounted(() => {
+  clearInterval(clockInterval);
+  clearTimeout(scanTimeout);
+});
 
 const displayEntries = computed(() => {
-  if (status.value !== 'in' || !lastEntry.value) return entries.value;
-  const shift = todayShifts.value.find((s) => s.chantier_id === lastEntry.value.chantier_id);
-  if (!shift) return entries.value;
+  if (pointage.status !== 'in' || !pointage.lastEntry) return pointage.entries;
+  const shift = pointage.todayShifts.find((s) => s.chantier_id === pointage.lastEntry.chantier_id);
+  if (!shift) return pointage.entries;
   return [
-    ...entries.value,
+    ...pointage.entries,
     { id: 'planned-departure', type: 'out', planned: true, plannedTime: shift.end_at },
   ];
 });
 
-function getPosition() {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 3000 }
-    );
-  });
-}
-
-async function scanAndClock() {
-  if (scanning.value) return;
-  scanError.value = '';
-  scanning.value = true;
-  try {
-    const uid = await scanNfcTag();
-    const chantier = chantiers.list.find(
-      (c) => c.nfc_tag_id && c.nfc_tag_id.toLowerCase() === uid.toLowerCase()
-    );
-    if (!chantier) {
-      scanError.value = 'Badge non reconnu. Contactez votre responsable.';
-      return;
+async function onCircleClick() {
+  // Android : la lecture est déclenchée automatiquement au tap du badge, ce
+  // bouton n'a rien à démarrer. iOS : il faut ouvrir la session explicitement.
+  if (!isIos || pointage.scanning) return;
+  pointage.scanError = '';
+  pointage.scanning = true;
+  clearTimeout(scanTimeout);
+  scanTimeout = setTimeout(() => {
+    if (pointage.scanning) {
+      pointage.scanning = false;
+      pointage.scanError = 'Aucun badge détecté.';
+      cancelIosNfcSession();
     }
-
-    const position = await getPosition();
-    const lastForChantier = [...entries.value].reverse().find((e) => e.chantier_id === chantier.id);
-    const shift = todayShifts.value.find((s) => s.chantier_id === chantier.id);
-
-    await api.post('/time-entries', {
-      chantierId: chantier.id,
-      shiftId: shift?.id,
-      type: lastForChantier?.type === 'in' ? 'out' : 'in',
-      ...position,
-    });
-    await load();
+  }, 30000);
+  try {
+    await startIosNfcSession();
   } catch (e) {
-    scanError.value = e.message || 'Lecture NFC impossible.';
-  } finally {
-    scanning.value = false;
+    pointage.scanning = false;
+    pointage.scanError = e.message || 'Lecture NFC impossible.';
   }
 }
 
@@ -101,7 +72,7 @@ function fmtTime(iso) {
       <p class="hello">Pointage</p>
       <p class="name sub-name">{{ now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
     </div>
-    <div class="avatar status-avatar" :class="{ active: status === 'in' }">
+    <div class="avatar status-avatar" :class="{ active: pointage.status === 'in' }">
       <i class="ti ti-shield-check"></i>
     </div>
   </div>
@@ -109,19 +80,19 @@ function fmtTime(iso) {
   <div class="clock-wrap">
     <button
       class="nfc-circle"
-      :class="{ active: status === 'in', scanning }"
-      :disabled="scanning || !nfcSupported"
-      @click="scanAndClock"
+      :class="{ active: pointage.status === 'in', scanning: pointage.scanning }"
+      :disabled="pointage.scanning || !nfcSupported"
+      @click="onCircleClick"
     >
-      <i class="ti" :class="scanning ? 'ti-loader-2 spin' : 'ti-nfc'"></i>
+      <i class="ti" :class="pointage.scanning ? 'ti-loader-2 spin' : 'ti-nfc'"></i>
       <p v-if="nfcSupported === false">NFC non disponible sur cet appareil</p>
-      <p v-else-if="scanning">Lecture en cours…</p>
+      <p v-else-if="pointage.scanning">Lecture en cours…</p>
       <p v-else>Approchez le badge du chantier</p>
     </button>
     <p class="big-time">{{ now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</p>
-    <p v-if="scanError" class="scan-error"><i class="ti ti-alert-circle"></i> {{ scanError }}</p>
-    <p v-else-if="lastEntry" class="status-line">
-      {{ status === 'in' ? 'Présent' : 'Absent' }} — {{ lastEntry.chantier_name }}
+    <p v-if="pointage.scanError" class="scan-error"><i class="ti ti-alert-circle"></i> {{ pointage.scanError }}</p>
+    <p v-else-if="pointage.lastEntry" class="status-line">
+      {{ pointage.status === 'in' ? 'Présent' : 'Absent' }} — {{ pointage.lastEntry.chantier_name }}
     </p>
   </div>
 
@@ -137,7 +108,7 @@ function fmtTime(iso) {
       </div>
       <span class="hist-time" :class="{ muted: e.planned }">{{ e.planned ? '--:--' : fmtTime(e.recorded_at) }}</span>
     </div>
-    <p v-if="!entries.length" class="empty">Aucun pointage aujourd'hui.</p>
+    <p v-if="!pointage.entries.length" class="empty">Aucun pointage aujourd'hui.</p>
   </div>
 </template>
 

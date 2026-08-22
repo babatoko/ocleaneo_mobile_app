@@ -1,12 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { NFC } from '@exxili/capacitor-nfc';
 
-function isNative() {
-  return Capacitor.isNativePlatform();
-}
-
 export async function isNfcSupported() {
-  if (!isNative()) return false;
+  if (!Capacitor.isNativePlatform()) return false;
   try {
     const { supported } = await NFC.isSupported();
     return supported;
@@ -16,43 +12,19 @@ export async function isNfcSupported() {
 }
 
 /**
- * Démarre une session de lecture NFC et résout avec l'identifiant (UID) du
- * premier badge lu. Se termine sur le premier tag lu, la première erreur,
- * ou après `timeoutMs` sans lecture.
+ * Sur iOS, lire un badge exige d'ouvrir explicitement une session NFC suite à un
+ * geste de l'utilisateur (contrainte Apple) : appelée par le bouton de l'écran
+ * Pointage. Sur Android, la lecture est automatique dès que l'app est au premier
+ * plan (voir stores/pointage.js) — appeler startScan() y échoue systématiquement
+ * ("Android NFC scanning does not require 'startScan' method"), donc on ne
+ * l'appelle que sur iOS.
  */
-export function scanNfcTag(timeoutMs = 30000) {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let unsubRead;
-    let unsubError;
-    let timer;
+export async function startIosNfcSession() {
+  if (Capacitor.getPlatform() !== 'ios') return;
+  await NFC.startScan();
+}
 
-    const cleanup = () => {
-      clearTimeout(timer);
-      unsubRead?.();
-      unsubError?.();
-      NFC.cancelScan().catch(() => {});
-    };
-
-    const settle = (fn, arg) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      fn(arg);
-    };
-
-    unsubRead = NFC.onRead((data) => {
-      const uid = data.string()?.tagInfo?.uid;
-      if (uid) settle(resolve, uid);
-      else settle(reject, new Error('Badge lu mais sans identifiant exploitable.'));
-    });
-
-    unsubError = NFC.onError((err) => {
-      settle(reject, new Error(err.error || 'Erreur de lecture NFC.'));
-    });
-
-    timer = setTimeout(() => settle(reject, new Error('Aucun badge détecté.')), timeoutMs);
-
-    NFC.startScan().catch((e) => settle(reject, e));
-  });
+export function cancelIosNfcSession() {
+  if (Capacitor.getPlatform() !== 'ios') return;
+  NFC.cancelScan().catch(() => {});
 }

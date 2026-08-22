@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { usePointageStore } from '../stores/pointage';
 import {
   clearSavedCredentials,
   getSavedCredentials,
@@ -21,6 +22,7 @@ const loading = ref(false);
 const biometricAvailable = ref(false);
 
 const auth = useAuthStore();
+const pointage = usePointageStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -34,8 +36,14 @@ onMounted(async () => {
   }
 });
 
-function afterLogin(loggedInUsername) {
+async function afterLogin(loggedInUsername) {
   localStorage.setItem(LAST_USERNAME_KEY, loggedInUsername);
+  if (pointage.pendingTagUid) {
+    // L'app vient d'être ouverte par ce badge : on traite la lecture en
+    // attente au lieu d'atterrir sur le planning.
+    await pointage.consumePendingTag(router);
+    return;
+  }
   router.replace(route.query.redirect || '/planning');
 }
 
@@ -45,7 +53,7 @@ async function tryBiometric() {
   try {
     const creds = await getSavedCredentials();
     await auth.login(creds.username, creds.password);
-    afterLogin(creds.username);
+    await afterLogin(creds.username);
   } catch {
     error.value = "Authentification par empreinte annulée ou impossible.";
   } finally {
@@ -72,7 +80,7 @@ async function submit() {
     if (biometricAvailable.value) {
       await saveCredentials(username.value, password.value);
     }
-    afterLogin(username.value);
+    await afterLogin(username.value);
   } catch (e) {
     error.value = e.response?.data?.error || 'Identifiants incorrects';
   } finally {
