@@ -131,9 +131,9 @@ Six axes ajoutés au-dessus du pointage NFC de base, tous dans `stores/pointage.
 
 **Non testable dans ce bac à sable** : file hors ligne, géofence, haptique et rappel programmé nécessitent du matériel réel (pas de GPS/vibreur/notifications système dans Chromium headless) — vérifiés par relecture de code et par la partie testable en navigateur (rendu des écrans, calculs d'heures, historique, bascule pause). À valider sur device.
 
-## Planning — vue Tournée (itinéraire optimisé OSRM)
+## Planning — vues Jour / Semaine / Mois / Tournée
 
-Le Planning a trois onglets : Jour, Semaine, et **Tournée**. La Tournée calcule l'ordre de passage optimal sur les chantiers du jour et l'itinéraire associé via [OSRM](http://project-osrm.org/) (Open Source Routing Machine), affiché sur une carte [Leaflet](https://leafletjs.com/) / tuiles OpenStreetMap :
+Le Planning a quatre onglets : Jour, Semaine, **Mois**, et **Tournée**. La Tournée calcule l'ordre de passage optimal sur les chantiers du jour et l'itinéraire associé via [OSRM](http://project-osrm.org/) (Open Source Routing Machine), affiché sur une carte [Leaflet](https://leafletjs.com/) / tuiles OpenStreetMap :
 
 1. Récupère les vacations du jour (`/shifts/mine`) et croise chaque `chantier_id` avec `chantiers.list` pour obtenir ses coordonnées GPS (`latitude`/`longitude` — voir ci-dessous).
 2. Récupère la position actuelle (`navigator.geolocation`) comme point de départ si l'utilisateur l'autorise ; sinon le départ est le premier chantier.
@@ -143,6 +143,28 @@ Le Planning a trois onglets : Jour, Semaine, et **Tournée**. La Tournée calcul
 **Coordonnées GPS des chantiers** : champ obligatoire pour que la Tournée fonctionne, géré côté **Odoo**, pas dans cette app — `latitude`/`longitude` sont simplement consommées telles que renvoyées par `/api/chantiers`. Elles correspondent à `partner_latitude`/`partner_longitude` sur `res.partner` (géolocalisation native d'Odoo, ou module OCA `base_geolocalize`).
 
 **⚠️ Serveur OSRM** : `frontend/src/services/osrm.js` pointe par défaut vers le serveur de démo public `router.project-osrm.org`. Ce serveur est explicitement documenté par le projet OSRM comme **non destiné à la production** (pas de garantie de disponibilité, débit limité). Pour la prod, définir `VITE_OSRM_URL` vers une instance OSRM auto-hébergée (le binaire OSRM est open source, se déploie facilement en Docker avec un extrait OpenStreetMap de la région). Idem pour les tuiles de carte (`tile.openstreetmap.org`), à remplacer par un fournisseur de tuiles adapté à un usage production (la [politique d'usage OSM](https://operations.osmfoundation.org/policies/tiles/) interdit aussi l'usage intensif du serveur de tuiles public).
+
+**Tournée — démarrer la navigation** : un bouton au-dessus de la liste des arrêts ouvre le guidage turn-by-turn natif (`services/navigation.js`, `turnByTurnHref()`) vers le premier arrêt — Apple Plans sur iOS (`maps.apple.com`), Google Maps sinon (`google.com/maps/dir`). Ce sont des liens `https://` standards (Universal/App Links), pas un schéma personnalisé : ils ouvrent l'app native si installée, sinon fonctionnent quand même dans le navigateur. Même mécanisme derrière chaque lien « Itinéraire » (vues Jour et Semaine), avec repli sur une simple recherche par adresse si les coordonnées du chantier sont inconnues.
+
+### Vue Mois
+
+Grille calendaire classique (semaines lundi→dimanche, jours hors mois grisés), un point sous chaque jour ayant au moins une vacation. Un tap sur un jour bascule vers la vue Jour correspondante — même comportement que le clic sur un jour en vue Semaine. Navigation mois précédent/suivant, chargement via `planning.loadMonth()` (`GET /shifts/mine?from=<1er du mois>&to=<dernier jour>`).
+
+### Fiabilité et proactivité — vers un planning « best in class »
+
+Quatre axes ajoutés au-dessus des vues de base :
+
+**Hors ligne** — `stores/planning.js` met en cache chaque réponse `/shifts/mine` (`@capacitor/preferences`), clé par plage de dates exacte (`from`/`to`). Une coupure réseau retombe sur la dernière réponse connue pour cette même plage plutôt que sur un écran vide — même logique que le cache chantiers du pointage.
+
+**Rappel avant une vacation** (`services/planningSync.js`, `syncShifts()`) — appelée après chaque chargement de vacations (jour/semaine/mois), elle programme une notification locale 30 min avant le début de toute vacation dans les 48 h à venir (`scheduleShiftReminder()`, id dérivé de `shift.id` pour se remplacer sans doublon plutôt que de s'accumuler).
+
+**Notification de changement de planning** — la même fonction compare chaque vacation proche (< 48 h) à sa dernière version connue (empreinte `start_at|end_at|status|note`) ; un écart déclenche une notification « Planning mis à jour ». *Portée volontairement limitée* : seules les vacations **proches** sont comparées — au-delà, une vacation absente d'un appel donné peut simplement être hors de la plage demandée (jour ≠ semaine ≠ mois), pas annulée ; détecter fiablement une nouvelle vacation ou une annulation sur l'ensemble du planning demanderait soit un flux de changement fourni par le serveur, soit une notification **push** envoyée par Odoo (FCM/APNs) — aucun des deux n'est en place ici. Ce qui existe est donc une détection **au moment où l'app est ouverte**, pas une vraie notification push en tâche de fond.
+
+**Export vers le calendrier natif** (`services/calendarExport.js`) — génère un fichier `.ics` standard (une vacation, ou toute la semaine d'un coup via le bouton dédié en vue Semaine) et ouvre la feuille de partage native (`@capacitor/share`) pour que le salarié l'ajoute à son agenda personnel. Écrit délibérément **pas** dans le calendrier du téléphone directement (`@capacitor/filesystem` + `Directory.Cache` seulement) — une écriture directe demanderait la permission « accès complet au calendrier », intrusive pour ce que ça apporte ici ; le `.ics` standard fait le même travail sans cette permission.
+
+**Non testable dans ce bac à sable** : cache hors ligne, rappels programmés et notifications de changement nécessitent du matériel réel (pas de notifications système ni de vraie coupure réseau dans Chromium headless) — vérifiés par relecture de code et par tout ce qui est testable en navigateur (build propre, les 4 vues, export calendrier — son repli web affiche une erreur claire au lieu d'échouer silencieusement). À valider sur device.
+
+**Limite pré-existante non corrigée ici** : les conversions date-only du Planning (`toIso()`, `startOfWeekIso()`, et les nouvelles `startOfMonthIso()`/`endOfMonthIso()`) utilisent `Date.toISOString().slice(0, 10)`, qui peut décaler d'un jour près de minuit dans un fuseau en avance sur UTC (ex. Europe/Paris) — une conversion locale (`getFullYear()`/`getMonth()`/`getDate()`) serait plus correcte. Existait déjà avant ce chantier ; pas corrigé maintenant pour rester dans le périmètre demandé (amélioration du Planning), signalé ici pour une correction dédiée ultérieure.
 
 ## Intégration Odoo
 

@@ -6,6 +6,11 @@ const REMINDER_NOTIFICATION_ID = 1002;
 const REMINDER_DELAY_MIN = 20;
 const CHANNEL_ID = 'pointage';
 
+const PLANNING_CHANNEL_ID = 'planning';
+const SHIFT_REMINDER_BASE_ID = 3000; // + shift.id, plage dédiée pour ne pas collisionner avec le pointage
+const SHIFT_REMINDER_BEFORE_MIN = 30;
+let planChangeSeq = 0;
+
 let permissionGranted = false;
 
 function fmtTime(date) {
@@ -21,8 +26,14 @@ export async function ensureNotificationChannel() {
       description: 'Statut du chantier en cours',
       importance: 3, // DEFAULT
     });
+    await LocalNotifications.createChannel({
+      id: PLANNING_CHANNEL_ID,
+      name: 'Planning',
+      description: 'Rappels de vacation et changements de planning',
+      importance: 3,
+    });
   } catch {
-    // Le canal existe peut-être déjà, ou la plateforme ne le supporte pas.
+    // Le(s) canal(aux) existe(nt) peut-être déjà, ou la plateforme ne le supporte pas.
   }
 }
 
@@ -105,4 +116,52 @@ export async function scheduleDepartureReminder({ chantierName, estimatedDepartu
 export async function cancelDepartureReminder() {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.cancel({ notifications: [{ id: REMINDER_NOTIFICATION_ID }] }).catch(() => {});
+}
+
+/**
+ * Programme un rappel {SHIFT_REMINDER_BEFORE_MIN} min avant le début d'une
+ * vacation. Un id dérivé de shift.id permet de ré-appeler cette fonction sans
+ * créer de doublon : la notification existante est simplement remplacée.
+ */
+export async function scheduleShiftReminder(shift) {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!(await ensurePermission())) return;
+
+  const at = new Date(new Date(shift.start_at).getTime() - SHIFT_REMINDER_BEFORE_MIN * 60000);
+  if (at.getTime() <= Date.now()) return;
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: SHIFT_REMINDER_BASE_ID + Number(shift.id),
+        title: 'Prochaine vacation bientôt',
+        body: `${shift.chantier_name} à ${fmtTime(shift.start_at)}${shift.chantier_address ? ' — ' + shift.chantier_address : ''}`,
+        channelId: PLANNING_CHANNEL_ID,
+        schedule: { at },
+      },
+    ],
+  });
+}
+
+export async function cancelShiftReminder(shiftId) {
+  if (!Capacitor.isNativePlatform()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: SHIFT_REMINDER_BASE_ID + Number(shiftId) }] }).catch(() => {});
+}
+
+/** Notification ponctuelle « ton planning a changé », un id différent à chaque appel. */
+export async function notifyPlanningChanged(message) {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!(await ensurePermission())) return;
+
+  planChangeSeq = (planChangeSeq + 1) % 1000;
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: 5000 + planChangeSeq,
+        title: 'Planning mis à jour',
+        body: message,
+        channelId: PLANNING_CHANNEL_ID,
+      },
+    ],
+  });
 }
