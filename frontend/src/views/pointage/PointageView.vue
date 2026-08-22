@@ -37,6 +37,16 @@ onMounted(async () => {
 
 const lastEntry = computed(() => entries.value[entries.value.length - 1]);
 
+const displayEntries = computed(() => {
+  if (status.value !== 'in' || !lastEntry.value) return entries.value;
+  const shift = todayShifts.value.find((s) => s.chantier_id === lastEntry.value.chantier_id);
+  if (!shift) return entries.value;
+  return [
+    ...entries.value,
+    { id: 'planned-departure', type: 'out', planned: true, plannedTime: shift.end_at },
+  ];
+});
+
 function getPosition() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
@@ -117,15 +127,15 @@ function fmtTime(iso) {
 
   <div class="history">
     <p class="history-title">Historique du jour</p>
-    <div v-for="e in entries" :key="e.id" class="hist-row">
+    <div v-for="e in displayEntries" :key="e.id" class="hist-row">
       <div class="hist-icon" :class="e.type">
         <i class="ti" :class="e.type === 'in' ? 'ti-login-2' : 'ti-logout-2'"></i>
       </div>
       <div class="hist-text">
-        <p class="lbl">{{ e.type === 'in' ? 'Arrivée' : 'Départ' }}</p>
-        <p class="sub">{{ e.chantier_name }}</p>
+        <p class="lbl" :class="{ muted: e.planned }">{{ e.type === 'in' ? 'Arrivée' : 'Départ' }}</p>
+        <p class="sub">{{ e.planned ? `Prévu ${fmtTime(e.plannedTime)}` : e.chantier_name }}</p>
       </div>
-      <span class="hist-time">{{ fmtTime(e.recorded_at) }}</span>
+      <span class="hist-time" :class="{ muted: e.planned }">{{ e.planned ? '--:--' : fmtTime(e.recorded_at) }}</span>
     </div>
     <p v-if="!entries.length" class="empty">Aucun pointage aujourd'hui.</p>
   </div>
