@@ -4,3 +4,6 @@ project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/
 
 include ':capgo-capacitor-native-biometric'
 project(':capgo-capacitor-native-biometric').projectDir = new File('../node_modules/@capgo/capacitor-native-biometric/android')
+
+include ':exxili-capacitor-nfc'
+project(':exxili-capacitor-nfc').projectDir = new File('../node_modules/@exxili/capacitor-nfc/android')

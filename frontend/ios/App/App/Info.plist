@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Ocleaneo utilise Face ID pour vous reconnecter rapidement sans ressaisir votre mot de passe.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>Ocleaneo lit le badge NFC du chantier pour pointer votre arrivée et votre départ.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

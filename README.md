@@ -68,6 +68,19 @@ Identifiant + mot de passe, stockés sur la fiche employé (côté Odoo). L'empr
 
 `frontend/src/services/biometric.js` encapsule tous les appels au plugin ; `LoginView.vue` ne fait que consommer `isBiometricAvailable()` / `hasSavedCredentials()` / `getSavedCredentials()` / `saveCredentials()`.
 
+## Pointage — sélection du chantier par badge NFC
+
+Le chantier n'est **pas choisi manuellement** : il est déterminé par la lecture du badge NFC posé sur site, via [`@exxili/capacitor-nfc`](https://github.com/Exxili/capacitor-nfc) :
+
+1. L'écran Pointage vérifie `isNfcSupported()` au chargement. Si l'appareil n'a pas de lecteur (web, ou matériel sans puce NFC), le cercle affiche « NFC non disponible sur cet appareil » et reste désactivé — pas de sélecteur de repli.
+2. Un tap sur le cercle lance `scanNfcTag()` (`frontend/src/services/nfc.js`), qui démarre une session de lecture et résout avec l'UID (identifiant matériel) du badge lu.
+3. L'UID est comparé au champ `nfc_tag_id` de chaque chantier (`chantiers.list`, renvoyé par `/api/chantiers/mine`). Un badge non reconnu affiche une erreur claire plutôt que d'échouer silencieusement.
+4. Une fois le chantier identifié, le type de pointage (arrivée/départ) est déduit du dernier pointage du jour **pour ce chantier précis** (un salarié peut visiter plusieurs sites dans la journée, chacun avec son propre badge).
+
+**Côté Odoo** : chaque chantier (`fsm.location` / partenaire associé) doit exposer un `nfc_tag_id` (UID du badge programmé sur site) dans la réponse de `/api/chantiers/mine` — à ajouter comme champ personnalisé si la suite Field Service ne l'a pas nativement.
+
+**Permissions natives** : `android.permission.NFC` + `<uses-feature android:required="false">` ajoutés à `AndroidManifest.xml` (l'app reste installable sur un appareil sans NFC). Côté iOS : `NFCReaderUsageDescription` dans `Info.plist`, et un fichier `App.entitlements` avec `com.apple.developer.nfc.readersession.formats` — ce dernier nécessite en plus d'activer la capacité « Near Field Communication Tag Reading » dans Xcode (Signing & Capabilities) sur un compte développeur Apple payant, étape qui ne peut se faire que sur un Mac.
+
 ## Planning — vue Tournée (itinéraire optimisé OSRM)
 
 Le Planning a trois onglets : Jour, Semaine, et **Tournée**. La Tournée calcule l'ordre de passage optimal sur les chantiers du jour et l'itinéraire associé via [OSRM](http://project-osrm.org/) (Open Source Routing Machine), affiché sur une carte [Leaflet](https://leafletjs.com/) / tuiles OpenStreetMap :
@@ -106,7 +119,7 @@ Une fois ces points tranchés, `frontend/src/services/api.js` et les stores Pini
 
 - **Connexion** : identifiant/mot de passe avec bascule automatique vers l'empreinte si l'appareil en a un (voir [Authentification](#authentification))
 - **Planning** : vue Jour, Semaine, et Tournée (itinéraire optimisé OSRM + carte, voir section dédiée ci-dessous)
-- **Pointage** : badge virtuel arrivée/départ, géolocalisation optionnelle, historique du jour
+- **Pointage** : chantier identifié par lecture de badge NFC (voir section dédiée ci-dessous), géolocalisation optionnelle, historique du jour tous chantiers confondus
 - **Stock** : sélecteur de site, statut par produit (rupture/faible/suffisant), stepper de quantité, commande groupée → récapitulatif + PDF
 - **Inventaire** : saisie du stock restant par produit/conditionnement
 - **Historique** : commandes passées par le salarié connecté

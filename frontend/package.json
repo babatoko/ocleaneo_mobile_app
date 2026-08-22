@@ -16,6 +16,7 @@
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
     "@capgo/capacitor-native-biometric": "^8.6.7",
+    "@exxili/capacitor-nfc": "^0.0.13",
     "@tabler/icons-webfont": "^3.46.0",
     "axios": "^1.7.7",
     "leaflet": "^1.9.4",

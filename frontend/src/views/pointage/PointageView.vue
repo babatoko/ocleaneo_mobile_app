@@ -2,14 +2,17 @@
 import { computed, onMounted, ref } from 'vue';
 import { api } from '../../services/api';
 import { useChantiersStore } from '../../stores/chantiers';
+import { isNfcSupported, scanNfcTag } from '../../services/nfc';
 
 const chantiers = useChantiersStore();
 const todayShifts = ref([]);
 const entries = ref([]);
-const status = ref('out'); // 'in' | 'out'
-const selectedChantierId = ref(null);
-const submitting = ref(false);
+const status = ref('out'); // 'in' | 'out', pour le dernier pointage du jour tous chantiers confondus
 const now = ref(new Date());
+
+const nfcSupported = ref(null); // null = vérification en cours
+const scanning = ref(false);
+const scanError = ref('');
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -23,23 +26,16 @@ async function load() {
   todayShifts.value = shiftsData;
   entries.value = entriesData.entries;
   status.value = entriesData.status;
-
-  if (!selectedChantierId.value) {
-    selectedChantierId.value = shiftsData[0]?.chantier_id ?? chantiers.list[0]?.id ?? null;
-  }
 }
 
 onMounted(async () => {
+  nfcSupported.value = await isNfcSupported();
   await chantiers.fetchMine();
   await load();
   setInterval(() => (now.value = new Date()), 1000);
 });
 
-const currentChantierName = computed(() => {
-  const shift = todayShifts.value.find((s) => s.chantier_id === selectedChantierId.value);
-  if (shift) return shift.chantier_name;
-  return chantiers.list.find((c) => c.id === selectedChantierId.value)?.name || '';
-});
+const lastEntry = computed(() => entries.value[entries.value.length - 1]);
 
 function getPosition() {
   return new Promise((resolve) => {
@@ -52,21 +48,35 @@ function getPosition() {
   });
 }
 
-async function clock() {
-  if (!selectedChantierId.value) return;
-  submitting.value = true;
+async function scanAndClock() {
+  if (scanning.value) return;
+  scanError.value = '';
+  scanning.value = true;
   try {
+    const uid = await scanNfcTag();
+    const chantier = chantiers.list.find(
+      (c) => c.nfc_tag_id && c.nfc_tag_id.toLowerCase() === uid.toLowerCase()
+    );
+    if (!chantier) {
+      scanError.value = 'Badge non reconnu. Contactez votre responsable.';
+      return;
+    }
+
     const position = await getPosition();
-    const shift = todayShifts.value.find((s) => s.chantier_id === selectedChantierId.value);
+    const lastForChantier = [...entries.value].reverse().find((e) => e.chantier_id === chantier.id);
+    const shift = todayShifts.value.find((s) => s.chantier_id === chantier.id);
+
     await api.post('/time-entries', {
-      chantierId: selectedChantierId.value,
+      chantierId: chantier.id,
       shiftId: shift?.id,
-      type: status.value === 'in' ? 'out' : 'in',
+      type: lastForChantier?.type === 'in' ? 'out' : 'in',
       ...position,
     });
     await load();
+  } catch (e) {
+    scanError.value = e.message || 'Lecture NFC impossible.';
   } finally {
-    submitting.value = false;
+    scanning.value = false;
   }
 }
 
@@ -86,20 +96,22 @@ function fmtTime(iso) {
     </div>
   </div>
 
-  <div class="chantier-select-wrap" v-if="chantiers.list.length > 1">
-    <select v-model="selectedChantierId" class="chantier-select">
-      <option v-for="c in chantiers.list" :key="c.id" :value="c.id">{{ c.name }}</option>
-    </select>
-  </div>
-
   <div class="clock-wrap">
-    <button class="nfc-circle" :class="{ active: status === 'in' }" :disabled="submitting || !selectedChantierId" @click="clock">
-      <i class="ti" :class="status === 'in' ? 'ti-player-pause' : 'ti-player-play'"></i>
-      <p>{{ status === 'in' ? 'Pointer le départ' : "Pointer l'arrivée" }}</p>
+    <button
+      class="nfc-circle"
+      :class="{ active: status === 'in', scanning }"
+      :disabled="scanning || !nfcSupported"
+      @click="scanAndClock"
+    >
+      <i class="ti" :class="scanning ? 'ti-loader-2 spin' : 'ti-nfc'"></i>
+      <p v-if="nfcSupported === false">NFC non disponible sur cet appareil</p>
+      <p v-else-if="scanning">Lecture en cours…</p>
+      <p v-else>Approchez le badge du chantier</p>
     </button>
     <p class="big-time">{{ now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</p>
-    <p class="status-line" v-if="currentChantierName">
-      {{ status === 'in' ? 'Présent' : 'Absent' }} — {{ currentChantierName }}
+    <p v-if="scanError" class="scan-error"><i class="ti ti-alert-circle"></i> {{ scanError }}</p>
+    <p v-else-if="lastEntry" class="status-line">
+      {{ status === 'in' ? 'Présent' : 'Absent' }} — {{ lastEntry.chantier_name }}
     </p>
   </div>
 
@@ -141,20 +153,39 @@ function fmtTime(iso) {
   font-size: 16px;
 }
 
-.chantier-select-wrap {
-  padding: 0 18px 10px;
-}
-
-.chantier-select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-1);
-}
-
 .nfc-circle {
   cursor: pointer;
+}
+
+.nfc-circle:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.scan-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--danger);
+  margin: 4px 0 0;
 }
 
 .empty {
