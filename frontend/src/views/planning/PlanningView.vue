@@ -1,10 +1,13 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
+import { useChantiersStore } from '../../stores/chantiers';
+import { getCurrentPosition, getOptimizedTrip } from '../../services/osrm';
 
 const auth = useAuthStore();
-const view = ref('jour'); // 'jour' | 'semaine'
+const chantiers = useChantiersStore();
+const view = ref('jour'); // 'jour' | 'semaine' | 'tournee'
 const selectedDate = ref(toIso(new Date()));
 const shifts = ref([]);
 const weekShiftsByDay = ref({});
@@ -80,7 +83,8 @@ async function loadWeek() {
 
 function refresh() {
   if (view.value === 'jour') loadDay();
-  else loadWeek();
+  else if (view.value === 'semaine') loadWeek();
+  else loadTournee();
 }
 
 function pickDay(date) {
@@ -98,11 +102,169 @@ function mapLink(address) {
   return `https://maps.google.com/?q=${encodeURIComponent(address)}`;
 }
 
-watch(view, refresh);
+// --- Tournée : itinéraire optimisé (OSRM) -------------------------------
+
+const tripLoading = ref(false);
+const tripError = ref('');
+const tripStops = ref([]); // stops avec ETA/départ calculés, dans l'ordre optimisé
+const tripDistanceMeters = ref(0);
+const tripDurationSeconds = ref(0);
+const missingCoords = ref([]);
+const mapEl = ref(null);
+let map = null;
+let L = null;
+
+function fmtKm(meters) {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(0)} km` : `${Math.round(meters)} m`;
+}
+
+function fmtDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`;
+}
+
+function fmtTime(date) {
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadTournee() {
+  tripError.value = '';
+  tripStops.value = [];
+  missingCoords.value = [];
+  tripLoading.value = true;
+  try {
+    await chantiers.fetchMine();
+    const { data: dayShifts } = await api.get('/shifts/mine', {
+      params: { from: selectedDate.value, to: selectedDate.value },
+    });
+
+    const withCoords = [];
+    for (const s of dayShifts) {
+      const chantier = chantiers.list.find((c) => c.id === s.chantier_id);
+      if (chantier?.latitude && chantier?.longitude) {
+        withCoords.push({
+          id: s.chantier_id,
+          name: s.chantier_name,
+          address: s.chantier_address,
+          latitude: chantier.latitude,
+          longitude: chantier.longitude,
+          shiftDurationSeconds:
+            (new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 1000,
+          startAt: s.start_at,
+        });
+      } else {
+        missingCoords.value.push(s.chantier_name);
+      }
+    }
+
+    if (withCoords.length < 2) {
+      tripLoading.value = false;
+      return;
+    }
+
+    const current = await getCurrentPosition();
+    const points = current
+      ? [{ id: 'me', name: 'Position actuelle', ...current }, ...withCoords]
+      : withCoords;
+
+    const trip = await getOptimizedTrip(points);
+
+    let clock = current
+      ? new Date()
+      : new Date(withCoords.sort((a, b) => a.startAt.localeCompare(b.startAt))[0].startAt);
+
+    const stops = [];
+    for (const stop of trip.order) {
+      if (stop.id === 'me') {
+        // Pas un arrêt à afficher : juste avancer l'horloge du trajet vers le 1er site.
+        clock = new Date(clock.getTime() + (stop.legDurationSeconds || 0) * 1000);
+        continue;
+      }
+      const arrival = new Date(clock.getTime());
+      const dwell = stop.shiftDurationSeconds || 30 * 60;
+      const departure = new Date(arrival.getTime() + dwell * 1000);
+      stops.push({ ...stop, arrival, departure });
+      clock = new Date(departure.getTime() + (stop.legDurationSeconds || 0) * 1000);
+    }
+
+    tripStops.value = stops;
+    tripDistanceMeters.value = trip.distanceMeters;
+    tripDurationSeconds.value = trip.durationSeconds;
+
+    await nextTick();
+    renderMap(trip.geometry, stops, current);
+  } catch (e) {
+    tripError.value = e.message || "Impossible de calculer l'itinéraire.";
+  } finally {
+    tripLoading.value = false;
+  }
+}
+
+async function renderMap(geometry, stops, current) {
+  if (!mapEl.value) return;
+  if (!L) {
+    await import('leaflet/dist/leaflet.css');
+    L = await import('leaflet');
+  }
+
+  if (map) {
+    map.remove();
+    map = null;
+  }
+
+  map = L.map(mapEl.value, { zoomControl: false, attributionControl: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+  }).addTo(map);
+
+  const points = [];
+  if (current) {
+    L.marker([current.latitude, current.longitude], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div class="trip-marker start"><i class="ti ti-navigation"></i></div>',
+        iconSize: [24, 24],
+      }),
+    }).addTo(map);
+    points.push([current.latitude, current.longitude]);
+  }
+
+  stops.forEach((stop, i) => {
+    L.marker([stop.latitude, stop.longitude], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div class="trip-marker">${i + 1}</div>`,
+        iconSize: [24, 24],
+      }),
+    }).addTo(map);
+    points.push([stop.latitude, stop.longitude]);
+  });
+
+  if (geometry?.length) {
+    L.polyline(geometry, { color: '#0f6e56', weight: 4, opacity: 0.85 }).addTo(map);
+  }
+
+  const bounds = L.latLngBounds(geometry?.length ? geometry : points);
+  map.fitBounds(bounds, { padding: [24, 24] });
+}
+
+function destroyMap() {
+  if (map) {
+    map.remove();
+    map = null;
+  }
+}
+
+watch(view, (v, prev) => {
+  if (prev === 'tournee') destroyMap();
+  refresh();
+});
 onMounted(() => {
   if (!auth.employee) auth.fetchMe();
   refresh();
 });
+onUnmounted(destroyMap);
 </script>
 
 <template>
@@ -117,6 +279,7 @@ onMounted(() => {
   <div class="view-toggle">
     <button class="opt" :class="{ active: view === 'jour' }" @click="view = 'jour'">Jour</button>
     <button class="opt" :class="{ active: view === 'semaine' }" @click="view = 'semaine'">Semaine</button>
+    <button class="opt" :class="{ active: view === 'tournee' }" @click="view = 'tournee'">Tournée</button>
   </div>
 
   <div v-if="view === 'jour'">
@@ -157,7 +320,7 @@ onMounted(() => {
     <p v-if="!loading && !shifts.length" class="empty">Aucune vacation ce jour-là.</p>
   </div>
 
-  <div v-else class="week">
+  <div v-else-if="view === 'semaine'" class="week">
     <div v-for="d in weekDays" :key="toIso(d)" class="week-day" @click="pickDay(d)">
       <div class="week-day-head">
         <strong>{{ d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) }}</strong>
@@ -167,6 +330,39 @@ onMounted(() => {
         {{ timeRange(s) }} · {{ s.chantier_name }}
       </div>
     </div>
+  </div>
+
+  <div v-else>
+    <p class="section-title">{{ selectedDateLabel }} — {{ tripStops.length }} site{{ tripStops.length > 1 ? 's' : '' }}</p>
+
+    <template v-if="tripStops.length">
+      <div ref="mapEl" class="map-wrap"></div>
+
+      <div class="map-summary-bar">
+        <div class="sitem"><i class="ti ti-route"></i> {{ fmtKm(tripDistanceMeters) }}</div>
+        <div class="sitem"><i class="ti ti-clock"></i> {{ fmtDuration(tripDurationSeconds) }} trajet</div>
+        <div class="optimize-badge"><i class="ti ti-sparkles"></i> Optimisée</div>
+      </div>
+
+      <div v-for="(s, i) in tripStops" :key="s.id" class="stop-row">
+        <div class="stop-num">{{ i + 1 }}</div>
+        <div class="stop-card">
+          <div class="stop-top">
+            <p class="sname">{{ s.name }}</p>
+            <p class="seta">{{ fmtTime(s.arrival) }} - {{ fmtTime(s.departure) }}</p>
+          </div>
+          <p v-if="s.address" class="saddr">{{ s.address }}</p>
+        </div>
+      </div>
+    </template>
+
+    <p v-else-if="tripLoading" class="trip-empty">Calcul de l'itinéraire optimisé…</p>
+    <p v-else-if="tripError" class="trip-empty">{{ tripError }}</p>
+    <p v-else-if="missingCoords.length" class="trip-empty">
+      Coordonnées GPS manquantes pour {{ missingCoords.join(', ') }} — ajoutez-les depuis l'admin
+      (Gérer les chantiers) pour calculer la tournée.
+    </p>
+    <p v-else class="trip-empty">Pas assez de sites planifiés ce jour-là pour une tournée.</p>
   </div>
 </template>
 

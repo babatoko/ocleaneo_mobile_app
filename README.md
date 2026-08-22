@@ -68,6 +68,19 @@ Identifiant + mot de passe, stockés sur la fiche employé (côté Odoo). L'empr
 
 `frontend/src/services/biometric.js` encapsule tous les appels au plugin ; `LoginView.vue` ne fait que consommer `isBiometricAvailable()` / `hasSavedCredentials()` / `getSavedCredentials()` / `saveCredentials()`.
 
+## Planning — vue Tournée (itinéraire optimisé OSRM)
+
+Le Planning a trois onglets : Jour, Semaine, et **Tournée**. La Tournée calcule l'ordre de passage optimal sur les chantiers du jour et l'itinéraire associé via [OSRM](http://project-osrm.org/) (Open Source Routing Machine), affiché sur une carte [Leaflet](https://leafletjs.com/) / tuiles OpenStreetMap :
+
+1. Récupère les vacations du jour (`/shifts/mine`) et croise chaque `chantier_id` avec `chantiers.list` pour obtenir ses coordonnées GPS (`latitude`/`longitude` — voir ci-dessous).
+2. Récupère la position actuelle (`navigator.geolocation`) comme point de départ si l'utilisateur l'autorise ; sinon le départ est le premier chantier.
+3. Appelle le service `/trip` d'OSRM (résolution du voyageur de commerce) : `frontend/src/services/osrm.js`, fonction `getOptimizedTrip()`.
+4. Affiche la carte (marqueurs numérotés + tracé), la distance/durée totale, et la liste des arrêts avec horaires estimés (arrivée/départ cumulés à partir des temps de trajet OSRM et de la durée de chaque vacation).
+
+**Coordonnées GPS des chantiers** : champ obligatoire pour que la Tournée fonctionne. Saisissables depuis Admin → Chantiers (latitude/longitude en plus du nom/adresse). Un chantier sans coordonnées est listé comme manquant plutôt que d'ignorer silencieusement le problème. Ces coordonnées correspondent à `partner_latitude`/`partner_longitude` sur `res.partner` côté Odoo (géolocalisation native), ou au module OCA `base_geolocalize`.
+
+**⚠️ Serveur OSRM** : `frontend/src/services/osrm.js` pointe par défaut vers le serveur de démo public `router.project-osrm.org`. Ce serveur est explicitement documenté par le projet OSRM comme **non destiné à la production** (pas de garantie de disponibilité, débit limité). Pour la prod, définir `VITE_OSRM_URL` vers une instance OSRM auto-hébergée (le binaire OSRM est open source, se déploie facilement en Docker avec un extrait OpenStreetMap de la région). Idem pour les tuiles de carte (`tile.openstreetmap.org`), à remplacer par un fournisseur de tuiles adapté à un usage production (la [politique d'usage OSM](https://operations.osmfoundation.org/policies/tiles/) interdit aussi l'usage intensif du serveur de tuiles public).
+
 ## Intégration Odoo
 
 Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Décisions encore ouvertes avant de rebrancher le frontend :
@@ -92,7 +105,7 @@ Une fois ces points tranchés, `frontend/src/services/api.js` et les stores Pini
 ## Fonctionnalités (vues déjà scaffoldées, backend à rebrancher)
 
 - **Connexion** : identifiant/mot de passe avec bascule automatique vers l'empreinte si l'appareil en a un (voir [Authentification](#authentification))
-- **Planning** : vue Jour (vacations du jour par chantier) et Semaine
+- **Planning** : vue Jour, Semaine, et Tournée (itinéraire optimisé OSRM + carte, voir section dédiée ci-dessous)
 - **Pointage** : badge virtuel arrivée/départ, géolocalisation optionnelle, historique du jour
 - **Stock** : sélecteur de site, statut par produit (rupture/faible/suffisant), stepper de quantité, commande groupée → récapitulatif + PDF
 - **Inventaire** : saisie du stock restant par produit/conditionnement

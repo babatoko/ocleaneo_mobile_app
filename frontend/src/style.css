@@ -181,7 +181,10 @@ select {
   font-weight: 500;
   margin: 12px 0 8px;
   padding: 0 18px;
-  text-transform: capitalize;
+}
+
+.section-title::first-letter {
+  text-transform: uppercase;
 }
 
 .shift {
@@ -718,4 +721,140 @@ select {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* Tournée (route view) */
+
+.map-wrap {
+  margin: 8px 18px 10px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #e8eae3;
+  position: relative;
+  height: 260px;
+}
+
+.map-summary-bar {
+  margin: 0 18px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-1);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.map-summary-bar .sitem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.map-summary-bar .sitem i {
+  font-size: 15px;
+}
+
+.map-summary-bar .optimize-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--success-text);
+  background: var(--success-bg);
+  padding: 3px 9px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stop-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0 18px;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.stop-row:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 29px;
+  top: 26px;
+  bottom: -8px;
+  width: 1.5px;
+  background: var(--border-strong);
+}
+
+.stop-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.stop-card {
+  flex: 1;
+  background: var(--surface-1);
+  border-radius: 12px;
+  padding: 9px 12px;
+}
+
+.stop-card .stop-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stop-card .sname {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.stop-card .seta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.stop-card .saddr {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+
+.trip-marker {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.trip-marker.start {
+  background: var(--accent);
+}
+
+.trip-empty {
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
 }

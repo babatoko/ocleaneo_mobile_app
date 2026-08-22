@@ -6,6 +6,8 @@ import AppHeader from '../../components/AppHeader.vue';
 const chantiers = ref([]);
 const newName = ref('');
 const newAddress = ref('');
+const newLatitude = ref('');
+const newLongitude = ref('');
 
 async function refresh() {
   const { data } = await api.get('/chantiers');
@@ -16,9 +18,16 @@ onMounted(refresh);
 
 async function create() {
   if (!newName.value.trim()) return;
-  await api.post('/chantiers', { name: newName.value.trim(), address: newAddress.value.trim() });
+  await api.post('/chantiers', {
+    name: newName.value.trim(),
+    address: newAddress.value.trim(),
+    latitude: newLatitude.value ? Number(newLatitude.value) : null,
+    longitude: newLongitude.value ? Number(newLongitude.value) : null,
+  });
   newName.value = '';
   newAddress.value = '';
+  newLatitude.value = '';
+  newLongitude.value = '';
   await refresh();
 }
 
@@ -34,6 +43,11 @@ async function deactivate(c) {
     <form class="new" @submit.prevent="create">
       <input v-model="newName" placeholder="Nom du chantier" />
       <input v-model="newAddress" placeholder="Adresse (optionnel)" />
+      <div class="row-inputs">
+        <input v-model="newLatitude" type="number" step="any" placeholder="Latitude" />
+        <input v-model="newLongitude" type="number" step="any" placeholder="Longitude" />
+      </div>
+      <p class="hint">Coordonnées GPS nécessaires pour l'itinéraire optimisé (vue Tournée).</p>
       <button type="submit">Ajouter</button>
     </form>
 
@@ -41,6 +55,7 @@ async function deactivate(c) {
       <div>
         <strong>{{ c.name }}</strong>
         <span v-if="c.address">{{ c.address }}</span>
+        <span v-if="!c.latitude || !c.longitude" class="warn">Sans coordonnées GPS</span>
       </div>
       <button class="danger" @click="deactivate(c)">Désactiver</button>
     </div>
@@ -74,6 +89,26 @@ async function deactivate(c) {
   background: var(--primary);
   color: white;
   font-weight: 600;
+}
+
+.row-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.row-inputs input {
+  flex: 1;
+  min-width: 0;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: -4px 0 0;
+}
+
+.warn {
+  color: var(--warn-text);
 }
 
 .row {
