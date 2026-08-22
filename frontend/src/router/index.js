@@ -6,6 +6,7 @@ const routes = [
   { path: '/', name: 'home', component: () => import('../views/HomeView.vue') },
 
   { path: '/planning', name: 'planning', component: () => import('../views/planning/PlanningView.vue') },
+  { path: '/planning/chantier/:id', name: 'planning-chantier', component: () => import('../views/planning/ChantierDetailView.vue'), props: true },
   { path: '/pointage', name: 'pointage', component: () => import('../views/pointage/PointageView.vue') },
 
   { path: '/commande/catalogue', name: 'commande-catalogue', component: () => import('../views/commande/CatalogueView.vue') },

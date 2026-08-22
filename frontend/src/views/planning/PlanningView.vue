@@ -1,12 +1,16 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import { useChantiersStore } from '../../stores/chantiers';
+import { usePlanningStore } from '../../stores/planning';
 import { getCurrentPosition, getOptimizedTrip } from '../../services/osrm';
 
+const router = useRouter();
 const auth = useAuthStore();
 const chantiers = useChantiersStore();
+const planning = usePlanningStore();
 const view = ref('jour'); // 'jour' | 'semaine' | 'tournee'
 const selectedDate = ref(toIso(new Date()));
 const shifts = ref([]);
@@ -100,6 +104,11 @@ function timeRange(shift) {
 
 function mapLink(address) {
   return `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+}
+
+function openDetail(shift) {
+  planning.selectShift(shift);
+  router.push({ name: 'planning-chantier', params: { id: shift.id }, query: { date: selectedDate.value } });
 }
 
 // --- Tournée : itinéraire optimisé (OSRM) -------------------------------
@@ -300,7 +309,7 @@ onUnmounted(destroyMap);
 
     <div class="shift" v-for="s in shifts" :key="s.id">
       <div class="bar" :class="s.status"></div>
-      <div class="card">
+      <div class="card" @click="openDetail(s)">
         <div class="top">
           <span class="time">{{ timeRange(s) }}</span>
           <span class="badge" :class="s.status">{{
@@ -311,7 +320,7 @@ onUnmounted(destroyMap);
         <p class="place"><i class="ti ti-map-pin"></i> {{ s.chantier_address || s.chantier_name }}</p>
         <p v-if="s.note" class="meta">{{ s.note }}</p>
         <div class="card-actions">
-          <a :href="mapLink(s.chantier_address || s.chantier_name)" target="_blank" rel="noopener">
+          <a :href="mapLink(s.chantier_address || s.chantier_name)" target="_blank" rel="noopener" @click.stop>
             <i class="ti ti-map-2"></i> Itinéraire
           </a>
         </div>
@@ -326,7 +335,7 @@ onUnmounted(destroyMap);
         <strong>{{ d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) }}</strong>
         <span class="count">{{ (weekShiftsByDay[toIso(d)] || []).length }}</span>
       </div>
-      <div v-for="s in weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift">
+      <div v-for="s in weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift" @click.stop="openDetail(s)">
         {{ timeRange(s) }} · {{ s.chantier_name }}
       </div>
     </div>
@@ -359,8 +368,8 @@ onUnmounted(destroyMap);
     <p v-else-if="tripLoading" class="trip-empty">Calcul de l'itinéraire optimisé…</p>
     <p v-else-if="tripError" class="trip-empty">{{ tripError }}</p>
     <p v-else-if="missingCoords.length" class="trip-empty">
-      Coordonnées GPS manquantes pour {{ missingCoords.join(', ') }} — ajoutez-les depuis l'admin
-      (Gérer les chantiers) pour calculer la tournée.
+      Coordonnées GPS manquantes pour {{ missingCoords.join(', ') }} — à renseigner sur la fiche
+      chantier dans Odoo pour calculer la tournée.
     </p>
     <p v-else class="trip-empty">Pas assez de sites planifiés ce jour-là pour une tournée.</p>
   </div>
@@ -395,6 +404,7 @@ onUnmounted(destroyMap);
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: 6px;
+  cursor: pointer;
 }
 
 .empty {

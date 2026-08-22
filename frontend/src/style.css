@@ -210,6 +210,7 @@ select {
   background: var(--surface-1);
   border-radius: 12px;
   padding: 10px 14px;
+  cursor: pointer;
 }
 
 .shift .top {
@@ -721,6 +722,143 @@ select {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* Détail chantier (planning) */
+
+.detail-hero {
+  margin: 10px 18px;
+  background: var(--surface-1);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.detail-hero .dtime {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0 0 2px;
+}
+
+.detail-hero .dclient {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 10px;
+}
+
+.detail-hero .daddr {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  margin: 0 18px 6px;
+}
+
+.detail-actions .dbtn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-1);
+  border-radius: 12px;
+  padding: 10px 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border: none;
+  text-decoration: none;
+}
+
+.detail-actions .dbtn i {
+  font-size: 19px;
+  color: var(--text-primary);
+}
+
+.detail-block {
+  padding: 6px 18px;
+}
+
+.note-box {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.note-box i {
+  font-size: 15px;
+  margin-top: 1px;
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.see-all {
+  font-size: 12px;
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.stock-mini-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.stock-mini {
+  flex-shrink: 0;
+  min-width: 76px;
+  background: var(--surface-1);
+  border-radius: 10px;
+  padding: 8px;
+  text-align: center;
+}
+
+.stock-mini i {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.stock-mini .sname {
+  font-size: 10px;
+  margin: 4px 0 2px;
+}
+
+.stock-mini .slevel {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.slevel.ok {
+  color: var(--success-text);
+}
+
+.slevel.low {
+  color: var(--warn-text);
+}
+
+.slevel.out {
+  color: var(--danger);
 }
 
 /* Tournée (route view) */

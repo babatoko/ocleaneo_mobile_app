@@ -4,13 +4,7 @@ import { useRouter } from 'vue-router';
 import { api } from '../../services/api';
 import { useCartStore } from '../../stores/cart';
 import { useChantiersStore } from '../../stores/chantiers';
-
-const CATEGORY_ICONS = {
-  Sol: 'ti-spray',
-  Vitres: 'ti-droplet',
-  Sanitaires: 'ti-toilet-paper',
-  Consommables: 'ti-package',
-};
+import { iconForProduct } from '../../utils/productIcons';
 
 const chantiers = useChantiersStore();
 const cart = useCartStore();
@@ -22,10 +16,6 @@ const orderQty = reactive({}); // productId -> quantity to order
 
 function defaultPackaging(product) {
   return product.packagings.find((pk) => pk.is_default) || product.packagings[0];
-}
-
-function iconFor(product) {
-  return CATEGORY_ICONS[product.category] || 'ti-flask';
 }
 
 function statusLabel(status) {
@@ -118,7 +108,7 @@ function goToOrder() {
 
   <div class="stock-grid">
     <div v-for="p in products" :key="p.id" class="stock-item">
-      <div class="icon-wrap"><i class="ti" :class="iconFor(p)"></i></div>
+      <div class="icon-wrap"><i class="ti" :class="iconForProduct(p)"></i></div>
       <p class="pname">{{ p.name }}</p>
       <p class="plevel" :class="stockByProduct[p.id]?.status">
         {{ statusLabel(stockByProduct[p.id]?.status) }}
