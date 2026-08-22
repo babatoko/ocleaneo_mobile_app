@@ -25,7 +25,9 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
   if (!to.meta.public && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } };
+    // "/" n'est pas un lien profond à préserver : après connexion, on atterrit
+    // directement sur le planning plutôt que sur l'accueil.
+    return { name: 'login', query: to.path === '/' ? {} : { redirect: to.fullPath } };
   }
   if (auth.isAuthenticated && !auth.employee) {
     await auth.fetchMe();

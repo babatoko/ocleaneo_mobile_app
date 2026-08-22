@@ -36,7 +36,7 @@ onMounted(async () => {
 
 function afterLogin(loggedInUsername) {
   localStorage.setItem(LAST_USERNAME_KEY, loggedInUsername);
-  router.replace(route.query.redirect || '/');
+  router.replace(route.query.redirect || '/planning');
 }
 
 async function tryBiometric() {
