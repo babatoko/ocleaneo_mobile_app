@@ -37,6 +37,18 @@ const weekDays = computed(() => {
   });
 });
 
+// Bandeau de dates de la vue Jour : toujours ancré sur aujourd'hui à gauche,
+// suivi des 6 jours suivants — pas une semaine calendaire (qui peut placer
+// aujourd'hui n'importe où, y compris tout à droite).
+const dayStrip = computed(() => {
+  const start = new Date(toIso(new Date()) + 'T00:00:00');
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+});
+
 const selectedDateLabel = computed(() =>
   new Date(selectedDate.value + 'T00:00:00').toLocaleDateString('fr-FR', {
     weekday: 'long',
@@ -294,7 +306,7 @@ onUnmounted(destroyMap);
   <div v-if="view === 'jour'">
     <div class="days">
       <button
-        v-for="d in weekDays"
+        v-for="d in dayStrip"
         :key="toIso(d)"
         class="day"
         :class="{ active: toIso(d) === selectedDate }"
