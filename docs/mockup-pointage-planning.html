@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Mockup App Pointage &amp; Planning</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+<style>
+  :root{
+    --bg-page:#F4F3EF;
+    --surface-2:#FFFFFF;
+    --surface-1:#F4F3EF;
+    --border:#E4E2DA;
+    --border-strong:#D3D1C7;
+    --text-primary:#26251F;
+    --text-secondary:#6B6A62;
+    --text-muted:#7A7870;
+    --accent:#0F6E56;
+    --accent-bg:#E1F5EE;
+    --accent-text:#085041;
+    --warn-bg:#FAEEDA;
+    --warn-text:#854F0B;
+    --success-bg:#EAF3DE;
+    --success-text:#3B6D11;
+    --radius:14px;
+    --font: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg-page);
+    font-family:var(--font);
+    color:var(--text-primary);
+    padding:40px 20px;
+  }
+  h1{
+    text-align:center;
+    font-size:20px;
+    font-weight:500;
+    margin:0 0 32px;
+  }
+  .row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:32px;
+    justify-content:center;
+    align-items:flex-start;
+  }
+  .phone-label{
+    text-align:center;
+    font-size:13px;
+    color:var(--text-secondary);
+    margin-bottom:10px;
+  }
+  .phone{
+    width:320px;
+    background:#000;
+    border-radius:36px;
+    padding:10px;
+    box-shadow:0 2px 20px rgba(0,0,0,0.12);
+  }
+  .screen{
+    background:var(--surface-2);
+    border-radius:26px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    min-height:620px;
+  }
+  .status-bar{
+    height:28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 20px;
+    font-size:12px;
+    font-weight:500;
+    color:var(--text-primary);
+  }
+  .content{flex:1; display:flex; flex-direction:column;}
+
+  /* Header */
+  .header{
+    padding:12px 18px 6px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .header .hello{font-size:12px; color:var(--text-secondary); margin:0;}
+  .header .name{font-size:16px; font-weight:500; margin:2px 0 0;}
+  .avatar{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--accent-bg); color:var(--accent-text);
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:500;
+  }
+
+  /* Days strip */
+  .days{
+    display:flex;gap:6px;padding:8px 14px 4px;
+    overflow-x:auto;
+  }
+  .day{
+    text-align:center;min-width:38px;
+  }
+  .day .dname{font-size:10px;color:var(--text-muted);margin:0 0 4px;}
+  .day .dnum{
+    width:30px;height:30px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;color:var(--text-secondary);margin:0 auto;
+  }
+  .day.active .dnum{background:var(--text-primary);color:#fff;font-weight:500;}
+
+  .section-title{
+    font-size:14px;font-weight:500;margin:12px 0 8px;padding:0 18px;
+  }
+
+  /* Shift cards */
+  .shift{
+    display:flex;gap:10px;padding:0 18px;margin-bottom:10px;
+  }
+  .shift .bar{width:3px;border-radius:2px;flex-shrink:0;}
+  .bar.confirmed{background:var(--accent);}
+  .bar.pending{background:var(--border-strong);}
+  .shift .card{
+    flex:1;background:var(--surface-1);border-radius:12px;padding:10px 14px;
+  }
+  .shift .card .top{
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;
+  }
+  .shift .time{font-size:13px;font-weight:500;}
+  .badge{font-size:11px;padding:2px 9px;border-radius:8px;}
+  .badge.confirmed{background:var(--success-bg);color:var(--success-text);}
+  .badge.pending{background:var(--warn-bg);color:var(--warn-text);}
+  .place{font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;}
+
+  /* Bottom nav */
+  .nav{
+    display:flex;border-top:0.5px solid var(--border);padding:8px 0 12px;
+    margin-top:auto;
+  }
+  .nav-item{flex:1;text-align:center;color:var(--text-muted);}
+  .nav-item.active{color:var(--accent);}
+  .nav-item.active .lbl{font-weight:600;}
+  .nav-item i{font-size:21px;}
+  .nav-item .lbl{font-size:10px;margin:2px 0 0;display:block;}
+
+  /* Pointage screen */
+  .clock-wrap{
+    display:flex;flex-direction:column;align-items:center;padding:20px 16px 8px;
+  }
+  .nfc-circle{
+    width:150px;height:150px;border-radius:50%;
+    border:2px solid var(--accent);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    margin-bottom:14px;
+  }
+  .nfc-circle i{font-size:28px;color:var(--accent);}
+  .nfc-circle p{font-size:12px;color:var(--text-secondary);margin:8px 0 0;text-align:center;padding:0 16px;}
+  .big-time{font-size:22px;font-weight:500;margin:0;}
+  .status-line{font-size:12px;color:var(--success-text);margin:4px 0 0;}
+
+  .history{padding:8px 18px;}
+  .history-title{font-size:12px;color:var(--text-muted);margin:0 0 8px;}
+  .hist-row{
+    display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border);
+  }
+  .hist-row:last-child{border-bottom:none;}
+  .hist-icon{
+    width:30px;height:30px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .hist-icon.in{background:var(--success-bg);color:var(--success-text);}
+  .hist-icon.out{background:var(--surface-1);color:var(--text-muted);}
+  .hist-text{flex:1;}
+  .hist-text .lbl{font-size:13px;margin:0;}
+  .hist-text .sub{font-size:11px;color:var(--text-secondary);margin:1px 0 0;}
+  .hist-time{font-size:13px;font-weight:500;}
+
+  /* Profile screen */
+  .profile-header{
+    display:flex;flex-direction:column;align-items:center;padding:24px 16px 16px;
+  }
+  .profile-avatar{
+    width:64px;height:64px;border-radius:50%;
+    background:var(--accent-bg);color:var(--accent-text);
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;font-weight:500;margin-bottom:10px;
+  }
+  .profile-name{font-size:16px;font-weight:500;margin:0;}
+  .profile-role{font-size:12px;color:var(--text-secondary);margin:2px 0 0;}
+
+  .menu{padding:0 16px;}
+  .menu-item{
+    display:flex;align-items:center;gap:12px;padding:14px 4px;
+    border-bottom:0.5px solid var(--border);min-height:44px;
+  }
+  .menu-item i{font-size:18px;color:var(--text-secondary);width:20px;text-align:center;}
+  .menu-item span{font-size:14px;flex:1;}
+  .menu-item .chev{color:var(--text-muted);font-size:16px;width:auto;}
+
+  .modules-card{
+    margin:14px 16px;background:var(--surface-1);border-radius:12px;padding:12px 14px;
+  }
+  .modules-card p{font-size:12px;color:var(--text-secondary);margin:0 0 8px;}
+  .module-row{
+    display:flex;align-items:center;justify-content:space-between;padding:6px 0;
+  }
+  .module-row .mname{font-size:13px;display:flex;align-items:center;gap:8px;}
+  .tag{font-size:10px;padding:2px 8px;border-radius:8px;background:var(--success-bg);color:var(--success-text);}
+  .tag.soon{background:var(--warn-bg);color:var(--warn-text);}
+
+  /* Conges screen */
+  .balance-row{display:flex;gap:10px;padding:4px 18px 14px;}
+  .balance-card{
+    flex:1;background:var(--surface-1);border-radius:12px;padding:12px 14px;
+  }
+  .balance-card .num{font-size:20px;font-weight:500;margin:0;}
+  .balance-card .lbl{font-size:11px;color:var(--text-secondary);margin:2px 0 0;}
+
+  .request-card{
+    margin:0 18px 10px;background:var(--surface-1);border-radius:12px;padding:12px 14px;
+  }
+  .request-card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+  .request-card .dates{font-size:13px;font-weight:500;}
+  .request-card .type{font-size:12px;color:var(--text-secondary);margin:2px 0 0;}
+
+  .fab{
+    position:absolute;right:18px;bottom:78px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--text-primary);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;box-shadow:0 4px 10px rgba(0,0,0,0.18);
+  }
+
+  /* Dossier salarie screen */
+  .info-block{padding:4px 18px;}
+  .info-block .block-title{font-size:12px;color:var(--text-muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.02em;}
+  .info-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:9px 0;border-bottom:0.5px solid var(--border);
+  }
+  .info-row:last-child{border-bottom:none;}
+  .info-row .k{font-size:13px;color:var(--text-secondary);}
+  .info-row .v{font-size:13px;font-weight:500;text-align:right;}
+  .doc-row{
+    display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border);
+    min-height:44px;
+  }
+  .doc-row:last-child{border-bottom:none;}
+  .doc-row i{font-size:17px;color:var(--text-secondary);}
+  .doc-row span{font-size:13px;flex:1;}
+  .doc-row .dl{
+    color:var(--text-secondary);font-size:17px;
+    width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+    border-radius:8px;background:var(--surface-1);flex-shrink:0;
+  }
+
+  /* Planning improvements */
+  .view-toggle{
+    display:flex;margin:0 18px 8px;background:var(--surface-1);border-radius:10px;padding:3px;
+  }
+  .view-toggle .opt{
+    flex:1;text-align:center;font-size:12px;padding:6px 0;border-radius:8px;color:var(--text-secondary);
+  }
+  .view-toggle .opt.active{background:var(--surface-2);color:var(--text-primary);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,0.06);}
+
+  .day .dnum{position:relative;}
+  .day-dot{
+    width:4px;height:4px;border-radius:50%;background:var(--accent);
+    margin:3px auto 0;
+  }
+  .day-dot.hidden{visibility:hidden;}
+
+  .badge.modified{background:var(--warn-bg);color:var(--warn-text);}
+  .shift .meta{font-size:12px;color:var(--text-secondary);margin:1px 0 0;display:flex;align-items:center;gap:4px;}
+  .shift .client{font-size:13px;font-weight:500;margin:0 0 2px;}
+  .shift .card-actions{display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border);}
+  .shift .card-actions a{
+    display:flex;align-items:center;gap:4px;font-size:12px;color:var(--accent-text);
+  }
+  .shift .card-actions i{font-size:14px;}
+
+  .nav-item{position:relative;}
+  .nav-dot{
+    position:absolute;top:2px;right:calc(50% - 14px);
+    width:7px;height:7px;border-radius:50%;background:var(--warn-text);border:1.5px solid var(--surface-2);
+  }
+
+  /* Login screen */
+  .login-screen{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    flex:1;padding:32px 28px;text-align:center;
+  }
+  .login-logo{
+    width:56px;height:56px;border-radius:16px;background:var(--text-primary);
+    display:flex;align-items:center;justify-content:center;margin-bottom:20px;
+  }
+  .login-logo i{font-size:26px;color:#fff;}
+  .login-title{font-size:17px;font-weight:500;margin:0 0 4px;}
+  .login-sub{font-size:13px;color:var(--text-secondary);margin:0 0 40px;}
+
+  .fingerprint-circle{
+    width:96px;height:96px;border-radius:50%;
+    border:2px solid var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:18px;
+  }
+  .fingerprint-circle i{font-size:40px;color:var(--accent);}
+  .login-hint{font-size:13px;color:var(--text-secondary);margin:0 0 6px;}
+  .login-name{font-size:14px;font-weight:500;margin:0 0 40px;}
+
+  .login-alt{
+    font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;
+  }
+
+  /* Stock screen */
+  .site-select{
+    display:flex;align-items:center;gap:8px;margin:0 18px 10px;
+    background:var(--surface-1);border-radius:10px;padding:9px 12px;
+  }
+  .site-select i{font-size:16px;color:var(--text-secondary);}
+  .site-select span{font-size:13px;font-weight:500;flex:1;}
+  .site-select .chev{color:var(--text-muted);}
+
+  .stock-grid{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:0 18px;
+  }
+  .stock-item{
+    background:var(--surface-1);border-radius:12px;padding:10px 12px;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .stock-item .icon-wrap{
+    width:36px;height:36px;border-radius:10px;background:var(--surface-2);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .stock-item .icon-wrap i{font-size:18px;color:var(--text-secondary);}
+  .stock-item .pname{font-size:12px;font-weight:500;margin:0;}
+  .stock-item .plevel{font-size:11px;margin:0;}
+  .plevel.ok{color:var(--success-text);}
+  .plevel.low{color:var(--warn-text);}
+  .plevel.out{color:var(--text-danger, #a32d2d);}
+  .stepper{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--surface-2);border-radius:8px;padding:4px 6px;margin-top:2px;
+  }
+  .stepper button{
+    width:30px;height:30px;border-radius:7px;border:none;background:var(--surface-1);
+    color:var(--text-secondary);font-size:15px;display:flex;align-items:center;justify-content:center;
+  }
+  .stepper .qty{font-size:13px;font-weight:500;min-width:18px;text-align:center;}
+
+  .stock-cart-bar{
+    margin:14px 18px 0;background:var(--text-primary);color:#fff;
+    border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
+  }
+  .stock-cart-bar span{font-size:13px;}
+  .stock-cart-bar .cta{font-size:13px;font-weight:500;display:flex;align-items:center;gap:4px;}
+
+  /* Detail chantier screen */
+  .detail-header{
+    padding:10px 18px 4px;display:flex;align-items:center;gap:12px;
+  }
+  .detail-header .back{
+    width:32px;height:32px;border-radius:50%;background:var(--surface-1);
+    display:flex;align-items:center;justify-content:center;color:var(--text-primary);
+  }
+  .detail-header .htitle{font-size:15px;font-weight:500;margin:0;}
+
+  .detail-hero{
+    margin:10px 18px;background:var(--surface-1);border-radius:14px;padding:14px 16px;
+  }
+  .detail-hero .dtime{font-size:18px;font-weight:500;margin:0 0 2px;}
+  .detail-hero .dclient{font-size:14px;color:var(--text-secondary);margin:0 0 10px;}
+  .detail-hero .daddr{font-size:13px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;margin:0;}
+
+  .detail-actions{display:flex;gap:10px;margin:0 18px 6px;}
+  .detail-actions .dbtn{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+    background:var(--surface-1);border-radius:12px;padding:10px 0;font-size:11px;color:var(--text-secondary);
+  }
+  .detail-actions .dbtn i{font-size:19px;color:var(--text-primary);}
+
+  .detail-block{padding:6px 18px;}
+  .task-row{
+    display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:0.5px solid var(--border);
+    min-height:44px;
+  }
+  .task-row:last-child{border-bottom:none;}
+  .task-check{
+    width:22px;height:22px;border-radius:6px;border:1.5px solid var(--border-strong);
+    flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  }
+  .task-check.done{background:var(--accent);border-color:var(--accent);color:#fff;font-size:13px;}
+  .task-label{font-size:13px;}
+  .task-label.done{color:var(--text-muted);text-decoration:line-through;}
+
+  .contact-mini{
+    display:flex;align-items:center;gap:10px;padding:8px 0;
+  }
+  .contact-mini .cavatar{
+    width:34px;height:34px;border-radius:50%;background:var(--accent-bg);color:var(--accent-text);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;
+  }
+  .contact-mini .cname{font-size:13px;font-weight:500;margin:0;}
+  .contact-mini .crole{font-size:11px;color:var(--text-secondary);margin:0;}
+  .contact-mini .cicon{margin-left:auto;color:var(--text-accent);font-size:18px;}
+
+  .note-box{
+    background:var(--warn-bg);color:var(--warn-text);border-radius:10px;padding:10px 12px;
+    font-size:12px;display:flex;gap:8px;align-items:flex-start;
+  }
+  .note-box i{font-size:15px;margin-top:1px;}
+
+  .stock-mini-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;}
+  .stock-mini{
+    flex-shrink:0;min-width:76px;background:var(--surface-1);border-radius:10px;
+    padding:8px;text-align:center;
+  }
+  .stock-mini i{font-size:16px;color:var(--text-secondary);}
+  .stock-mini .sname{font-size:10px;margin:4px 0 2px;}
+  .stock-mini .slevel{font-size:10px;font-weight:500;}
+  .see-all{font-size:12px;color:var(--text-accent);display:flex;align-items:center;gap:2px;}
+  .block-head{display:flex;align-items:center;justify-content:space-between;}
+
+  /* Securite PTI screen */
+  .pti-status-bar{
+    margin:6px 18px 14px;padding:9px 14px;border-radius:10px;
+    background:var(--success-bg);color:var(--success-text);
+    display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;
+  }
+  .pti-status-bar.alert{background:var(--warn-bg);color:var(--warn-text);}
+  .pti-status-bar i{font-size:16px;}
+
+  .pti-ring-wrap{
+    display:flex;flex-direction:column;align-items:center;padding:6px 16px 10px;
+  }
+  .pti-ring{
+    width:170px;height:170px;border-radius:50%;
+    border:6px solid var(--success-bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    position:relative;
+  }
+  .pti-ring::before{
+    content:"";position:absolute;inset:-6px;border-radius:50%;
+    border:6px solid var(--accent);border-right-color:transparent;border-bottom-color:transparent;
+    transform:rotate(45deg);
+  }
+  .pti-ring .countdown{font-size:26px;font-weight:500;margin:0;}
+  .pti-ring .clabel{font-size:11px;color:var(--text-secondary);margin:2px 0 0;}
+
+  .pti-hint{font-size:12px;color:var(--text-secondary);text-align:center;margin:14px 0 0;padding:0 30px;}
+
+  .sos-button{
+    margin:16px 18px 6px;background:var(--fill-danger,#E24B4A);color:#fff;
+    border-radius:14px;padding:14px 0;text-align:center;font-size:14px;font-weight:500;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .sos-button i{font-size:18px;}
+
+  .pti-settings-row{
+    display:flex;align-items:center;justify-content:space-between;padding:10px 0;
+    border-bottom:0.5px solid var(--border);
+  }
+  .pti-settings-row:last-child{border-bottom:none;}
+  .pti-settings-row .srow-label{font-size:13px;}
+  .pti-settings-row .srow-sub{font-size:11px;color:var(--text-secondary);margin:1px 0 0;}
+  .toggle{
+    width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex-shrink:0;
+  }
+  .toggle::after{
+    content:"";position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;
+  }
+  .toggle.off{background:var(--border-strong);}
+  .toggle.off::after{right:auto;left:2px;}
+
+  /* Steps indicator */
+  .hero-stats{
+    display:flex;gap:0;margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border);
+  }
+  .hero-stat{flex:1;display:flex;align-items:center;gap:8px;}
+  .hero-stat i{font-size:16px;color:var(--text-secondary);}
+  .hero-stat .hnum{font-size:14px;font-weight:500;margin:0;}
+  .hero-stat .hlbl{font-size:10px;color:var(--text-secondary);margin:0;}
+  .hero-stat-sep{width:0.5px;background:var(--border);margin:0 12px;}
+
+  /* Tournee map screen */
+  .map-wrap{
+    margin:8px 18px 10px;border-radius:14px;overflow:hidden;background:#E8EAE3;position:relative;height:230px;
+  }
+  .map-summary-bar{
+    margin:0 18px 10px;display:flex;align-items:center;justify-content:space-between;
+    background:var(--surface-1);border-radius:10px;padding:10px 14px;
+  }
+  .map-summary-bar .sitem{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);}
+  .map-summary-bar .sitem i{font-size:15px;}
+  .map-summary-bar .optimize-badge{
+    font-size:11px;font-weight:500;color:var(--success-text);background:var(--success-bg);
+    padding:3px 9px;border-radius:8px;display:flex;align-items:center;gap:4px;
+  }
+
+  .stop-row{
+    display:flex;align-items:flex-start;gap:10px;padding:0 18px;margin-bottom:8px;position:relative;
+  }
+  .stop-row:not(:last-child)::before{
+    content:"";position:absolute;left:29px;top:26px;bottom:-8px;width:1.5px;background:var(--border-strong);
+  }
+  .stop-num{
+    width:22px;height:22px;border-radius:50%;background:var(--text-primary);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;z-index:1;
+  }
+  .stop-num.done{background:var(--accent);}
+  .stop-card{
+    flex:1;background:var(--surface-1);border-radius:12px;padding:9px 12px;
+  }
+  .stop-card .stop-top{display:flex;justify-content:space-between;align-items:center;}
+  .stop-card .sname{font-size:13px;font-weight:500;margin:0;}
+  .stop-card .seta{font-size:11px;color:var(--text-secondary);margin:0;}
+  .stop-card .saddr{font-size:11px;color:var(--text-secondary);margin:2px 0 0;}
+
+  /* Auto-controle qualite screen */
+  .progress-bar-wrap{margin:0 18px 4px;}
+  .progress-bar-track{
+    height:6px;border-radius:4px;background:var(--surface-1);overflow:hidden;
+  }
+  .progress-bar-fill{height:100%;background:var(--accent);border-radius:4px;}
+  .progress-label{font-size:11px;color:var(--text-secondary);margin:6px 0 0;}
+
+  .qc-item{
+    margin:0 18px 10px;background:var(--surface-1);border-radius:12px;padding:12px 14px;
+  }
+  .qc-item .qtop{display:flex;justify-content:space-between;align-items:flex-start;}
+  .qc-item .qname{font-size:13px;font-weight:500;margin:0 0 2px;}
+  .qc-item .qzone{font-size:11px;color:var(--text-secondary);margin:0;}
+  .qc-status{
+    font-size:11px;padding:2px 9px;border-radius:8px;flex-shrink:0;
+  }
+  .qc-status.pending{background:var(--surface-2);color:var(--text-muted);border:0.5px solid var(--border);}
+  .qc-status.ok{background:var(--success-bg);color:var(--success-text);}
+  .qc-status.issue{background:var(--warn-bg);color:var(--warn-text);}
+
+  .qc-photo-row{display:flex;gap:8px;margin-top:10px;}
+  .qc-photo-slot{
+    width:54px;height:54px;border-radius:10px;background:var(--surface-2);
+    border:1px dashed var(--border-strong);
+    display:flex;align-items:center;justify-content:center;color:var(--text-muted);
+  }
+  .qc-photo-slot i{font-size:18px;}
+  .qc-photo-slot.filled{border:none;background:#c9c7bd;}
+
+  .qc-actions{display:flex;gap:8px;margin-top:10px;}
+  .qc-actions button{
+    flex:1;font-size:12px;padding:7px 0;border-radius:8px;border:0.5px solid var(--border-strong);
+    background:transparent;color:var(--text-secondary);
+  }
+  .qc-actions button.primary{background:var(--fill-primary,var(--text-primary));color:#fff;border:none;}
+
+  .submit-bar{
+    margin:14px 18px 6px;background:var(--text-primary);color:#fff;border-radius:12px;
+    padding:13px 0;text-align:center;font-size:14px;font-weight:500;
+  }
+
+  /* Chat Odoo screen */
+  .chat-thread-row{
+    display:flex;align-items:center;gap:10px;padding:9px 18px;border-bottom:0.5px solid var(--border);
+  }
+  .chat-thread-row .cavatar{
+    width:38px;height:38px;border-radius:50%;background:var(--accent-bg);color:var(--accent-text);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;flex-shrink:0;position:relative;
+  }
+  .chat-thread-row .cbody{flex:1;min-width:0;}
+  .chat-thread-row .ctop{display:flex;justify-content:space-between;align-items:center;}
+  .chat-thread-row .cname{font-size:13px;font-weight:500;margin:0;}
+  .chat-thread-row .ctime{font-size:11px;color:var(--text-muted);}
+  .chat-thread-row .cpreview{font-size:12px;color:var(--text-secondary);margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
+  .chat-unread{
+    width:16px;height:16px;border-radius:50%;background:var(--accent);color:#fff;
+    font-size:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+
+  /* Chat conversation */
+  .chat-bubble-row{padding:0 18px;margin-bottom:8px;display:flex;}
+  .chat-bubble-row.out{justify-content:flex-end;}
+  .chat-bubble{
+    max-width:75%;padding:8px 12px;border-radius:14px;font-size:13px;
+  }
+  .chat-bubble-row.in .chat-bubble{background:var(--surface-1);border-bottom-left-radius:4px;}
+  .chat-bubble-row.out .chat-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px;}
+  .chat-time-label{text-align:center;font-size:10px;color:var(--text-muted);margin:8px 0;}
+  .chat-input-bar{
+    display:flex;align-items:center;gap:8px;margin:8px 18px 4px;
+    background:var(--surface-1);border-radius:20px;padding:8px 8px 8px 14px;
+  }
+  .chat-input-bar span{flex:1;font-size:13px;color:var(--text-muted);}
+  .chat-input-bar .send{
+    width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+
+  /* Declaration anomalie screen */
+  .anomaly-type-row{display:flex;gap:10px;margin:0 18px 14px;}
+  .anomaly-type{
+    flex:1;border-radius:12px;border:1.5px solid var(--border);padding:14px 10px;
+    text-align:center;color:var(--text-secondary);
+  }
+  .anomaly-type i{font-size:22px;display:block;margin-bottom:6px;}
+  .anomaly-type .atname{font-size:12px;font-weight:500;}
+  .anomaly-type.selected{border-color:var(--accent);background:var(--accent-bg);color:var(--accent-text);}
+  .anomaly-type.selected i{color:var(--accent-text);}
+
+  .field-label{font-size:12px;color:var(--text-muted);margin:0 18px 6px;}
+  .photo-grid{display:flex;gap:8px;margin:0 18px 16px;flex-wrap:wrap;}
+  .photo-slot-lg{
+    width:70px;height:70px;border-radius:12px;background:var(--surface-1);
+    border:1px dashed var(--border-strong);display:flex;align-items:center;justify-content:center;
+    color:var(--text-muted);
+  }
+  .photo-slot-lg.filled{border:none;background:#c9c7bd;}
+  .photo-slot-lg i{font-size:20px;}
+
+  .comment-box{
+    margin:0 18px 16px;background:var(--surface-1);border-radius:12px;padding:12px 14px;
+    font-size:13px;color:var(--text-muted);min-height:70px;
+  }
+
+  .anomaly-submit{
+    margin:0 18px;background:var(--fill-danger,#E24B4A);color:#fff;border-radius:12px;
+    padding:13px 0;text-align:center;font-size:14px;font-weight:500;
+  }
+  .anomaly-submit.disabled{background:var(--border-strong);color:var(--text-muted);}
+
+  /* Formation screen */
+  .training-progress-card{
+    margin:0 18px 14px;background:var(--surface-1);border-radius:14px;padding:14px 16px;
+  }
+  .training-progress-card .tprow{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .training-progress-card .tnum{font-size:20px;font-weight:500;margin:0;}
+  .training-progress-card .tlbl{font-size:11px;color:var(--text-secondary);margin:0;}
+
+  .course-card{
+    margin:0 18px 10px;background:var(--surface-1);border-radius:12px;padding:10px;
+    display:flex;gap:10px;align-items:center;
+  }
+  .course-thumb{
+    width:52px;height:52px;border-radius:10px;background:var(--surface-2);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;position:relative;
+  }
+  .course-thumb i{font-size:20px;color:var(--text-secondary);}
+  .course-thumb .playdot{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,0.15);border-radius:10px;
+  }
+  .course-thumb .playdot i{color:#fff;font-size:16px;}
+  .course-body{flex:1;min-width:0;}
+  .course-body .cname{font-size:13px;font-weight:500;margin:0 0 2px;}
+  .course-body .cmeta{font-size:11px;color:var(--text-secondary);margin:0;}
+  .course-badge{font-size:10px;padding:2px 8px;border-radius:8px;flex-shrink:0;}
+  .course-badge.done{background:var(--success-bg);color:var(--success-text);}
+  .course-badge.todo{background:var(--warn-bg);color:var(--warn-text);}
+
+  /* KPI dashboard screen */
+  .role-toggle{display:flex;gap:6px;margin:0 18px 12px;overflow-x:auto;}
+  .role-chip{
+    flex-shrink:0;font-size:12px;padding:6px 14px;border-radius:20px;
+    background:var(--surface-1);color:var(--text-secondary);
+  }
+  .role-chip.active{background:var(--text-primary);color:#fff;}
+
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 18px 14px;}
+  .kpi-card{background:var(--surface-1);border-radius:12px;padding:12px 14px;}
+  .kpi-card .kicon{font-size:16px;color:var(--text-secondary);margin-bottom:6px;}
+  .kpi-card .kval{font-size:19px;font-weight:500;margin:0;}
+  .kpi-card .klbl{font-size:10px;color:var(--text-secondary);margin:2px 0 4px;}
+  .kpi-trend{font-size:10px;display:flex;align-items:center;gap:2px;}
+  .kpi-trend.up{color:var(--success-text);}
+  .kpi-trend.down{color:var(--warn-text);}
+
+  .kpi-list-card{margin:0 18px 10px;background:var(--surface-1);border-radius:12px;padding:12px 14px;}
+  .kpi-list-title{font-size:12px;color:var(--text-muted);margin:0 0 8px;}
+  .kpi-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .kpi-bar-row:last-child{margin-bottom:0;}
+  .kpi-bar-row .kname{font-size:11px;width:78px;flex-shrink:0;color:var(--text-secondary);}
+  .kpi-bar-track{flex:1;height:6px;border-radius:4px;background:var(--surface-2);overflow:hidden;}
+  .kpi-bar-fill{height:100%;border-radius:4px;background:var(--accent);}
+  .kpi-bar-fill.warn{background:#D9A441;}
+  .kpi-bar-val{font-size:11px;font-weight:500;width:32px;text-align:right;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<h1>Mockup — App pointage &amp; planning</h1>
+
+<div class="row">
+
+  <!-- ECRAN CONNEXION -->
+  <div>
+    <p class="phone-label">Connexion</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="login-screen">
+            <div class="login-logo"><i class="ti ti-sparkles"></i></div>
+            <p class="login-title">Bonjour</p>
+            <p class="login-sub">Connectez-vous pour continuer</p>
+
+            <div class="fingerprint-circle">
+              <i class="ti ti-fingerprint"></i>
+            </div>
+            <p class="login-hint">Posez votre doigt sur le capteur</p>
+            <p class="login-name">Sophie Martin</p>
+
+            <div class="login-alt">
+              <i class="ti ti-lock"></i> Utiliser le code PIN
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN PLANNING -->
+  <div>
+    <p class="phone-label">Planning</p>
+    <div class="phone">
+      <div class="screen" style="position:relative;">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Bonjour</p>
+              <p class="name">Sophie Martin</p>
+            </div>
+            <div class="avatar">SM</div>
+          </div>
+
+          <div class="view-toggle">
+            <div class="opt active">Jour</div>
+            <div class="opt">Semaine</div>
+            <div class="opt">Tournee</div>
+          </div>
+
+          <div class="days">
+            <div class="day">
+              <p class="dname">lun</p><div class="dnum">17</div>
+              <div class="day-dot"></div>
+            </div>
+            <div class="day active">
+              <p class="dname">mar</p><div class="dnum">18</div>
+              <div class="day-dot"></div>
+            </div>
+            <div class="day">
+              <p class="dname">mer</p><div class="dnum">19</div>
+              <div class="day-dot hidden"></div>
+            </div>
+            <div class="day">
+              <p class="dname">jeu</p><div class="dnum">20</div>
+              <div class="day-dot"></div>
+            </div>
+            <div class="day">
+              <p class="dname">ven</p><div class="dnum">21</div>
+              <div class="day-dot"></div>
+            </div>
+            <div class="day">
+              <p class="dname">sam</p><div class="dnum">22</div>
+              <div class="day-dot hidden"></div>
+            </div>
+          </div>
+
+          <p class="section-title">Mardi 18 aout</p>
+
+          <div class="shift">
+            <div class="bar confirmed"></div>
+            <div class="card">
+              <div class="top">
+                <span class="time">08:00 - 11:00</span>
+                <span class="badge confirmed">confirme</span>
+              </div>
+              <p class="client">Cegetel</p>
+              <div class="place"><i class="ti ti-map-pin"></i> Bureaux Cegetel, Macon</div>
+              <p class="meta"><i class="ti ti-clock"></i> Duree 3h</p>
+              <div class="card-actions">
+                <a href="#"><i class="ti ti-map-2"></i> Itineraire</a>
+                <a href="#"><i class="ti ti-phone"></i> Contacter</a>
+                <a href="#" style="margin-left:auto;color:var(--text-secondary);"><i class="ti ti-chevron-right"></i></a>
+              </div>
+            </div>
+          </div>
+
+          <div class="shift">
+            <div class="bar pending"></div>
+            <div class="card">
+              <div class="top">
+                <span class="time">14:00 - 16:30</span>
+                <span class="badge modified">modifie</span>
+              </div>
+              <p class="client">Residence Les Tilleuls</p>
+              <div class="place"><i class="ti ti-map-pin"></i> Residence Les Tilleuls, Tournus</div>
+              <p class="meta"><i class="ti ti-clock"></i> Duree 2h30 — horaire change</p>
+              <div class="card-actions">
+                <a href="#"><i class="ti ti-map-2"></i> Itineraire</a>
+                <a href="#"><i class="ti ti-phone"></i> Contacter</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="fab"><i class="ti ti-calendar-exclamation"></i></div>
+
+          <div class="nav">
+            <div class="nav-item active">
+              <i class="ti ti-calendar"></i><span class="lbl">Planning</span>
+              <span class="nav-dot"></span>
+            </div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN PLANNING - VUE TOURNEE -->
+  <div>
+    <p class="phone-label">Planning — vue tournee</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Bonjour</p>
+              <p class="name">Sophie Martin</p>
+            </div>
+            <div class="avatar">SM</div>
+          </div>
+
+          <div class="view-toggle">
+            <div class="opt">Jour</div>
+            <div class="opt">Semaine</div>
+            <div class="opt active">Tournee</div>
+          </div>
+
+          <p class="section-title" style="margin:4px 0 4px;">Mardi 18 aout — 4 sites</p>
+
+          <div class="map-wrap">
+            <svg viewBox="0 0 320 230" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <rect width="320" height="230" fill="#E8EAE3"></rect>
+              <path d="M0,60 L320,50" stroke="#D3D1C7" stroke-width="6" fill="none"></path>
+              <path d="M40,0 L60,230" stroke="#D3D1C7" stroke-width="5" fill="none"></path>
+              <path d="M0,160 L320,175" stroke="#D3D1C7" stroke-width="4" fill="none"></path>
+              <path d="M230,0 L245,230" stroke="#D3D1C7" stroke-width="4" fill="none"></path>
+              <path d="M55,120 Q100,60 150,75 T210,60 Q250,90 270,150" stroke="#0F6E56" stroke-width="3" fill="none" stroke-dasharray="1,7" stroke-linecap="round"></path>
+              <circle cx="55" cy="120" r="10" fill="#26251F"></circle>
+              <text x="55" y="124" text-anchor="middle" font-size="10" fill="#fff" font-family="sans-serif">1</text>
+              <circle cx="150" cy="75" r="10" fill="#0F6E56"></circle>
+              <text x="150" y="79" text-anchor="middle" font-size="10" fill="#fff" font-family="sans-serif">2</text>
+              <circle cx="210" cy="60" r="10" fill="#0F6E56"></circle>
+              <text x="210" y="64" text-anchor="middle" font-size="10" fill="#fff" font-family="sans-serif">3</text>
+              <circle cx="270" cy="150" r="10" fill="#0F6E56"></circle>
+              <text x="270" y="154" text-anchor="middle" font-size="10" fill="#fff" font-family="sans-serif">4</text>
+            </svg>
+          </div>
+
+          <div class="map-summary-bar">
+            <div class="sitem"><i class="ti ti-route"></i> 34 km</div>
+            <div class="sitem"><i class="ti ti-clock"></i> 1h05 trajet</div>
+            <div class="optimize-badge"><i class="ti ti-sparkles"></i> Optimisee</div>
+          </div>
+
+          <div class="stop-row">
+            <div class="stop-num done"><i class="ti ti-check" style="font-size:12px;"></i></div>
+            <div class="stop-card">
+              <div class="stop-top">
+                <p class="sname">Cegetel</p>
+                <p class="seta">08:00 - 09:30</p>
+              </div>
+              <p class="saddr">Macon centre</p>
+            </div>
+          </div>
+
+          <div class="stop-row">
+            <div class="stop-num">2</div>
+            <div class="stop-card">
+              <div class="stop-top">
+                <p class="sname">Cabinet Girard</p>
+                <p class="seta">09:50 - 10:40</p>
+              </div>
+              <p class="saddr">Route de Charnay, Macon</p>
+            </div>
+          </div>
+
+          <div class="stop-row">
+            <div class="stop-num">3</div>
+            <div class="stop-card">
+              <div class="stop-top">
+                <p class="sname">Residence Beausoleil</p>
+                <p class="seta">11:00 - 12:15</p>
+              </div>
+              <p class="saddr">Sancé</p>
+            </div>
+          </div>
+
+          <div class="stop-row">
+            <div class="stop-num">4</div>
+            <div class="stop-card">
+              <div class="stop-top">
+                <p class="sname">Residence Les Tilleuls</p>
+                <p class="seta">13:30 - 14:30</p>
+              </div>
+              <p class="saddr">Tournus</p>
+            </div>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item active"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ECRAN POINTAGE -->
+  <div>
+    <p class="phone-label">Pointage</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Pointage</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Mardi 18 aout</p>
+            </div>
+            <div class="avatar" style="background:var(--success-bg);color:var(--success-text);"><i class="ti ti-shield-check" style="font-size:16px;"></i></div>
+          </div>
+
+          <div class="clock-wrap">
+            <div class="nfc-circle">
+              <i class="ti ti-nfc"></i>
+              <p>Approchez le badge</p>
+            </div>
+            <p class="big-time">08:02</p>
+            <p class="status-line">Arrive — Bureaux Cegetel</p>
+          </div>
+
+          <div class="detail-block" style="padding:0 18px 10px;">
+            <div class="pti-status-bar" style="background:var(--accent-bg);color:var(--accent-text);margin:0;">
+              <i class="ti ti-robot"></i> Le systeme demande un auto-controle sur ce site
+            </div>
+          </div>
+
+          <div class="balance-row" style="padding:4px 18px 12px;">
+            <div class="balance-card">
+              <p class="num" style="font-size:17px;">3 820</p>
+              <p class="lbl">pas aujourd'hui</p>
+            </div>
+            <div class="balance-card">
+              <p class="num" style="font-size:17px;">2,6 km</p>
+              <p class="lbl">distance totale</p>
+            </div>
+          </div>
+
+          <div class="history">
+            <p class="history-title">Historique du jour</p>
+            <div class="hist-row">
+              <div class="hist-icon in"><i class="ti ti-login-2"></i></div>
+              <div class="hist-text">
+                <p class="lbl">Arrivee</p>
+                <p class="sub">Bureaux Cegetel, Macon</p>
+              </div>
+              <span class="hist-time">08:02</span>
+            </div>
+            <div class="hist-row">
+              <div class="hist-icon out"><i class="ti ti-logout-2"></i></div>
+              <div class="hist-text">
+                <p class="lbl" style="color:var(--text-muted);">Depart</p>
+                <p class="sub">Prevu 11:00</p>
+              </div>
+              <span class="hist-time" style="color:var(--text-muted);font-weight:400;">--:--</span>
+            </div>
+          </div>
+
+          <div class="nav">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item active"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN PROFIL -->
+  <div>
+    <p class="phone-label">Profil</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="profile-header">
+            <div class="profile-avatar">SM</div>
+            <p class="profile-name">Sophie Martin</p>
+            <p class="profile-role">Agent de proprete — Site Macon</p>
+          </div>
+
+          <div class="modules-card">
+            <p>Modules actifs</p>
+            <div class="module-row">
+              <span class="mname"><i class="ti ti-calendar" style="font-size:15px;"></i> Planning</span>
+              <span class="tag">actif</span>
+            </div>
+            <div class="module-row">
+              <span class="mname"><i class="ti ti-clock" style="font-size:15px;"></i> Pointage</span>
+              <span class="tag">actif</span>
+            </div>
+            <div class="module-row">
+              <span class="mname"><i class="ti ti-beach" style="font-size:15px;"></i> Conges</span>
+              <span class="tag soon">bientot</span>
+            </div>
+            <div class="module-row">
+              <span class="mname"><i class="ti ti-package" style="font-size:15px;"></i> Commandes</span>
+              <span class="tag soon">bientot</span>
+            </div>
+          </div>
+
+          <div class="menu">
+            <div class="menu-item"><i class="ti ti-user-circle"></i><span>Mes informations</span><i class="ti ti-chevron-right chev"></i></div>
+            <div class="menu-item"><i class="ti ti-messages"></i><span>Messages</span><i class="ti ti-chevron-right chev"></i></div>
+            <div class="menu-item"><i class="ti ti-school"></i><span>Formation</span><i class="ti ti-chevron-right chev"></i></div>
+            <div class="menu-item"><i class="ti ti-bell"></i><span>Notifications</span><i class="ti ti-chevron-right chev"></i></div>
+            <div class="menu-item"><i class="ti ti-lock"></i><span>Confidentialite</span><i class="ti ti-chevron-right chev"></i></div>
+            <div class="menu-item"><i class="ti ti-help-circle"></i><span>Aide</span><i class="ti ti-chevron-right chev"></i></div>
+            <div class="menu-item"><i class="ti ti-logout"></i><span>Deconnexion</span></div>
+          </div>
+
+          <div class="nav">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item active"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN CONGES -->
+  <div>
+    <p class="phone-label">Demande de conges</p>
+    <div class="phone">
+      <div class="screen" style="position:relative;">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Conges</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Solde et demandes</p>
+            </div>
+          </div>
+
+          <div class="balance-row">
+            <div class="balance-card">
+              <p class="num">14,5</p>
+              <p class="lbl">jours acquis</p>
+            </div>
+            <div class="balance-card">
+              <p class="num">6</p>
+              <p class="lbl">jours poses</p>
+            </div>
+            <div class="balance-card">
+              <p class="num">8,5</p>
+              <p class="lbl">solde restant</p>
+            </div>
+          </div>
+
+          <p class="section-title">Mes demandes</p>
+
+          <div class="request-card">
+            <div class="top">
+              <span class="dates">4 - 8 aout</span>
+              <span class="badge confirmed">validee</span>
+            </div>
+            <p class="type">Conges payes — 5 jours</p>
+          </div>
+
+          <div class="request-card">
+            <div class="top">
+              <span class="dates">23 - 24 dec</span>
+              <span class="badge pending">en attente</span>
+            </div>
+            <p class="type">Conges payes — 2 jours</p>
+          </div>
+
+          <div class="fab"><i class="ti ti-plus"></i></div>
+
+          <div class="nav">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item active"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN DOSSIER SALARIE -->
+  <div>
+    <p class="phone-label">Dossier salarie</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="profile-header" style="padding:18px 16px 10px;">
+            <div class="profile-avatar" style="width:56px;height:56px;font-size:17px;">SM</div>
+            <p class="profile-name">Sophie Martin</p>
+            <p class="profile-role">Agent de proprete — CDI temps plein</p>
+          </div>
+
+          <div class="info-block">
+            <p class="block-title">Contrat</p>
+            <div class="info-row"><span class="k">Poste</span><span class="v">Agent de proprete</span></div>
+            <div class="info-row"><span class="k">Type de contrat</span><span class="v">CDI</span></div>
+            <div class="info-row"><span class="k">Anciennete</span><span class="v">3 ans, 4 mois</span></div>
+            <div class="info-row"><span class="k">Site rattache</span><span class="v">Macon</span></div>
+
+            <p class="block-title">Coordonnees</p>
+            <div class="info-row"><span class="k">Telephone</span><span class="v">06 12 34 56 78</span></div>
+            <div class="info-row"><span class="k">Email</span><span class="v">s.martin@email.fr</span></div>
+
+            <p class="block-title">Contrats et avenants</p>
+            <div class="doc-row"><i class="ti ti-file-text"></i><span>Contrat de travail — CDI</span><i class="ti ti-download dl"></i></div>
+            <div class="doc-row"><i class="ti ti-file-text"></i><span>Avenant — passage temps plein</span><i class="ti ti-download dl"></i></div>
+
+            <p class="block-title">Bulletins de paie</p>
+            <div class="doc-row"><i class="ti ti-receipt"></i><span>Bulletin — juillet 2026</span><i class="ti ti-download dl"></i></div>
+            <div class="doc-row"><i class="ti ti-receipt"></i><span>Bulletin — juin 2026</span><i class="ti ti-download dl"></i></div>
+            <div class="doc-row"><i class="ti ti-receipt"></i><span>Bulletin — mai 2026</span><i class="ti ti-download dl"></i></div>
+
+            <p class="block-title">Attestations et certificats</p>
+            <div class="doc-row"><i class="ti ti-certificate"></i><span>Attestation employeur — 2025</span><i class="ti ti-download dl"></i></div>
+            <div class="doc-row"><i class="ti ti-certificate"></i><span>Certificat de travail</span><i class="ti ti-download dl"></i></div>
+
+            <p class="block-title">Justificatifs d'absence</p>
+            <div class="doc-row"><i class="ti ti-file-medical"></i><span>Arret maladie — mars 2026</span><i class="ti ti-download dl"></i></div>
+          </div>
+
+          <div class="nav">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item active"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN STOCK -->
+  <div>
+    <p class="phone-label">Stock site</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Stock</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Produits sur site</p>
+            </div>
+          </div>
+
+          <div class="site-select">
+            <i class="ti ti-building-warehouse"></i>
+            <span>Bureaux Cegetel, Macon</span>
+            <i class="ti ti-chevron-down chev"></i>
+          </div>
+
+          <div class="stock-grid">
+            <div class="stock-item">
+              <div class="icon-wrap"><i class="ti ti-spray"></i></div>
+              <p class="pname">Nettoyant sols</p>
+              <p class="plevel ok">Stock suffisant</p>
+              <div class="stepper">
+                <button>-</button><span class="qty">0</span><button>+</button>
+              </div>
+            </div>
+            <div class="stock-item">
+              <div class="icon-wrap"><i class="ti ti-droplet"></i></div>
+              <p class="pname">Savon mains</p>
+              <p class="plevel low">Stock faible</p>
+              <div class="stepper">
+                <button>-</button><span class="qty">2</span><button>+</button>
+              </div>
+            </div>
+            <div class="stock-item">
+              <div class="icon-wrap"><i class="ti ti-toilet-paper"></i></div>
+              <p class="pname">Papier toilette</p>
+              <p class="plevel out">Rupture</p>
+              <div class="stepper">
+                <button>-</button><span class="qty">4</span><button>+</button>
+              </div>
+            </div>
+            <div class="stock-item">
+              <div class="icon-wrap"><i class="ti ti-wash"></i></div>
+              <p class="pname">Chiffons</p>
+              <p class="plevel ok">Stock suffisant</p>
+              <div class="stepper">
+                <button>-</button><span class="qty">0</span><button>+</button>
+              </div>
+            </div>
+            <div class="stock-item">
+              <div class="icon-wrap"><i class="ti ti-trash"></i></div>
+              <p class="pname">Sacs poubelle</p>
+              <p class="plevel low">Stock faible</p>
+              <div class="stepper">
+                <button>-</button><span class="qty">1</span><button>+</button>
+              </div>
+            </div>
+            <div class="stock-item">
+              <div class="icon-wrap"><i class="ti ti-flask"></i></div>
+              <p class="pname">Desinfectant</p>
+              <p class="plevel ok">Stock suffisant</p>
+              <div class="stepper">
+                <button>-</button><span class="qty">0</span><button>+</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="stock-cart-bar">
+            <span>3 produits selectionnes</span>
+            <span class="cta">Commander <i class="ti ti-arrow-right"></i></span>
+          </div>
+
+          <div class="nav" style="margin-top:14px;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item active"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN DETAIL CHANTIER -->
+  <div>
+    <p class="phone-label">Detail chantier</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="detail-header">
+            <div class="back"><i class="ti ti-arrow-left"></i></div>
+            <p class="htitle">Detail du chantier</p>
+          </div>
+
+          <div class="detail-hero">
+            <p class="dtime">08:00 - 11:00</p>
+            <p class="dclient">Cegetel</p>
+            <p class="daddr"><i class="ti ti-map-pin"></i> 12 rue des Frères Lumière, Macon</p>
+            <div class="hero-stats">
+              <div class="hero-stat">
+                <i class="ti ti-shoe"></i>
+                <div>
+                  <p class="hnum">2 340</p>
+                  <p class="hlbl">pas parcourus</p>
+                </div>
+              </div>
+              <div class="hero-stat-sep"></div>
+              <div class="hero-stat">
+                <i class="ti ti-route"></i>
+                <div>
+                  <p class="hnum">1,7 km</p>
+                  <p class="hlbl">distance estimee</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-actions">
+            <div class="dbtn"><i class="ti ti-map-2"></i> Itineraire</div>
+            <div class="dbtn"><i class="ti ti-phone"></i> Appeler</div>
+            <div class="dbtn"><i class="ti ti-message-circle"></i> Message</div>
+            <div class="dbtn"><i class="ti ti-box"></i> Stock</div>
+          </div>
+
+          <div class="detail-block">
+            <p class="section-title" style="padding:0;margin:8px 0 6px;">Note du responsable</p>
+            <div class="note-box">
+              <i class="ti ti-alert-circle"></i>
+              <span>Horaire modifie suite a une demande client — badge disponible a l'accueil.</span>
+            </div>
+          </div>
+
+          <div class="detail-block">
+            <p class="section-title" style="padding:0;margin:14px 0 4px;">Taches a realiser</p>
+            <div class="task-row">
+              <div class="task-check done"><i class="ti ti-check"></i></div>
+              <span class="task-label done">Nettoyage sanitaires</span>
+            </div>
+            <div class="task-row">
+              <div class="task-check done"><i class="ti ti-check"></i></div>
+              <span class="task-label done">Vidage corbeilles</span>
+            </div>
+            <div class="task-row">
+              <div class="task-check"></div>
+              <span class="task-label">Aspiration bureaux</span>
+            </div>
+            <div class="task-row">
+              <div class="task-check"></div>
+              <span class="task-label">Vitres accueil</span>
+            </div>
+          </div>
+
+          <div class="detail-block">
+            <div class="stock-cart-bar" style="background:var(--accent-bg);color:var(--accent-text);margin:8px 0 0;">
+              <span style="display:flex;align-items:center;gap:8px;"><i class="ti ti-robot" style="font-size:17px;"></i> Auto-controle demande — 2/4</span>
+              <span class="cta" style="color:var(--accent-text);">Ouvrir <i class="ti ti-chevron-right"></i></span>
+            </div>
+          </div>
+
+          <div class="detail-block">
+            <div class="stock-cart-bar" style="background:var(--surface-1);color:var(--text-primary);margin:8px 0 0;">
+              <span style="display:flex;align-items:center;gap:8px;"><i class="ti ti-alert-triangle" style="font-size:17px;"></i> Declarer une anomalie</span>
+              <span class="cta" style="color:var(--text-accent);">Ouvrir <i class="ti ti-chevron-right"></i></span>
+            </div>
+          </div>
+
+          <div class="detail-block">
+            <div class="block-head">
+              <p class="section-title" style="padding:0;margin:14px 0 6px;">Stock du site</p>
+              <span class="see-all">Tout voir <i class="ti ti-chevron-right"></i></span>
+            </div>
+            <div class="stock-mini-row">
+              <div class="stock-mini">
+                <i class="ti ti-toilet-paper"></i>
+                <p class="sname">Papier WC</p>
+                <p class="slevel" style="color:var(--warn-text);">Rupture</p>
+              </div>
+              <div class="stock-mini">
+                <i class="ti ti-droplet"></i>
+                <p class="sname">Savon</p>
+                <p class="slevel" style="color:var(--warn-text);">Faible</p>
+              </div>
+              <div class="stock-mini">
+                <i class="ti ti-spray"></i>
+                <p class="sname">Nettoyant</p>
+                <p class="slevel" style="color:var(--success-text);">OK</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-block">
+            <p class="section-title" style="padding:0;margin:14px 0 4px;">Contact sur site</p>
+            <div class="contact-mini">
+              <div class="cavatar">JL</div>
+              <div>
+                <p class="cname">Jean Lefevre</p>
+                <p class="crole">Responsable accueil</p>
+              </div>
+              <i class="ti ti-phone cicon"></i>
+            </div>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item active"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN SECURITE PTI -->
+  <div>
+    <p class="phone-label">Securite — homme mort</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Securite</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Protection travailleur isole</p>
+            </div>
+          </div>
+
+          <div class="pti-status-bar">
+            <i class="ti ti-shield-check"></i> Dispositif actif — chantier seul
+          </div>
+
+          <div class="pti-ring-wrap">
+            <div class="pti-ring">
+              <p class="countdown">04:12</p>
+              <p class="clabel">avant prochain signal</p>
+            </div>
+            <p class="pti-hint">Appuyez sur le bouton avant la fin du compte a rebours pour confirmer que tout va bien.</p>
+          </div>
+
+          <div class="sos-button">
+            <i class="ti ti-phone-call"></i> Alerte urgence
+          </div>
+
+          <div class="detail-block">
+            <p class="section-title" style="padding:0;margin:16px 0 4px;">Parametres</p>
+            <div class="pti-settings-row">
+              <div>
+                <p class="srow-label">Mode travailleur isole</p>
+                <p class="srow-sub">Active automatiquement hors horaires d'equipe</p>
+              </div>
+              <div class="toggle"></div>
+            </div>
+            <div class="pti-settings-row">
+              <div>
+                <p class="srow-label">Detection d'immobilite</p>
+                <p class="srow-sub">Alerte si aucun mouvement detecte</p>
+              </div>
+              <div class="toggle"></div>
+            </div>
+            <div class="pti-settings-row">
+              <div>
+                <p class="srow-label">Partage de position</p>
+                <p class="srow-sub">Visible par le responsable pendant l'alerte</p>
+              </div>
+              <div class="toggle off"></div>
+            </div>
+          </div>
+
+          <div class="detail-block">
+            <p class="section-title" style="padding:0;margin:14px 0 4px;">Contact d'urgence</p>
+            <div class="contact-mini">
+              <div class="cavatar">RB</div>
+              <div>
+                <p class="cname">Rachid Boudjemaa</p>
+                <p class="crole">Responsable d'exploitation</p>
+              </div>
+              <i class="ti ti-phone cicon"></i>
+            </div>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- ECRAN AUTO-CONTROLE -->
+  <div>
+    <p class="phone-label">Auto-controle qualite</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="detail-header">
+            <div class="back"><i class="ti ti-arrow-left"></i></div>
+            <p class="htitle">Auto-controle — Cegetel</p>
+          </div>
+
+          <div class="pti-status-bar" style="background:var(--accent-bg);color:var(--accent-text);margin-top:2px;">
+            <i class="ti ti-robot"></i> Controle demande par le systeme — echeance 17:00
+          </div>
+
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:50%;"></div></div>
+            <p class="progress-label">2 sur 4 points verifies</p>
+          </div>
+
+          <div class="detail-block" style="padding-top:10px;">
+            <p class="section-title" style="padding:0;margin:0 0 8px;">Grille de controle vitres</p>
+          </div>
+
+          <div class="qc-item">
+            <div class="qtop">
+              <div>
+                <p class="qname">Vitrines rez-de-chaussee</p>
+                <p class="qzone">Zone accueil</p>
+              </div>
+              <span class="qc-status ok">Conforme</span>
+            </div>
+          </div>
+
+          <div class="qc-item">
+            <div class="qtop">
+              <div>
+                <p class="qname">Baies vitrees bureaux</p>
+                <p class="qzone">Etage 1</p>
+              </div>
+              <span class="qc-status ok">Conforme</span>
+            </div>
+          </div>
+
+          <div class="qc-item">
+            <div class="qtop">
+              <div>
+                <p class="qname">Porte d'entree vitree</p>
+                <p class="qzone">Accueil</p>
+              </div>
+              <span class="qc-status issue">Anomalie</span>
+            </div>
+            <div class="qc-photo-row">
+              <div class="qc-photo-slot filled"></div>
+              <div class="qc-photo-slot"><i class="ti ti-camera-plus"></i></div>
+            </div>
+          </div>
+
+          <div class="qc-item">
+            <div class="qtop">
+              <div>
+                <p class="qname">Verriere hall</p>
+                <p class="qzone">Hall central</p>
+              </div>
+              <span class="qc-status pending">A verifier</span>
+            </div>
+            <div class="qc-actions">
+              <button>Anomalie</button>
+              <button class="primary">Conforme</button>
+            </div>
+          </div>
+
+          <div class="submit-bar">Valider l'auto-controle</div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN MESSAGES -->
+  <div>
+    <p class="phone-label">Messages</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Messages</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Equipe et responsables</p>
+            </div>
+          </div>
+
+          <div style="padding:0 18px 10px;">
+            <div class="pti-status-bar" style="background:var(--accent-bg);color:var(--accent-text);margin:0;">
+              <i class="ti ti-messages"></i> Messagerie interne
+            </div>
+          </div>
+
+          <div class="chat-thread-row">
+            <div class="cavatar">RB</div>
+            <div class="cbody">
+              <div class="ctop">
+                <p class="cname">Rachid Boudjemaa</p>
+                <span class="ctime">09:14</span>
+              </div>
+              <p class="cpreview">D'accord, je previens le client pour l'horaire</p>
+            </div>
+            <div class="chat-unread">2</div>
+          </div>
+
+          <div class="chat-thread-row">
+            <div class="cavatar">EQ</div>
+            <div class="cbody">
+              <div class="ctop">
+                <p class="cname">Equipe Macon</p>
+                <span class="ctime">hier</span>
+              </div>
+              <p class="cpreview">Julie: J'ai pris le materiel manquant</p>
+            </div>
+          </div>
+
+          <div class="chat-thread-row">
+            <div class="cavatar">MP</div>
+            <div class="cbody">
+              <div class="ctop">
+                <p class="cname">Mme Pelletier — Paie</p>
+                <span class="ctime">lun.</span>
+              </div>
+              <p class="cpreview">Bulletin de juillet disponible</p>
+            </div>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN CONVERSATION -->
+  <div>
+    <p class="phone-label">Conversation</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="detail-header">
+            <div class="back"><i class="ti ti-arrow-left"></i></div>
+            <div class="cavatar" style="width:32px;height:32px;font-size:11px;">RB</div>
+            <p class="htitle">Rachid Boudjemaa</p>
+          </div>
+
+          <p class="chat-time-label">Aujourd'hui 09:10</p>
+
+          <div class="chat-bubble-row in">
+            <div class="chat-bubble">Le client de Cegetel demande a decaler le creneau de cet apres-midi a 15h</div>
+          </div>
+          <div class="chat-bubble-row out">
+            <div class="chat-bubble">Ok pas de souci, je m'organise</div>
+          </div>
+          <div class="chat-bubble-row in">
+            <div class="chat-bubble">D'accord, je previens le client pour l'horaire</div>
+          </div>
+
+          <div style="margin-top:auto;">
+            <div class="chat-input-bar">
+              <span>Ecrire un message...</span>
+              <div class="send"><i class="ti ti-send" style="font-size:14px;"></i></div>
+            </div>
+            <div class="nav">
+              <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+              <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+              <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+              <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+              <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN DECLARATION ANOMALIE -->
+  <div>
+    <p class="phone-label">Declarer une anomalie</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="detail-header">
+            <div class="back"><i class="ti ti-arrow-left"></i></div>
+            <p class="htitle">Declarer une anomalie</p>
+          </div>
+
+          <p class="field-label" style="margin-top:10px;">Type d'anomalie</p>
+          <div class="anomaly-type-row">
+            <div class="anomaly-type selected">
+              <i class="ti ti-building"></i>
+              <p class="atname">Interne</p>
+            </div>
+            <div class="anomaly-type">
+              <i class="ti ti-users"></i>
+              <p class="atname">Externe / client</p>
+            </div>
+          </div>
+
+          <p class="field-label">Site concerne</p>
+          <div class="site-select" style="margin:0 18px 16px;">
+            <i class="ti ti-map-pin"></i>
+            <span>Bureaux Cegetel, Macon</span>
+            <i class="ti ti-chevron-down chev"></i>
+          </div>
+
+          <p class="field-label">Photos (obligatoire)</p>
+          <div class="photo-grid">
+            <div class="photo-slot-lg filled"></div>
+            <div class="photo-slot-lg filled"></div>
+            <div class="photo-slot-lg"><i class="ti ti-camera-plus"></i></div>
+          </div>
+
+          <p class="field-label">Commentaire</p>
+          <div class="comment-box">Decrivez l'anomalie constatee...</div>
+
+          <div class="anomaly-submit disabled">Ajouter un commentaire pour envoyer</div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN FORMATION -->
+  <div>
+    <p class="phone-label">Formation</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Formation</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Modules et competences</p>
+            </div>
+          </div>
+
+          <div class="training-progress-card">
+            <div class="tprow">
+              <div>
+                <p class="tnum">6 / 9</p>
+                <p class="tlbl">modules completes</p>
+              </div>
+              <div style="text-align:right;">
+                <p class="tnum" style="color:var(--accent-text);">67%</p>
+                <p class="tlbl">progression</p>
+              </div>
+            </div>
+            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:67%;"></div></div>
+          </div>
+
+          <p class="section-title">A faire cette semaine</p>
+
+          <div class="course-card">
+            <div class="course-thumb"><i class="ti ti-spray"></i><div class="playdot"><i class="ti ti-player-play"></i></div></div>
+            <div class="course-body">
+              <p class="cname">Dosage produits chimiques</p>
+              <p class="cmeta">Video — 4 min</p>
+            </div>
+            <span class="course-badge todo">a faire</span>
+          </div>
+
+          <div class="course-card">
+            <div class="course-thumb"><i class="ti ti-shield-check"></i><div class="playdot"><i class="ti ti-player-play"></i></div></div>
+            <div class="course-body">
+              <p class="cname">Gestes et postures</p>
+              <p class="cmeta">Video — 6 min + quiz</p>
+            </div>
+            <span class="course-badge todo">a faire</span>
+          </div>
+
+          <p class="section-title">Termines</p>
+
+          <div class="course-card">
+            <div class="course-thumb"><i class="ti ti-toilet-paper"></i></div>
+            <div class="course-body">
+              <p class="cname">Accueil et savoir-etre client</p>
+              <p class="cmeta">Complete — 15 aout</p>
+            </div>
+            <span class="course-badge done"><i class="ti ti-check"></i></span>
+          </div>
+
+          <div class="course-card">
+            <div class="course-thumb"><i class="ti ti-nfc"></i></div>
+            <div class="course-body">
+              <p class="cname">Utilisation de l'application</p>
+              <p class="cmeta">Complete — 2 aout</p>
+            </div>
+            <span class="course-badge done"><i class="ti ti-check"></i></span>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN DASHBOARD KPI -->
+  <div>
+    <p class="phone-label">Dashboard KPI</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Tableau de bord</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Vue equipe — Macon</p>
+            </div>
+          </div>
+
+          <div class="role-toggle">
+            <div class="role-chip">Agent</div>
+            <div class="role-chip active">Chef d'equipe</div>
+            <div class="role-chip">Resp. exploitation</div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <i class="ti ti-clock kicon"></i>
+              <p class="kval">96,4%</p>
+              <p class="klbl">Ponctualite</p>
+              <span class="kpi-trend up"><i class="ti ti-trending-up"></i> +1,2 pt</span>
+            </div>
+            <div class="kpi-card">
+              <i class="ti ti-checklist kicon"></i>
+              <p class="kval">91%</p>
+              <p class="klbl">Auto-controles conformes</p>
+              <span class="kpi-trend down"><i class="ti ti-trending-down"></i> -3 pt</span>
+            </div>
+            <div class="kpi-card">
+              <i class="ti ti-alert-triangle kicon"></i>
+              <p class="kval">4</p>
+              <p class="klbl">Anomalies ouvertes</p>
+              <span class="kpi-trend down"><i class="ti ti-trending-up"></i> +2</span>
+            </div>
+            <div class="kpi-card">
+              <i class="ti ti-users kicon"></i>
+              <p class="kval">2</p>
+              <p class="klbl">Absences non planifiees</p>
+              <span class="kpi-trend up"><i class="ti ti-trending-down"></i> -1</span>
+            </div>
+          </div>
+
+          <div class="kpi-list-card">
+            <p class="kpi-list-title">Ponctualite par agent</p>
+            <div class="kpi-bar-row">
+              <span class="kname">S. Martin</span>
+              <div class="kpi-bar-track"><div class="kpi-bar-fill" style="width:98%;"></div></div>
+              <span class="kpi-bar-val">98%</span>
+            </div>
+            <div class="kpi-bar-row">
+              <span class="kname">J. Dubois</span>
+              <div class="kpi-bar-track"><div class="kpi-bar-fill" style="width:94%;"></div></div>
+              <span class="kpi-bar-val">94%</span>
+            </div>
+            <div class="kpi-bar-row">
+              <span class="kname">K. Nguyen</span>
+              <div class="kpi-bar-track"><div class="kpi-bar-fill warn" style="width:79%;"></div></div>
+              <span class="kpi-bar-val">79%</span>
+            </div>
+          </div>
+
+          <div class="kpi-list-card">
+            <p class="kpi-list-title">Sites a risque (taux d'anomalie)</p>
+            <div class="kpi-bar-row">
+              <span class="kname">Les Tilleuls</span>
+              <div class="kpi-bar-track"><div class="kpi-bar-fill warn" style="width:62%;"></div></div>
+              <span class="kpi-bar-val">62%</span>
+            </div>
+            <div class="kpi-bar-row">
+              <span class="kname">Cegetel</span>
+              <div class="kpi-bar-track"><div class="kpi-bar-fill" style="width:12%;"></div></div>
+              <span class="kpi-bar-val">12%</span>
+            </div>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item active"><i class="ti ti-chart-bar"></i><span class="lbl">KPI</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
