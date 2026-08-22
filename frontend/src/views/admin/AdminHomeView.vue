@@ -5,6 +5,7 @@ import AppHeader from '../../components/AppHeader.vue';
 <template>
   <AppHeader title="Administration" />
   <div class="menu">
+    <RouterLink to="/admin/planning" class="item">📅 Gérer le planning</RouterLink>
     <RouterLink to="/admin/salaries" class="item">👥 Gérer les salariés</RouterLink>
     <RouterLink to="/admin/chantiers" class="item">🏗️ Gérer les chantiers</RouterLink>
     <RouterLink to="/admin/produits" class="item">🧴 Gérer les produits</RouterLink>

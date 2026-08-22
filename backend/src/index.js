@@ -9,6 +9,8 @@ import productsRoutes from './routes/products.routes.js';
 import ordersRoutes from './routes/orders.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import employeesRoutes from './routes/employees.routes.js';
+import shiftsRoutes from './routes/shifts.routes.js';
+import timeEntriesRoutes from './routes/timeEntries.routes.js';
 
 initDb();
 
@@ -24,6 +26,8 @@ app.use('/api/products', productsRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/employees', employeesRoutes);
+app.use('/api/shifts', shiftsRoutes);
+app.use('/api/time-entries', timeEntriesRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Route introuvable' }));
 

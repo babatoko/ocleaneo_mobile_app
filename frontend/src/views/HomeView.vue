@@ -13,6 +13,8 @@ onMounted(() => {
   <div class="home">
     <h1>Bonjour {{ auth.employee?.name || '' }} 👋</h1>
     <div class="menu">
+      <RouterLink to="/planning" class="tile">📅<span>Planning</span></RouterLink>
+      <RouterLink to="/pointage" class="tile">⏱️<span>Pointage</span></RouterLink>
       <RouterLink to="/commande/chantier" class="tile">🛒<span>Commander</span></RouterLink>
       <RouterLink to="/inventaire" class="tile">📦<span>Inventaire</span></RouterLink>
       <RouterLink to="/historique" class="tile">🕓<span>Historique</span></RouterLink>

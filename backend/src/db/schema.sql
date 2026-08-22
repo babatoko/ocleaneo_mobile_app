@@ -70,3 +70,25 @@ CREATE TABLE IF NOT EXISTS inventory_items (
     packaging_id INTEGER REFERENCES product_packagings(id),
     quantity_remaining INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS shifts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER REFERENCES employees(id),
+    chantier_id INTEGER REFERENCES chantiers(id),
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    status TEXT DEFAULT 'confirmed',
+    note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS time_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER REFERENCES employees(id),
+    chantier_id INTEGER REFERENCES chantiers(id),
+    shift_id INTEGER REFERENCES shifts(id),
+    type TEXT NOT NULL,
+    recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    latitude REAL,
+    longitude REAL
+);

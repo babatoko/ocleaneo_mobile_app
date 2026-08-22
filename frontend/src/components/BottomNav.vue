@@ -6,11 +6,11 @@ const auth = useAuthStore();
 
 <template>
   <nav class="bottom-nav">
-    <RouterLink to="/" class="nav-item">🏠<span>Accueil</span></RouterLink>
+    <RouterLink to="/planning" class="nav-item">📅<span>Planning</span></RouterLink>
+    <RouterLink to="/pointage" class="nav-item">⏱️<span>Pointage</span></RouterLink>
     <RouterLink to="/commande/chantier" class="nav-item">🛒<span>Commande</span></RouterLink>
-    <RouterLink to="/inventaire" class="nav-item">📦<span>Inventaire</span></RouterLink>
     <RouterLink to="/historique" class="nav-item">🕓<span>Historique</span></RouterLink>
-    <RouterLink v-if="auth.isAdmin" to="/admin" class="nav-item">⚙️<span>Admin</span></RouterLink>
+    <RouterLink to="/" class="nav-item">🏠<span>Accueil</span></RouterLink>
   </nav>
 </template>
 
