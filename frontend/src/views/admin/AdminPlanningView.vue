@@ -60,8 +60,8 @@ function timeRange(s) {
         <option value="" disabled>Chantier</option>
         <option v-for="c in chantiers" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
+      <input v-model="form.date" type="date" required />
       <div class="row">
-        <input v-model="form.date" type="date" required />
         <input v-model="form.start" type="time" required />
         <input v-model="form.end" type="time" required />
       </div>
@@ -113,6 +113,7 @@ function timeRange(s) {
 
 .row input {
   flex: 1;
+  min-width: 0;
 }
 
 .new button {

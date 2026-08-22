@@ -28,10 +28,13 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore();
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } };
+  }
+  if (auth.isAuthenticated && !auth.employee) {
+    await auth.fetchMe();
   }
   if (to.meta.adminOnly && !auth.isAdmin) {
     return { name: 'home' };
