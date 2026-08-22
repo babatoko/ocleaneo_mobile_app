@@ -1,12 +1,14 @@
 # Ocleaneo Mobile App
 
-Application mobile (PWA) Ocleaneo pour la gestion terrain : planning, pointage, commande de produits d'entretien, inventaire de chantier, historique et administration.
+Application mobile **Android et iOS** (via Capacitor) Ocleaneo pour la gestion terrain : planning, pointage, commande de produits d'entretien, inventaire de chantier, historique et administration. Le même code Vue est aussi packagé en PWA pour un accès web.
 
 ## Stack
 
-- **Frontend** : Vue 3 + Vite, Vue Router, Pinia, Axios, PWA installable (`vite-plugin-pwa`)
+- **Frontend** : Vue 3 + Vite, Vue Router, Pinia, Axios
+- **Apps natives** : [Capacitor](https://capacitorjs.com) 8 — enveloppe le build web dans un shell natif Android (`frontend/android/`) et iOS (`frontend/ios/`), donne accès aux API natives (caméra, géolocalisation, NFC, notifications push) nécessaires aux écrans du mockup (pointage NFC, photos d'anomalie, PTI/SOS)
+- **PWA** : `vite-plugin-pwa` en plus, pour un accès web installable indépendant des stores
 - **Backend : Odoo 14 + modules OCA** (instance existante, à connecter — voir [Intégration Odoo](#intégration-odoo) ci-dessous)
-- **Déploiement frontend** : Docker + Nginx
+- **Déploiement web** : Docker + Nginx (pour la variante PWA/navigateur)
 
 > ⚠️ Le backend Node.js/Express + SQLite qui existait dans une version précédente de ce projet a été retiré : le backend réel est une instance Odoo 14. Le frontend décrit ci-dessous appelait cette ancienne API (`/api/...`) et doit être rebranché sur Odoo — voir la section Intégration Odoo.
 
@@ -28,10 +30,31 @@ ocleaneo_mobile_app/
 │   │   ├── router/             # Vue Router + garde d'authentification
 │   │   └── services/api.js     # Client Axios — À REBRANCHER sur Odoo
 │   └── Dockerfile / nginx.conf
+│   ├── android/                # Projet natif Android (généré par `cap add android`)
+│   ├── ios/                    # Projet natif iOS (généré par `cap add ios`)
+│   └── capacitor.config.json   # appId com.ocleaneo.mobile, webDir dist
 ├── docs/
 │   └── mockup-pointage-planning.html   # Mockup de référence (17 écrans, vision produit complète)
-└── docker-compose.yml          # Sert uniquement le frontend (VITE_API_URL → Odoo)
+└── docker-compose.yml          # Sert la variante web/PWA (VITE_API_URL → Odoo)
 ```
+
+## Apps natives (Capacitor)
+
+```bash
+cd frontend
+npm install
+
+# build web + synchronise vers android/ et ios/
+npm run cap:sync
+
+# ouvre le projet natif dans l'IDE correspondant
+npm run cap:android   # nécessite Android Studio + Android SDK
+npm run cap:ios        # nécessite macOS + Xcode (impossible à générer/builder depuis cet environnement Linux)
+```
+
+`android/` a été scaffoldé et peut être ouvert avec Android Studio. `ios/` a été scaffoldé (fichiers de projet Xcode) mais n'a **jamais été buildé** — CocoaPods et Xcode ne sont disponibles que sur macOS, donc `pod install` et l'ouverture dans Xcode devront se faire sur une machine Mac.
+
+Après chaque changement du code Vue, relancer `npm run cap:sync` pour propager le nouveau build web vers les deux plateformes natives.
 
 ## Intégration Odoo
 
