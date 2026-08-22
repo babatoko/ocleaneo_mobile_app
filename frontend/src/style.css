@@ -123,14 +123,13 @@ select {
 
 .days {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   padding: 8px 14px 4px;
-  overflow-x: auto;
 }
 
 .day {
-  flex-shrink: 0;
-  min-width: 38px;
+  flex: 1;
+  min-width: 0;
   text-align: center;
   border: none;
   background: transparent;
