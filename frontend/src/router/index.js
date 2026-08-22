@@ -8,6 +8,7 @@ const routes = [
   { path: '/planning', name: 'planning', component: () => import('../views/planning/PlanningView.vue') },
   { path: '/planning/chantier/:id', name: 'planning-chantier', component: () => import('../views/planning/ChantierDetailView.vue'), props: true },
   { path: '/pointage', name: 'pointage', component: () => import('../views/pointage/PointageView.vue') },
+  { path: '/pointage/historique', name: 'pointage-historique', component: () => import('../views/pointage/PointageHistoryView.vue') },
 
   { path: '/commande/catalogue', name: 'commande-catalogue', component: () => import('../views/commande/CatalogueView.vue') },
   { path: '/commande/panier', name: 'commande-panier', component: () => import('../views/commande/PanierView.vue') },

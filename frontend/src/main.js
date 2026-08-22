@@ -14,7 +14,9 @@ app.use(router);
 
 // Enregistré avant même le montage : un badge peut relancer l'app depuis
 // fermée, la fenêtre pour rater la lecture doit être la plus courte possible.
-usePointageStore(pinia).initGlobalListener(router);
+const pointage = usePointageStore(pinia);
+pointage.initGlobalListener(router);
+pointage.initOfflineSync();
 ensureNotificationChannel();
 
 app.mount('#app');

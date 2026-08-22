@@ -6,6 +6,7 @@ import { useAuthStore } from '../../stores/auth';
 import { useChantiersStore } from '../../stores/chantiers';
 import { usePlanningStore } from '../../stores/planning';
 import { getCurrentPosition, getOptimizedTrip } from '../../services/osrm';
+import { startOfWeekIso } from '../../utils/week';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -22,10 +23,7 @@ function toIso(date) {
 }
 
 function startOfWeek(dateIso) {
-  const d = new Date(dateIso + 'T00:00:00');
-  const day = (d.getDay() + 6) % 7; // 0 = lundi
-  d.setDate(d.getDate() - day);
-  return d;
+  return new Date(startOfWeekIso(dateIso) + 'T00:00:00');
 }
 
 const weekDays = computed(() => {

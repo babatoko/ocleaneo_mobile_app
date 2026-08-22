@@ -109,6 +109,28 @@ La permission est demandée au premier pointage (`ensurePermission()`), pas au d
 
 **Limite honnête** : la notification native ne reproduit pas exactement la maquette (carte à deux colonnes, badge « En cours », ligne « Prochain » en transparence) — c'est le système (iOS/Android) qui gère la mise en page réelle d'une notification, avec un gabarit beaucoup plus limité (titre/corps/corps étendu). Non testable dans ce bac à sable (pas de matériel Android/iOS) : à valider sur device.
 
+### Fiabilité, confiance et suivi — vers un pointage « best in class »
+
+Six axes ajoutés au-dessus du pointage NFC de base, tous dans `stores/pointage.js` sauf mention contraire :
+
+**Mode hors ligne** (`services/offlineQueue.js`) — si `POST /time-entries` échoue par coupure réseau (pas une erreur métier — `!error.response`), le pointage est mis en file d'attente locale persistante (`@capacitor/preferences`) au lieu d'être perdu, avec une mise à jour optimiste immédiate de l'écran (marquée « en attente de synchronisation »). La file est rejouée dans l'ordre dès que `@capacitor/network` signale un retour de connexion ou que `@capacitor/app` signale un retour au premier plan (`watchConnectivity()`), en s'arrêtant à la première entrée qui échoue encore pour ne pas désynchroniser l'alternance arrivée/départ. `stores/chantiers.js` met aussi en cache la liste des chantiers (même mécanisme) pour que le badge reste reconnaissable même hors ligne. *Limite* : sans avoir jamais eu de réseau au moins une fois dans la session (chantiers jamais mis en cache), un badge ne peut pas être matché — couvre le cas réel (perte de réseau sur site après une ouverture d'app le matin), pas un premier lancement hors ligne.
+
+**Anti-fraude par géofence** (`services/geofence.js`) — la position captée au scan est comparée aux `latitude`/`longitude` du chantier (distance de Haversine, tolérance `GEOFENCE_TOLERANCE_M = 150` m pour absorber l'imprécision GPS en intérieur). Un dépassement ne bloque **jamais** le pointage (un salarié ne doit pas être pénalisé par une dérive GPS) — il est seulement signalé (`outOfRange: true` envoyé au serveur, message à l'écran) pour permettre une revue a posteriori côté Odoo.
+
+**Retour haptique + animation** (`services/haptics.js`) — `Haptics.notification()` sur succès/échec de scan (guard `Capacitor.isNativePlatform()`, aucun effet web). Un check ✓ animé remplace brièvement l'icône NFC sur le cercle après un pointage réussi.
+
+**Historique complet des pointages** — `/api/time-entries/mine?from&to` (nouveau contrat, à côté de `/time-entries/today`) alimente `views/pointage/PointageHistoryView.vue` (`/pointage/historique`), qui liste les 14 derniers jours groupés par date. L'écran Pointage n'affichait jusque-là que le jour même.
+
+**Compteur d'heures hebdomadaire + alerte de dépassement** — `loadWeekSummary()` charge les vacations et pointages de la semaine calendaire en cours ; `weekWorkedHours` associe chronologiquement arrivées/départs (en déduisant les pauses) pour un total qui **avance en direct** tant qu'une session reste ouverte, pas seulement une fois le départ badgé. Comparé à `weekPlannedHours` (somme des vacations planifiées), un badge « Dépassement » et une barre de progression ambrée apparaissent si `weekOvertimeHours > 0`.
+
+**Pauses** — le badge NFC ne peut pas à lui seul distinguer « je pars » de « je fais une pause » (c'est le même geste physique) : la pause est donc une action manuelle (bouton « Pause » / « Reprendre » sur l'écran Pointage), postant des entrées `pause_start` / `pause_end` sur le même endpoint `/time-entries`. Le statut du jour (`in` / `paused` / `out`) est dérivé du type du dernier pointage plutôt que d'un champ serveur séparé.
+
+**Rappel d'oubli de départ** — `scheduleDepartureReminder()` programme une notification locale 20 min après le départ estimé, annulée au pointage de départ (`cancelDepartureReminder()`). En complément, l'écran affiche un bandeau si la vacation est dépassée de plus de 20 min et que le salarié est toujours pointé présent (filet de sécurité si la notification système est retardée ou manquée).
+
+**Contrat Odoo à prévoir** pour tout ce qui précède : `POST /time-entries` doit accepter `recordedAt` (horodatage réel du scan, capturé côté client — important pour l'exactitude d'un pointage mis en file d'attente et synchronisé plus tard) et `outOfRange` (booléen, méta-donnée de revue) ; `type` doit accepter `pause_start`/`pause_end` en plus de `in`/`out` ; un nouvel endpoint `GET /time-entries/mine?from&to` doit renvoyer la liste des pointages sur une période.
+
+**Non testable dans ce bac à sable** : file hors ligne, géofence, haptique et rappel programmé nécessitent du matériel réel (pas de GPS/vibreur/notifications système dans Chromium headless) — vérifiés par relecture de code et par la partie testable en navigateur (rendu des écrans, calculs d'heures, historique, bascule pause). À valider sur device.
+
 ## Planning — vue Tournée (itinéraire optimisé OSRM)
 
 Le Planning a trois onglets : Jour, Semaine, et **Tournée**. La Tournée calcule l'ordre de passage optimal sur les chantiers du jour et l'itinéraire associé via [OSRM](http://project-osrm.org/) (Open Source Routing Machine), affiché sur une carte [Leaflet](https://leafletjs.com/) / tuiles OpenStreetMap :

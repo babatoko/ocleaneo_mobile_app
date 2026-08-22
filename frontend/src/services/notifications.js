@@ -2,6 +2,8 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 const SHIFT_NOTIFICATION_ID = 1001;
+const REMINDER_NOTIFICATION_ID = 1002;
+const REMINDER_DELAY_MIN = 20;
 const CHANNEL_ID = 'pointage';
 
 let permissionGranted = false;
@@ -72,4 +74,35 @@ export async function showClockedInNotification({ chantierName, arrivalAt, estim
 export async function clearClockedInNotification() {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.cancel({ notifications: [{ id: SHIFT_NOTIFICATION_ID }] }).catch(() => {});
+}
+
+/**
+ * Programme un rappel « vous êtes toujours pointé présent » à envoyer si le
+ * salarié n'a pas badgé son départ {REMINDER_DELAY_MIN} minutes après la fin
+ * estimée de sa vacation. Annulé au pointage de départ (voir ci-dessous) ou
+ * remplacé par le prochain appel si un nouveau pointage d'arrivée est fait.
+ */
+export async function scheduleDepartureReminder({ chantierName, estimatedDeparture }) {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!(await ensurePermission())) return;
+
+  const at = new Date(new Date(estimatedDeparture).getTime() + REMINDER_DELAY_MIN * 60000);
+  if (at.getTime() <= Date.now()) return; // fin déjà dépassée de plus de 20 min : inutile
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: REMINDER_NOTIFICATION_ID,
+        title: 'Toujours sur le chantier ?',
+        body: `Vous êtes encore pointé présent sur ${chantierName} — pensez à badger votre départ.`,
+        channelId: CHANNEL_ID,
+        schedule: { at },
+      },
+    ],
+  });
+}
+
+export async function cancelDepartureReminder() {
+  if (!Capacitor.isNativePlatform()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: REMINDER_NOTIFICATION_ID }] }).catch(() => {});
 }
