@@ -5,6 +5,7 @@ import AppHeader from '../../components/AppHeader.vue';
 
 const employees = ref([]);
 const newName = ref('');
+const newUsername = ref('');
 
 async function refresh() {
   const { data } = await api.get('/employees');
@@ -14,9 +15,10 @@ async function refresh() {
 onMounted(refresh);
 
 async function create() {
-  if (!newName.value.trim()) return;
-  await api.post('/employees', { name: newName.value.trim() });
+  if (!newName.value.trim() || !newUsername.value.trim()) return;
+  await api.post('/employees', { name: newName.value.trim(), username: newUsername.value.trim() });
   newName.value = '';
+  newUsername.value = '';
   await refresh();
 }
 
@@ -36,13 +38,15 @@ async function deactivate(emp) {
   <div class="content">
     <form class="new" @submit.prevent="create">
       <input v-model="newName" placeholder="Nom du salarié" />
+      <input v-model="newUsername" placeholder="Identifiant de connexion" autocapitalize="none" />
       <button type="submit">Ajouter</button>
     </form>
+    <p class="hint">Le mot de passe initial est envoyé au salarié séparément (Odoo).</p>
 
     <div v-for="e in employees" :key="e.id" class="row">
       <div>
         <strong>{{ e.name }}</strong>
-        <span>Code : {{ e.login_code }}{{ e.is_admin ? ' · admin' : '' }}</span>
+        <span>Identifiant : {{ e.username }}{{ e.is_admin ? ' · admin' : '' }}</span>
       </div>
       <div class="actions">
         <button @click="toggleAdmin(e)">{{ e.is_admin ? 'Retirer admin' : 'Rendre admin' }}</button>
@@ -62,14 +66,20 @@ async function deactivate(emp) {
 
 .new {
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .new input {
-  flex: 1;
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -6px 0 4px;
 }
 
 .new button {

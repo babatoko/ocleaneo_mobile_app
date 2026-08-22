@@ -11,8 +11,8 @@ export const useAuthStore = defineStore('auth', {
     isAdmin: (state) => !!state.employee?.isAdmin,
   },
   actions: {
-    async login(loginCode) {
-      const { data } = await api.post('/auth/login', { loginCode });
+    async login(username, password) {
+      const { data } = await api.post('/auth/login', { username, password });
       this.token = data.token;
       this.employee = data.employee;
       localStorage.setItem('ocleaneo_token', data.token);

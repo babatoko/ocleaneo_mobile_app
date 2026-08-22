@@ -21,14 +21,15 @@ ocleaneo_mobile_app/
 │   │   ├── views/
 │   │   │   ├── planning/       # Planning jour/semaine
 │   │   │   ├── pointage/       # Badge virtuel arrivée/départ
-│   │   │   ├── commande/       # Choix chantier → catalogue → panier → récap
+│   │   │   ├── commande/       # Écran Stock (site + catalogue + panier) → récap
 │   │   │   ├── inventaire/    # Saisie du stock restant
 │   │   │   ├── historique/    # Historique des commandes
 │   │   │   └── admin/         # Gestion salariés / chantiers / produits / planning
-│   │   ├── components/        # BottomNav, ProductCard, QuantityStepper, AppHeader
+│   │   ├── components/        # BottomNav, QuantityStepper, AppHeader
 │   │   ├── stores/             # Pinia : auth, chantiers, panier
 │   │   ├── router/             # Vue Router + garde d'authentification
-│   │   └── services/api.js     # Client Axios — À REBRANCHER sur Odoo
+│   │   ├── services/api.js     # Client Axios — À REBRANCHER sur Odoo
+│   │   └── services/biometric.js  # Empreinte via @capgo/capacitor-native-biometric
 │   └── Dockerfile / nginx.conf
 │   ├── android/                # Projet natif Android (généré par `cap add android`)
 │   ├── ios/                    # Projet natif iOS (généré par `cap add ios`)
@@ -56,6 +57,17 @@ npm run cap:ios        # nécessite macOS + Xcode (impossible à générer/build
 
 Après chaque changement du code Vue, relancer `npm run cap:sync` pour propager le nouveau build web vers les deux plateformes natives.
 
+## Authentification
+
+Identifiant + mot de passe, stockés sur la fiche employé (côté Odoo). L'empreinte n'est proposée que si l'appareil dispose d'un lecteur :
+
+1. Premier login : formulaire identifiant/mot de passe (`POST /api/auth/login { username, password }`).
+2. Si l'appareil a un capteur biométrique disponible (`NativeBiometric.isAvailable()`, via `@capgo/capacitor-native-biometric`), les identifiants sont enregistrés dans le stockage sécurisé natif (Keychain iOS / Keystore Android, `accessControl: BIOMETRY_ANY`) juste après une connexion réussie.
+3. Aux connexions suivantes sur cet appareil, l'écran affiche directement le cercle d'empreinte (`getSecureCredentials`, qui déclenche le prompt biométrique du système) au lieu du formulaire ; un lien « Utiliser le mot de passe » reste disponible en repli.
+4. Sur le web (PWA, pas de plateforme native), `isAvailable()` retourne `false` et l'app retombe simplement sur le formulaire — aucun crash, aucune dépendance à un lecteur.
+
+`frontend/src/services/biometric.js` encapsule tous les appels au plugin ; `LoginView.vue` ne fait que consommer `isBiometricAvailable()` / `hasSavedCredentials()` / `getSavedCredentials()` / `saveCredentials()`.
+
 ## Intégration Odoo
 
 Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Décisions encore ouvertes avant de rebrancher le frontend :
@@ -64,7 +76,7 @@ Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Dé
 2. **Protocole d'API** entre l'app Vue et Odoo :
    - **OCA `base_rest`** (repo `rest-framework`) : expose des endpoints REST/JSON propres, plus simple à consommer depuis Axios que le JSON-RPC natif. Recommandé pour une app mobile/SPA.
    - **JSON-RPC natif** (`/web/dataset/call_kw`) : zéro dépendance supplémentaire côté Odoo mais payloads plus rigides, moins adapté à un client REST classique.
-   - **Authentification** : à coupler avec un module OCA comme `auth_api_key` (repo `server-auth`) ou `auth_jwt` si on veut garder un flux proche de l'actuel (code salarié → token Bearer).
+   - **Authentification** : Odoo doit vérifier identifiant + mot de passe (stockés sur la fiche employé) et renvoyer un token Bearer — via un module OCA comme `auth_api_key` (repo `server-auth`) ou `auth_jwt`. La biométrie (voir [Authentification](#authentification) ci-dessus) est gérée uniquement côté app, Odoo ne voit jamais que du login/mot de passe classique.
 3. **Mapping métier** — le domaine (chantiers, salariés, planning, pointage, stock par site) correspond de près à la suite **OCA Field Service Management** (repo `field-service`) :
    - `fsm.location` ↔ chantier
    - `fsm.person` / `hr.employee` ↔ salarié
@@ -79,12 +91,13 @@ Une fois ces points tranchés, `frontend/src/services/api.js` et les stores Pini
 
 ## Fonctionnalités (vues déjà scaffoldées, backend à rebrancher)
 
+- **Connexion** : identifiant/mot de passe avec bascule automatique vers l'empreinte si l'appareil en a un (voir [Authentification](#authentification))
 - **Planning** : vue Jour (vacations du jour par chantier) et Semaine
 - **Pointage** : badge virtuel arrivée/départ, géolocalisation optionnelle, historique du jour
-- **Commande par chantier** : catalogue par catégorie → panier avec quantités → validation → récapitulatif + PDF
+- **Stock** : sélecteur de site, statut par produit (rupture/faible/suffisant), stepper de quantité, commande groupée → récapitulatif + PDF
 - **Inventaire** : saisie du stock restant par produit/conditionnement
 - **Historique** : commandes passées par le salarié connecté
-- **Administration** : salariés, chantiers, produits, planning (création de vacations)
+- **Administration** : salariés (identifiant, droits admin), chantiers, produits, planning (création de vacations)
 - **PWA** : installable sur écran d'accueil mobile (manifest + service worker)
 
 ## Mockup de référence
