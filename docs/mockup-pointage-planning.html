@@ -97,12 +97,13 @@
   }
 
   /* Days strip */
+  /* Les 7 jours se partagent toute la largeur (flex:1) plutot que de defiler :
+     le dernier jour ne doit pas etre coupe hors de l'ecran. */
   .days{
-    display:flex;gap:6px;padding:8px 14px 4px;
-    overflow-x:auto;
+    display:flex;gap:4px;padding:8px 14px 4px;
   }
   .day{
-    text-align:center;min-width:38px;
+    flex:1;min-width:0;text-align:center;
   }
   .day .dname{font-size:10px;color:var(--text-muted);margin:0 0 4px;}
   .day .dnum{
@@ -265,6 +266,37 @@
     flex:1;text-align:center;font-size:12px;padding:6px 0;border-radius:8px;color:var(--text-secondary);
   }
   .view-toggle .opt.active{background:var(--surface-2);color:var(--text-primary);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,0.06);}
+  .view-toggle.four .opt{font-size:11px;padding:7px 0;}
+
+  /* Etats de donnees : chargement / erreur. Un ecran vide et un chargement
+     qui a echoue ne veulent pas dire la meme chose pour le salarie — l'un
+     des deux merite un bouton Reessayer. */
+  .ds-skeletons{display:flex;flex-direction:column;gap:10px;padding:8px 18px;}
+  .ds-skeleton{height:76px;border-radius:12px;background:var(--surface-1);}
+  .ds-error{
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    padding:40px 28px;text-align:center;
+  }
+  .ds-error > i{font-size:30px;color:var(--text-muted);}
+  .ds-msg{font-size:13px;color:var(--text-secondary);margin:6px 0 0;}
+  .ds-retry{
+    display:flex;align-items:center;gap:6px;margin-top:14px;padding:9px 18px;
+    border-radius:10px;background:var(--accent-bg);color:var(--accent-text);
+    font-size:13px;font-weight:500;
+  }
+
+  /* Variante sombre : mêmes composants, seuls les tokens changent. */
+  .screen.dark{
+    --bg-page:#16150f;--surface-2:#201e18;--surface-1:#1c1a14;
+    --border:#322f26;--border-strong:#464236;
+    --text-primary:#f0eee6;--text-secondary:#aaa79b;--text-muted:#8a8779;
+    --accent:#3aab8b;--accent-bg:#1c3a32;--accent-text:#8fe0c7;
+    --warn-bg:#3a2e15;--warn-text:#e3b465;
+    --success-bg:#26340f;--success-text:#a9cf6e;
+    background:var(--bg-page);color:var(--text-primary);
+  }
+  .screen.dark .day.active .dnum{background:var(--text-primary);color:#16150f;}
+  .screen.dark .nav{background:var(--surface-2);}
 
   .day .dnum{position:relative;}
   .day-dot{
@@ -790,17 +822,18 @@
             <div class="avatar">SM</div>
           </div>
 
-          <div class="view-toggle">
+          <div class="view-toggle four">
             <div class="opt active">Jour</div>
             <div class="opt">Semaine</div>
+            <div class="opt">Mois</div>
             <div class="opt">Tournee</div>
           </div>
 
+          <!-- Bandeau ancre sur aujourd'hui a gauche, puis les 6 jours
+               suivants : une semaine calendaire placerait « aujourd'hui »
+               n'importe ou, y compris tout a droite. La pastille signale les
+               journees qui ont du travail, sans avoir a les ouvrir. -->
           <div class="days">
-            <div class="day">
-              <p class="dname">lun</p><div class="dnum">17</div>
-              <div class="day-dot"></div>
-            </div>
             <div class="day active">
               <p class="dname">mar</p><div class="dnum">18</div>
               <div class="day-dot"></div>
@@ -820,6 +853,14 @@
             <div class="day">
               <p class="dname">sam</p><div class="dnum">22</div>
               <div class="day-dot hidden"></div>
+            </div>
+            <div class="day">
+              <p class="dname">dim</p><div class="dnum">23</div>
+              <div class="day-dot hidden"></div>
+            </div>
+            <div class="day">
+              <p class="dname">lun</p><div class="dnum">24</div>
+              <div class="day-dot"></div>
             </div>
           </div>
 
@@ -1347,11 +1388,13 @@
             </div>
           </div>
 
+          <!-- « Inventaire » est ici parce que la saisie se fait sur place :
+               c'est depuis la vacation en cours que le geste a du sens. -->
           <div class="detail-actions">
             <div class="dbtn"><i class="ti ti-map-2"></i> Itineraire</div>
             <div class="dbtn"><i class="ti ti-phone"></i> Appeler</div>
-            <div class="dbtn"><i class="ti ti-message-circle"></i> Message</div>
             <div class="dbtn"><i class="ti ti-box"></i> Stock</div>
+            <div class="dbtn"><i class="ti ti-clipboard-list"></i> Inventaire</div>
           </div>
 
           <div class="detail-block">
@@ -1940,6 +1983,145 @@
             <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
             <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
             <div class="nav-item active"><i class="ti ti-chart-bar"></i><span class="lbl">KPI</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN PLANNING — CHARGEMENT ECHOUE -->
+  <div>
+    <p class="phone-label">Planning — chargement echoue</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Bonjour</p>
+              <p class="name">Sophie Martin</p>
+            </div>
+            <div class="avatar">SM</div>
+          </div>
+
+          <div class="view-toggle four">
+            <div class="opt active">Jour</div>
+            <div class="opt">Semaine</div>
+            <div class="opt">Mois</div>
+            <div class="opt">Tournee</div>
+          </div>
+
+          <p class="section-title">Mardi 18 aout</p>
+
+          <!-- Ne jamais afficher « aucune vacation » quand le chargement a
+               echoue : l'agent croirait sa journee libre. -->
+          <div class="ds-error">
+            <i class="ti ti-cloud-off"></i>
+            <p class="ds-msg">Pas de connexion — le planning n'a pas pu etre charge.</p>
+            <div class="ds-retry"><i class="ti ti-refresh"></i> Reessayer</div>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item active"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN PLANNING — MODE SOMBRE -->
+  <div>
+    <p class="phone-label">Planning — mode sombre</p>
+    <div class="phone">
+      <div class="screen dark">
+        <div class="status-bar"><span>5:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Bonjour</p>
+              <p class="name">Sophie Martin</p>
+            </div>
+            <div class="avatar">SM</div>
+          </div>
+
+          <div class="view-toggle four">
+            <div class="opt active">Jour</div>
+            <div class="opt">Semaine</div>
+            <div class="opt">Mois</div>
+            <div class="opt">Tournee</div>
+          </div>
+
+          <div class="days">
+            <div class="day active">
+              <p class="dname">mar</p><div class="dnum">18</div>
+              <div class="day-dot"></div>
+            </div>
+            <div class="day">
+              <p class="dname">mer</p><div class="dnum">19</div>
+              <div class="day-dot hidden"></div>
+            </div>
+            <div class="day">
+              <p class="dname">jeu</p><div class="dnum">20</div>
+              <div class="day-dot"></div>
+            </div>
+            <div class="day">
+              <p class="dname">ven</p><div class="dnum">21</div>
+              <div class="day-dot"></div>
+            </div>
+            <div class="day">
+              <p class="dname">sam</p><div class="dnum">22</div>
+              <div class="day-dot hidden"></div>
+            </div>
+            <div class="day">
+              <p class="dname">dim</p><div class="dnum">23</div>
+              <div class="day-dot hidden"></div>
+            </div>
+            <div class="day">
+              <p class="dname">lun</p><div class="dnum">24</div>
+              <div class="day-dot"></div>
+            </div>
+          </div>
+
+          <p class="section-title">Mardi 18 aout</p>
+
+          <div class="shift">
+            <div class="bar confirmed"></div>
+            <div class="card">
+              <div class="top">
+                <span class="time">06:00 - 09:00</span>
+                <span class="badge confirmed">confirme</span>
+              </div>
+              <p class="client">Bureaux Cegetel</p>
+              <p class="meta"><i class="ti ti-map-pin"></i> 12 rue des Freres Lumiere, Macon</p>
+              <div class="card-actions">
+                <a><i class="ti ti-map-2"></i> Itineraire</a>
+                <a><i class="ti ti-calendar-plus"></i> Calendrier</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="shift">
+            <div class="bar"></div>
+            <div class="card">
+              <div class="top">
+                <span class="time">14:00 - 16:30</span>
+                <span class="badge modified">modifie</span>
+              </div>
+              <p class="client">Residence Les Tilleuls</p>
+              <p class="meta"><i class="ti ti-map-pin"></i> Tournus</p>
+            </div>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item active"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item"><i class="ti ti-beach"></i><span class="lbl">Conges</span></div>
             <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
             <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
           </div>

@@ -27,7 +27,10 @@ onMounted(async () => {
   await pointage.loadWeekSummary().catch(() => {});
   await pointage.refreshQueueCount();
   initialLoadDone = true;
-  clockInterval = setInterval(() => (now.value = new Date()), 1000);
+  clockInterval = setInterval(() => {
+    now.value = new Date();
+    pointage.updateTick(); // fait avancer le total d'heures de la semaine
+  }, 1000);
 });
 
 onUnmounted(() => {
@@ -76,6 +79,20 @@ const overdueMinutes = computed(() => {
   const diffMin = (now.value - estimated) / 60000;
   return diffMin > 20 ? Math.round(diffMin) : 0;
 });
+
+// Un médaillon coloré seul était ambigu (vert = absent, ambre = présent se
+// lisait comme un avertissement) : le statut est désormais écrit.
+const statusText = computed(() =>
+  pointage.status === 'in' ? 'Présent' : pointage.status === 'paused' ? 'En pause' : 'Absent'
+);
+
+const statusIcon = computed(() =>
+  pointage.status === 'in'
+    ? 'ti-player-play'
+    : pointage.status === 'paused'
+      ? 'ti-player-pause'
+      : 'ti-player-stop'
+);
 
 function fmtOverdue(min) {
   if (min < 60) return `${min} min`;
@@ -141,8 +158,9 @@ function fmtTime(iso) {
       <p class="hello">Pointage</p>
       <p class="name sub-name">{{ now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
     </div>
-    <div class="avatar status-avatar" :class="{ active: pointage.status !== 'out' }">
-      <i class="ti ti-shield-check"></i>
+    <div class="status-pill" :class="pointage.status">
+      <i class="ti" :class="statusIcon"></i>
+      <span>{{ statusText }}</span>
     </div>
   </div>
 
@@ -177,7 +195,7 @@ function fmtTime(iso) {
     <p class="big-time">{{ now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</p>
     <p v-if="pointage.scanError" class="scan-error"><i class="ti ti-alert-circle"></i> {{ pointage.scanError }}</p>
     <p v-else-if="pointage.lastEntry" class="status-line">
-      {{ pointage.status === 'in' ? 'Présent' : pointage.status === 'paused' ? 'En pause' : 'Absent' }} — {{ pointage.lastEntry.chantier_name }}
+      {{ statusText }} — {{ pointage.lastEntry.chantier_name }}
     </p>
 
     <div v-if="pointage.status === 'in'" class="pause-actions">
@@ -230,18 +248,31 @@ function fmtTime(iso) {
   text-transform: capitalize;
 }
 
-.status-avatar {
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+}
+
+.status-pill i {
+  font-size: 14px;
+}
+
+.status-pill.in {
   background: var(--success-bg);
   color: var(--success-text);
 }
 
-.status-avatar.active {
+.status-pill.paused {
   background: var(--warn-bg);
   color: var(--warn-text);
-}
-
-.status-avatar i {
-  font-size: 16px;
 }
 
 .offline-banner,

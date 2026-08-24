@@ -7,6 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "check": "npm run lint && npm run test && npm run build",
     "cap:sync": "vite build && cap sync",
     "cap:android": "npm run cap:sync && cap open android",
     "cap:ios": "npm run cap:sync && cap open ios"
@@ -33,8 +37,13 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^6.0.8",
+    "eslint": "^10.9.0",
+    "eslint-plugin-vue": "^10.10.0",
+    "globals": "^17.11.0",
     "vite": "^8.2.0",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.11"
   }
 }

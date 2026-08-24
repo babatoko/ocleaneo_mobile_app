@@ -41,21 +41,50 @@ ocleaneo_mobile_app/
 │   │   │   ├── commande/       # Écran Stock (site + catalogue + panier) → récap
 │   │   │   ├── inventaire/    # Saisie du stock restant
 │   │   │   └── historique/    # Historique des commandes
-│   │   ├── components/        # BottomNav, QuantityStepper, AppHeader
+│   │   │   └── ProfileView.vue # Profil : notifications, biométrie, serveur, déconnexion
+│   │   ├── components/        # BottomNav, QuantityStepper, AppHeader, DataState
 │   │   ├── stores/             # Pinia : auth, chantiers, planning, pointage, panier
 │   │   ├── providers/          # Couche données backend-agnostique — voir ci-dessus
 │   │   ├── services/           # NFC, biométrie, notifications, hors ligne, navigation…
 │   │   ├── router/             # Vue Router + garde d'authentification
-│   │   └── utils/              # Aides date/semaine/mois, icônes produit
+│   │   └── utils/              # Dates locales, semaine/mois, icônes produit
+│   ├── eslint.config.js        # Lint (préréglage vue/essential : vrais défauts, pas de mise en forme)
 │   └── Dockerfile / nginx.conf
 │   ├── android/                # Projet natif Android (généré par `cap add android`)
 │   ├── ios/                    # Projet natif iOS (généré par `cap add ios`)
 │   └── capacitor.config.json   # appId com.ocleaneo.mobile, webDir dist
+├── .github/workflows/ci.yml    # lint + tests + build (dont un build en provider mock)
 ├── docs/
-│   ├── mockup-pointage-planning.html   # Mockup de référence (22 écrans, vision produit complète)
+│   ├── mockup-pointage-planning.html   # Mockup de référence (24 écrans, vision produit complète)
 │   └── retour-artefact.html            # Page publique (QR sur porte-clé/porte-carte) : procédure de retour
 └── docker-compose.yml          # Sert la variante web/PWA (VITE_API_URL → Odoo)
 ```
+
+## Qualité
+
+```bash
+cd frontend
+npm run lint     # ESLint (préréglage vue/essential)
+npm run test     # Vitest — logique de calcul et contrat des providers
+npm run check    # lint + test + build, ce que lance la CI
+```
+
+Les tests ciblent la logique où une erreur coûte cher plutôt que la couverture pour elle-même :
+
+- **`computeWorkedHours`** — le total d'heures de la semaine et l'alerte de dépassement. Couvre les pauses, une pause close par un départ (reprise oubliée), une session encore ouverte, les entrées désordonnées.
+- **`utils/date`** — les dates seules doivent rester dans le fuseau du salarié. `toISOString().slice(0,10)` datait en UTC : en France, tout ce qui se passe entre minuit et 2h était rattaché à la veille, or les équipes démarrent avant l'aube.
+- **`providers/errors`** — verrouille le contrat d'erreur (`.message` lisible, `.status`, `.isNetworkError`, jamais la forme axios `.response`). Une vue qui lisait encore `e.response.data.error` affichait « Identifiants incorrects » pour *toute* panne, y compris une coupure réseau ; ce test rend la régression impossible.
+- **`services/geofence`** — distances et tolérance de l'anti-fraude au pointage.
+
+### États d'écran
+
+`components/DataState.vue` porte les quatre états d'un écran alimenté par des données distantes : chargement (squelettes), erreur (message + **Réessayer**), vide, contenu. Il existe pour qu'aucun écran ne puisse plus afficher « aucune vacation » alors que le chargement a échoué — un planning vide et un planning non chargé ne veulent pas dire la même chose pour un salarié.
+
+### Thème sombre et accessibilité
+
+Le thème est entièrement piloté par les tokens CSS de `style.css` : `prefers-color-scheme: dark` n'y redéfinit que les variables, aucun composant ne déclare de couleur en dur. Deux tokens méritent une mention — `--on-solid` et `--on-accent`, la couleur du texte posé sur un aplat plein : sans eux, un `#fff` codé en dur devient illisible en sombre, où ces fonds s'éclaircissent.
+
+Côté accessibilité : `:focus-visible` global, cartes et lignes cliquables en vrais `<button>` (focusables et annoncés), libellés sur les commandes à icône seule, cibles tactiles de 44 px, et `prefers-reduced-motion` respecté. `viewport-fit=cover` étant actif, les en-têtes compensent `env(safe-area-inset-top)` et la zone de contenu `env(safe-area-inset-bottom)`, faute de quoi l'interface passe sous l'encoche et sous la barre gestuelle.
 
 ## Apps natives (Capacitor)
 
@@ -181,7 +210,7 @@ Quatre axes ajoutés au-dessus des vues de base :
 
 **Non testable dans ce bac à sable** : cache hors ligne, rappels programmés et notifications de changement nécessitent du matériel réel (pas de notifications système ni de vraie coupure réseau dans Chromium headless) — vérifiés par relecture de code et par tout ce qui est testable en navigateur (build propre, les 4 vues, export calendrier — son repli web affiche une erreur claire au lieu d'échouer silencieusement). À valider sur device.
 
-**Limite pré-existante non corrigée ici** : les conversions date-only du Planning (`toIso()`, `startOfWeekIso()`, et les nouvelles `startOfMonthIso()`/`endOfMonthIso()`) utilisent `Date.toISOString().slice(0, 10)`, qui peut décaler d'un jour près de minuit dans un fuseau en avance sur UTC (ex. Europe/Paris) — une conversion locale (`getFullYear()`/`getMonth()`/`getDate()`) serait plus correcte. Existait déjà avant ce chantier ; pas corrigé maintenant pour rester dans le périmètre demandé (amélioration du Planning), signalé ici pour une correction dédiée ultérieure.
+**Dates seules** : toutes les conversions passent par `utils/date.js` (`toLocalIso`, `todayIso`, `addDaysIso`), qui construit la chaîne à partir des composantes locales. L'ancienne forme `Date.toISOString().slice(0, 10)` datait en UTC et décalait d'un jour entre minuit et 2h du matin en Europe/Paris — un vrai problème pour des équipes qui démarrent avant l'aube. Ne pas la réintroduire : le comportement est verrouillé par `utils/__tests__/date.test.js`.
 
 ## Intégration Odoo
 
@@ -238,7 +267,7 @@ Aucun écran de gestion (création/édition de salariés, chantiers, produits, p
 
 ## Mockup de référence
 
-`docs/mockup-pointage-planning.html` présente la vision produit complète (22 écrans) : au-delà de planning/pointage déjà scaffoldés, elle couvre congés, dossier salarié RH, sécurité travailleur isolé (PTI/SOS), auto-contrôle qualité, déclaration d'anomalies, messagerie interne, formation, dashboard KPI, et **gestion des artefacts** (porte-clés, badges/codes portail-porte, empreintes) — traçabilité de qui détient quoi (Mes artefacts, détail avec historique de détention, registre par site pour un responsable), déclaration de perte et de retrouvaille par l'agent. Priorisation à définir avec le mapping modules Odoo/OCA ci-dessus.
+`docs/mockup-pointage-planning.html` présente la vision produit complète (24 écrans) : au-delà de planning/pointage déjà scaffoldés, elle couvre congés, dossier salarié RH, sécurité travailleur isolé (PTI/SOS), auto-contrôle qualité, déclaration d'anomalies, messagerie interne, formation, dashboard KPI, et **gestion des artefacts** (porte-clés, badges/codes portail-porte, empreintes) — traçabilité de qui détient quoi (Mes artefacts, détail avec historique de détention, registre par site pour un responsable), déclaration de perte et de retrouvaille par l'agent. Priorisation à définir avec le mapping modules Odoo/OCA ci-dessus.
 
 « Porte-clés » est le nom donné à l'objet physique remis à l'agent (par opposition à « clé » comme concept abstrait) — pas une unité de gestion à part qui regrouperait plusieurs sites. La gestion reste **par site** : chaque chantier a son propre porte-clés, avec son propre statut, sa propre déclaration de perte/retrouvaille et son propre historique de détention — même si le même agent en détient plusieurs. Badges/porte-cartes, codes et empreinte suivent le même principe : un artefact par site.
 

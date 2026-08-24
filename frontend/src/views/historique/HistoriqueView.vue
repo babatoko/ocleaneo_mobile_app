@@ -2,28 +2,45 @@
 import { onMounted, ref } from 'vue';
 import { provider } from '../../providers';
 import AppHeader from '../../components/AppHeader.vue';
+import DataState from '../../components/DataState.vue';
 
 const orders = ref([]);
+const loading = ref(true);
+const error = ref('');
 
-onMounted(async () => {
-  orders.value = await provider.fetchMyOrders();
-});
+async function load() {
+  loading.value = true;
+  error.value = '';
+  try {
+    orders.value = await provider.fetchMyOrders();
+  } catch (e) {
+    error.value = e.isNetworkError
+      ? "Pas de connexion — l'historique n'a pas pu être chargé."
+      : e.message || 'Historique indisponible.';
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(load);
 </script>
 
 <template>
   <AppHeader title="Historique des commandes" />
-  <div class="list">
-    <RouterLink
-      v-for="o in orders"
-      :key="o.id"
-      :to="`/commande/${o.id}/recap`"
-      class="order"
-    >
-      <strong>Commande n°{{ o.id }} — {{ o.chantier_name }}</strong>
-      <span>{{ new Date(o.created_at).toLocaleDateString('fr-FR') }} · {{ o.status }}</span>
-    </RouterLink>
-    <p v-if="!orders.length" class="empty">Aucune commande pour le moment.</p>
-  </div>
+  <DataState :loading="loading" :error="error" :empty="!orders.length" @retry="load">
+    <template #empty>Aucune commande pour le moment.</template>
+    <div class="list">
+      <RouterLink
+        v-for="o in orders"
+        :key="o.id"
+        :to="`/commande/${o.id}/recap`"
+        class="order"
+      >
+        <strong>Commande n°{{ o.id }} — {{ o.chantier_name }}</strong>
+        <span>{{ new Date(o.created_at).toLocaleDateString('fr-FR') }} · {{ o.status }}</span>
+      </RouterLink>
+    </div>
+  </DataState>
 </template>
 
 <style scoped>

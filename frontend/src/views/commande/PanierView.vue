@@ -97,7 +97,7 @@ async function submit() {
   border: none;
   border-radius: 8px;
   background: var(--primary);
-  color: white;
+  color: var(--on-accent);
   font-weight: 600;
 }
 

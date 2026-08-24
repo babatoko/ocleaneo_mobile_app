@@ -36,6 +36,16 @@ onMounted(async () => {
   }
 });
 
+// Un échec de connexion a trois causes très différentes pour le salarié : pas
+// de réseau (fréquent en sous-sol/local technique), mauvais identifiants, ou
+// serveur en panne. Les confondre sous « Identifiants incorrects » envoie
+// l'agent retaper un mot de passe correct.
+function loginErrorMessage(e) {
+  if (e.isNetworkError) return 'Pas de connexion — vérifiez votre réseau puis réessayez.';
+  if (e.status === 401 || e.status === 403) return 'Identifiants incorrects.';
+  return e.message || 'Connexion impossible pour le moment.';
+}
+
 async function afterLogin(loggedInUsername) {
   localStorage.setItem(LAST_USERNAME_KEY, loggedInUsername);
   if (pointage.pendingTagUid) {
@@ -54,8 +64,12 @@ async function tryBiometric() {
     const creds = await getSavedCredentials();
     await auth.login(creds.username, creds.password);
     await afterLogin(creds.username);
-  } catch {
-    error.value = "Authentification par empreinte annulée ou impossible.";
+  } catch (e) {
+    // Le réseau peut tomber après une empreinte pourtant valide : ne pas
+    // laisser croire que le capteur a échoué.
+    error.value = e.isNetworkError
+      ? loginErrorMessage(e)
+      : "Authentification par empreinte annulée ou impossible.";
   } finally {
     loading.value = false;
   }
@@ -82,7 +96,7 @@ async function submit() {
     }
     await afterLogin(username.value);
   } catch (e) {
-    error.value = e.response?.data?.error || 'Identifiants incorrects';
+    error.value = loginErrorMessage(e);
   } finally {
     loading.value = false;
   }
@@ -147,7 +161,7 @@ async function submit() {
   border: none;
   border-radius: 10px;
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   font-weight: 500;
 }
 

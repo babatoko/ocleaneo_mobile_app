@@ -14,10 +14,7 @@ import { hapticSuccess, hapticError, hapticTap } from '../services/haptics';
 import { checkGeofence } from '../services/geofence';
 import { enqueue, queueLength, flushQueue, watchConnectivity } from '../services/offlineQueue';
 import { startOfWeekIso } from '../utils/week';
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayIso } from '../utils/date';
 
 function getPosition() {
   return new Promise((resolve) => {
@@ -35,7 +32,7 @@ function getPosition() {
 // ouverte (présent ou en pause maintenant) compte jusqu'à l'instant présent,
 // pour un compteur qui avance en direct plutôt que de rester figé tant qu'on
 // n'a pas badgé le départ.
-function computeWorkedHours(entries, now = new Date()) {
+export function computeWorkedHours(entries, now = new Date()) {
   const sorted = [...entries].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
   let totalMs = 0;
   let openIn = null;
@@ -46,6 +43,10 @@ function computeWorkedHours(entries, now = new Date()) {
       openIn = t;
     } else if (e.type === 'out') {
       if (openIn) totalMs += t - openIn;
+      // Badger son départ pendant une pause est un cas réel (l'agent oublie de
+      // reprendre puis s'en va) : la pause est alors close par le départ, sans
+      // quoi son temps serait compté comme travaillé.
+      if (openPause) totalMs -= t - openPause;
       openIn = null;
       openPause = null;
     } else if (e.type === 'pause_start') {
@@ -77,6 +78,12 @@ export const usePointageStore = defineStore('pointage', {
     lastMessage: null, // { type: 'queued'|'warn', text } — feedback transitoire non bloquant
     pendingTagUid: null, // badge lu avant que le salarié soit authentifié
     offlineQueueCount: 0,
+    // Horloge réactive : sans elle, weekWorkedHours (un getter) ne se
+    // recalculerait jamais, puisqu'un `new Date()` interne n'est pas une
+    // dépendance réactive. Le compteur resterait figé à la valeur du
+    // chargement, alors qu'il est censé avancer tant que la session est
+    // ouverte.
+    tick: Date.now(),
   }),
   getters: {
     lastEntry: (state) => state.entries[state.entries.length - 1],
@@ -114,7 +121,7 @@ export const usePointageStore = defineStore('pointage', {
 
     weekPlannedHours: (state) =>
       state.weekShifts.reduce((sum, s) => sum + (new Date(s.end_at) - new Date(s.start_at)) / 3600000, 0),
-    weekWorkedHours: (state) => computeWorkedHours(state.weekEntries),
+    weekWorkedHours: (state) => computeWorkedHours(state.weekEntries, new Date(state.tick)),
     weekOvertimeHours() {
       return Math.max(0, this.weekWorkedHours - this.weekPlannedHours);
     },
@@ -152,6 +159,12 @@ export const usePointageStore = defineStore('pointage', {
 
     async refreshQueueCount() {
       this.offlineQueueCount = await queueLength();
+    },
+
+    /** Avance l'horloge du store — appelée par l'écran Pointage tant qu'il est
+     *  affiché, pour que le total d'heures de la semaine progresse en direct. */
+    updateTick() {
+      this.tick = Date.now();
     },
 
     async flushOfflineQueue() {

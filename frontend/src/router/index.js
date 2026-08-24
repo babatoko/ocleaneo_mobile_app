@@ -3,7 +3,10 @@ import { useAuthStore } from '../stores/auth';
 
 const routes = [
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
-  { path: '/', name: 'home', component: () => import('../views/HomeView.vue') },
+  // L'ancien écran d'accueil dupliquait la barre de navigation et n'avait plus
+  // d'entrée depuis que l'onglet Profil occupe la 5e place : le planning est le
+  // véritable point de départ de la journée.
+  { path: '/', redirect: '/planning' },
 
   { path: '/planning', name: 'planning', component: () => import('../views/planning/PlanningView.vue') },
   { path: '/planning/chantier/:id', name: 'planning-chantier', component: () => import('../views/planning/ChantierDetailView.vue'), props: true },

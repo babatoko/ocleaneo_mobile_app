@@ -8,27 +8,31 @@ import { getCurrentPosition, getOptimizedTrip } from '../../services/osrm';
 import { turnByTurnHref } from '../../services/navigation';
 import { exportShiftsToCalendar } from '../../services/calendarExport';
 import { startOfWeekIso, startOfMonthIso, endOfMonthIso } from '../../utils/week';
+import { toLocalIso, todayIso, addDaysIso } from '../../utils/date';
+import { provider } from '../../providers';
+import DataState from '../../components/DataState.vue';
 
 const router = useRouter();
 const auth = useAuthStore();
 const chantiers = useChantiersStore();
 const planning = usePlanningStore();
 const view = ref('jour'); // 'jour' | 'semaine' | 'mois' | 'tournee'
-const selectedDate = ref(toIso(new Date()));
-const monthAnchor = ref(toIso(new Date()));
+const selectedDate = ref(todayIso());
+const monthAnchor = ref(todayIso());
 const exportError = ref('');
+const todayIsoValue = todayIso();
 
-function toIso(date) {
-  return date.toISOString().slice(0, 10);
-}
+const toIso = toLocalIso;
 
 function startOfWeek(dateIso) {
   return new Date(startOfWeekIso(dateIso) + 'T00:00:00');
 }
 
+// Semaine complète du lundi au dimanche : une vacation programmée un dimanche
+// existe dans la vue Mois, elle doit aussi être visible ici.
 const weekDays = computed(() => {
   const start = startOfWeek(selectedDate.value);
-  return Array.from({ length: 6 }, (_, i) => {
+  return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     return d;
@@ -39,13 +43,48 @@ const weekDays = computed(() => {
 // suivi des 6 jours suivants — pas une semaine calendaire (qui peut placer
 // aujourd'hui n'importe où, y compris tout à droite).
 const dayStrip = computed(() => {
-  const start = new Date(toIso(new Date()) + 'T00:00:00');
+  const start = new Date(todayIsoValue + 'T00:00:00');
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     return d;
   });
 });
+
+// Nombre de vacations par jour sur la fenêtre du bandeau : permet d'afficher
+// la pastille « ce jour-là a du travail » sans avoir à ouvrir chaque journée.
+const stripCounts = ref({}); // 'AAAA-MM-JJ' -> nombre de vacations
+
+async function loadStripCounts() {
+  const from = todayIsoValue;
+  const to = addDaysIso(from, 6);
+  try {
+    const shifts = await provider.fetchShifts({ from, to });
+    const counts = {};
+    for (const s of shifts) {
+      const day = s.start_at.slice(0, 10);
+      counts[day] = (counts[day] || 0) + 1;
+    }
+    stripCounts.value = counts;
+  } catch {
+    // Indicateur purement informatif : son échec ne doit rien casser à l'écran.
+    stripCounts.value = {};
+  }
+}
+
+function dayCellLabel(d) {
+  const n = shiftsCountForDay(toIso(d));
+  const date = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  if (!n) return `${date}, aucune vacation`;
+  return `${date}, ${n} vacation${n > 1 ? 's' : ''}`;
+}
+
+function dayStripLabel(d) {
+  const n = stripCounts.value[toIso(d)] || 0;
+  const date = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  if (!n) return `${date}, aucune vacation`;
+  return `${date}, ${n} vacation${n > 1 ? 's' : ''}`;
+}
 
 const selectedDateLabel = computed(() =>
   new Date(selectedDate.value + 'T00:00:00').toLocaleDateString('fr-FR', {
@@ -191,7 +230,14 @@ async function loadTournee() {
   tripLoading.value = true;
   try {
     await chantiers.fetchMine();
-    const dayShifts = await planning.loadDay(selectedDate.value).then(() => planning.dayShifts);
+    await planning.loadDay(selectedDate.value);
+    // loadDay ne lève plus : c'est le store qui porte l'erreur, il faut donc
+    // la relayer ici plutôt que de calculer une tournée sur une liste vide.
+    if (planning.error) {
+      tripError.value = planning.error;
+      return;
+    }
+    const dayShifts = planning.dayShifts;
 
     const withCoords = [];
     for (const s of dayShifts) {
@@ -316,7 +362,10 @@ watch(view, (v, prev) => {
 });
 onMounted(async () => {
   if (!auth.employee) auth.fetchMe();
-  await chantiers.fetchMine(); // pour les liens Itinéraire avec guidage direct (coordonnées)
+  // Les coordonnées servent aux liens Itinéraire avec guidage direct ; leur
+  // absence ne doit pas empêcher l'affichage du planning lui-même.
+  await chantiers.fetchMine().catch(() => {});
+  loadStripCounts();
   refresh();
 });
 onUnmounted(destroyMap);
@@ -347,91 +396,131 @@ onUnmounted(destroyMap);
         :key="toIso(d)"
         class="day"
         :class="{ active: toIso(d) === selectedDate }"
+        :aria-label="dayStripLabel(d)"
+        :aria-current="toIso(d) === selectedDate ? 'date' : undefined"
         @click="pickDay(d)"
       >
-        <span class="dname">{{ d.toLocaleDateString('fr-FR', { weekday: 'short' }) }}</span>
-        <span class="dnum">{{ d.getDate() }}</span>
+        <span class="dname" aria-hidden="true">{{ d.toLocaleDateString('fr-FR', { weekday: 'short' }) }}</span>
+        <span class="dnum" aria-hidden="true">{{ d.getDate() }}</span>
+        <span class="day-dot" :class="{ hidden: !stripCounts[toIso(d)] }" aria-hidden="true"></span>
       </button>
     </div>
 
     <p class="section-title">{{ selectedDateLabel }}</p>
 
-    <div class="shift" v-for="s in planning.dayShifts" :key="s.id">
-      <div class="bar" :class="s.status"></div>
-      <div class="card" @click="openDetail(s)">
-        <div class="top">
-          <span class="time">{{ timeRange(s) }}</span>
-          <span class="badge" :class="s.status">{{
-            s.status === 'confirmed' ? 'confirmé' : s.status === 'modified' ? 'modifié' : s.status
-          }}</span>
-        </div>
-        <p class="client">{{ s.chantier_name }}</p>
-        <p class="place"><i class="ti ti-map-pin"></i> {{ s.chantier_address || s.chantier_name }}</p>
-        <p v-if="s.note" class="meta">{{ s.note }}</p>
-        <div class="card-actions">
-          <a :href="itineraryHref(s)" target="_blank" rel="noopener" @click.stop>
-            <i class="ti ti-map-2"></i> Itinéraire
-          </a>
-          <button type="button" @click.stop="exportToCalendar([s], `vacation-${s.id}.ics`)">
-            <i class="ti ti-calendar-plus"></i> Calendrier
+    <DataState
+      :loading="planning.loading"
+      :error="planning.error"
+      :empty="!planning.dayShifts.length"
+      @retry="loadDay"
+    >
+      <template #empty>Aucune vacation ce jour-là.</template>
+
+      <div class="shift" v-for="s in planning.dayShifts" :key="s.id">
+        <div class="bar" :class="s.status"></div>
+        <div class="card">
+          <button
+            type="button"
+            class="card-main"
+            :aria-label="`Détail de la vacation ${timeRange(s)} à ${s.chantier_name}`"
+            @click="openDetail(s)"
+          >
+            <div class="top">
+              <span class="time">{{ timeRange(s) }}</span>
+              <span class="badge" :class="s.status">{{
+                s.status === 'confirmed' ? 'confirmé' : s.status === 'modified' ? 'modifié' : s.status
+              }}</span>
+            </div>
+            <p class="client">{{ s.chantier_name }}</p>
+            <p class="place"><i class="ti ti-map-pin"></i> {{ s.chantier_address || s.chantier_name }}</p>
+            <p v-if="s.note" class="meta">{{ s.note }}</p>
           </button>
+          <div class="card-actions">
+            <a :href="itineraryHref(s)" target="_blank" rel="noopener">
+              <i class="ti ti-map-2"></i> Itinéraire
+            </a>
+            <button type="button" @click="exportToCalendar([s], `vacation-${s.id}.ics`)">
+              <i class="ti ti-calendar-plus"></i> Calendrier
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-    <p v-if="!planning.loading && !planning.dayShifts.length" class="empty">Aucune vacation ce jour-là.</p>
+    </DataState>
   </div>
 
   <div v-else-if="view === 'semaine'" class="week">
-    <button
-      v-if="Object.values(planning.weekShiftsByDay).flat().length"
-      type="button"
-      class="export-week-btn"
-      @click="exportToCalendar(Object.values(planning.weekShiftsByDay).flat(), 'planning-semaine.ics')"
+    <DataState
+      :loading="planning.loading"
+      :error="planning.error"
+      :empty="false"
+      @retry="loadWeek"
     >
-      <i class="ti ti-calendar-plus"></i> Exporter la semaine
-    </button>
+      <button
+        v-if="Object.values(planning.weekShiftsByDay).flat().length"
+        type="button"
+        class="export-week-btn"
+        @click="exportToCalendar(Object.values(planning.weekShiftsByDay).flat(), 'planning-semaine.ics')"
+      >
+        <i class="ti ti-calendar-plus"></i> Exporter la semaine
+      </button>
 
-    <div v-for="d in weekDays" :key="toIso(d)" class="week-day">
-      <div class="week-day-head" @click="pickDay(d)">
-        <strong>{{ d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) }}</strong>
-        <span class="count">{{ (planning.weekShiftsByDay[toIso(d)] || []).length }}</span>
+      <div v-for="d in weekDays" :key="toIso(d)" class="week-day">
+        <button type="button" class="week-day-head" @click="pickDay(d)">
+          <strong>{{ d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) }}</strong>
+          <span class="count">{{ (planning.weekShiftsByDay[toIso(d)] || []).length }}</span>
+        </button>
+        <div v-for="s in planning.weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift">
+          <button type="button" class="ws-info" @click="openDetail(s)">
+            {{ timeRange(s) }} · {{ s.chantier_name }}
+            <span v-if="s.status === 'modified'" class="ws-badge">modifié</span>
+          </button>
+          <a
+            class="ws-itin"
+            :href="itineraryHref(s)"
+            target="_blank"
+            rel="noopener"
+            :aria-label="`Itinéraire vers ${s.chantier_name}`"
+          >
+            <i class="ti ti-map-2"></i>
+          </a>
+        </div>
       </div>
-      <div v-for="s in planning.weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift">
-        <span class="ws-info" @click="openDetail(s)">
-          {{ timeRange(s) }} · {{ s.chantier_name }}
-          <span v-if="s.status === 'modified'" class="ws-badge">modifié</span>
-        </span>
-        <a class="ws-itin" :href="itineraryHref(s)" target="_blank" rel="noopener" @click.stop>
-          <i class="ti ti-map-2"></i>
-        </a>
-      </div>
-    </div>
+    </DataState>
   </div>
 
   <div v-else-if="view === 'mois'" class="month">
     <div class="month-nav">
-      <button type="button" @click="shiftMonth(-1)"><i class="ti ti-chevron-left"></i></button>
+      <button type="button" aria-label="Mois précédent" @click="shiftMonth(-1)"><i class="ti ti-chevron-left"></i></button>
       <strong>{{ monthLabel }}</strong>
-      <button type="button" @click="shiftMonth(1)"><i class="ti ti-chevron-right"></i></button>
+      <button type="button" aria-label="Mois suivant" @click="shiftMonth(1)"><i class="ti ti-chevron-right"></i></button>
     </div>
-    <div class="month-weekdays">
-      <span v-for="wd in ['L', 'M', 'M', 'J', 'V', 'S', 'D']" :key="wd">{{ wd }}</span>
+    <div class="month-weekdays" aria-hidden="true">
+      <span v-for="(wd, i) in ['L', 'M', 'M', 'J', 'V', 'S', 'D']" :key="i">{{ wd }}</span>
     </div>
-    <div class="month-grid">
-      <template v-for="(w, wi) in monthGridWeeks" :key="wi">
-        <button
-          v-for="d in w"
-          :key="toIso(d)"
-          type="button"
-          class="month-cell"
-          :class="{ dim: !isCurrentMonth(d), today: toIso(d) === toIso(new Date()) }"
-          @click="pickDay(d)"
-        >
-          <span class="mc-num">{{ d.getDate() }}</span>
-          <span class="mc-dot" :class="{ hidden: !shiftsCountForDay(toIso(d)) }"></span>
-        </button>
-      </template>
-    </div>
+    <DataState
+      :loading="planning.loading"
+      :error="planning.error"
+      :empty="false"
+      :skeleton-count="2"
+      @retry="loadMonth"
+    >
+      <div class="month-grid">
+        <template v-for="(w, wi) in monthGridWeeks" :key="wi">
+          <button
+            v-for="d in w"
+            :key="toIso(d)"
+            type="button"
+            class="month-cell"
+            :class="{ dim: !isCurrentMonth(d), today: toIso(d) === todayIsoValue }"
+            :aria-label="dayCellLabel(d)"
+            @click="pickDay(d)"
+          >
+            <span class="mc-num">{{ d.getDate() }}</span>
+            <span class="mc-dot" :class="{ hidden: !shiftsCountForDay(toIso(d)) }"></span>
+          </button>
+        </template>
+      </div>
+    </DataState>
   </div>
 
   <div v-else>
@@ -523,9 +612,15 @@ onUnmounted(destroyMap);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
   font-size: 13px;
   text-transform: capitalize;
-  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
 }
 
 .count {
@@ -544,7 +639,13 @@ onUnmounted(destroyMap);
 
 .week-shift .ws-info {
   flex: 1;
-  cursor: pointer;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
 }
 
 .ws-badge {
@@ -631,7 +732,7 @@ onUnmounted(destroyMap);
 
 .month-cell.today .mc-num {
   background: var(--text-primary);
-  color: #fff;
+  color: var(--on-solid);
   border-radius: 50%;
   width: 22px;
   height: 22px;
@@ -664,7 +765,7 @@ onUnmounted(destroyMap);
   gap: 8px;
   margin: 0 18px 14px;
   background: var(--text-primary);
-  color: #fff;
+  color: var(--on-solid);
   border-radius: 12px;
   padding: 12px;
   font-size: 13px;

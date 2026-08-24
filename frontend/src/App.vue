@@ -20,6 +20,9 @@ const showNav = computed(() => auth.isAuthenticated && !route.meta.public);
 .page {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 72px;
+  /* La barre du bas ajoute env(safe-area-inset-bottom) à sa propre hauteur :
+     le réserver ici aussi, sinon le dernier élément d'une liste passe sous
+     la nav sur les téléphones à barre gestuelle. */
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 </style>

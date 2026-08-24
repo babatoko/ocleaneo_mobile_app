@@ -16,19 +16,81 @@
   --success-text: #3b6d11;
   --danger: #c0392b;
   --danger-bg: #fbe6e3;
+  --skeleton-sheen: #eceadf;
+  /* Texte posé sur un aplat plein : --on-solid sur --text-primary,
+     --on-accent sur --accent. Sans ces tokens, un `#fff` en dur devient
+     illisible en mode sombre, où ces deux fonds s'éclaircissent. */
+  --on-solid: #ffffff;
+  --on-accent: #ffffff;
   --radius: 14px;
 
-  /* Aliases used across older components */
+  /* Alias conservés pour les composants les plus anciens. Ne jamais y
+     redéfinir un token déjà déclaré au-dessus : la seconde déclaration
+     gagnerait silencieusement (c'était le cas de --text-muted). */
   --bg: var(--bg-page);
   --surface: var(--surface-2);
   --text: var(--text-primary);
-  --text-muted: var(--text-secondary);
   --primary: var(--accent);
 
   font: 16px/1.5 -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light;
   color: var(--text-primary);
   background: var(--bg-page);
+}
+
+/* Mode sombre. Les agents badgent avant l'aube et en soirée, souvent dans des
+   locaux éteints : un écran blanc plein format éblouit à ces heures-là.
+   Seuls les tokens sont redéfinis — aucun composant ne déclare de couleur en
+   dur, donc tout suit. Le garde `:not([data-theme='light'])` laisse un choix
+   explicite de l'utilisateur l'emporter sur la préférence système. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg-page: #16150f;
+    --surface-2: #201e18;
+    --surface-1: #1c1a14;
+    --border: #322f26;
+    --border-strong: #464236;
+    --text-primary: #f0eee6;
+    --text-secondary: #aaa79b;
+    --text-muted: #8a8779;
+    --accent: #3aab8b;
+    --accent-bg: #1c3a32;
+    --accent-text: #8fe0c7;
+    --warn-bg: #3a2e15;
+    --warn-text: #e3b465;
+    --success-bg: #26340f;
+    --success-text: #a9cf6e;
+    --danger: #f08a7c;
+    --danger-bg: #3d211e;
+    --skeleton-sheen: #2a2721;
+    --on-solid: #16150f;
+    --on-accent: #06231c;
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg-page: #16150f;
+  --surface-2: #201e18;
+  --surface-1: #1c1a14;
+  --border: #322f26;
+  --border-strong: #464236;
+  --text-primary: #f0eee6;
+  --text-secondary: #aaa79b;
+  --text-muted: #8a8779;
+  --accent: #3aab8b;
+  --accent-bg: #1c3a32;
+  --accent-text: #8fe0c7;
+  --warn-bg: #3a2e15;
+  --warn-text: #e3b465;
+  --success-bg: #26340f;
+  --success-text: #a9cf6e;
+  --danger: #f08a7c;
+  --danger-bg: #3d211e;
+  --skeleton-sheen: #2a2721;
+
+  color-scheme: dark;
 }
 
 * {
@@ -58,12 +120,77 @@ select {
   font: inherit;
 }
 
+/* Un contour de focus visible partout : sans lui, l'app est inutilisable au
+   clavier et l'utilisateur ne sait jamais où il se trouve. `:focus-visible`
+   n'apparaît qu'à la navigation clavier, jamais au doigt. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Cible tactile minimale recommandée : sur un chantier, l'app est utilisée
+   debout, parfois avec des gants. */
+button,
+a,
+select,
+input[type='number'] {
+  min-height: 44px;
+}
+
+/* Les petites commandes en ligne (chevrons, liens d'entête) gardent leur
+   taille propre : la règle ci-dessus ne doit pas déformer la mise en page. */
+.nav-item,
+.see-all,
+.login-alt,
+.toggle,
+.day,
+.month-cell,
+.view-toggle .opt,
+.stepper button,
+.card-actions a,
+.card-actions button,
+.ws-itin,
+.ws-info,
+.week-day-head,
+.card-main,
+.filter-chip {
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Texte réservé aux lecteurs d'écran. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------------------------------------------------------------------
    Shared design-system classes (mirrors docs/mockup-pointage-planning.html)
    --------------------------------------------------------------------- */
 
+/* `viewport-fit=cover` (index.html) fait passer l'app sous la barre de statut :
+   tout ce qui est en haut de l'écran doit compenser l'encoche / l'îlot
+   dynamique / le poinçon, sinon l'en-tête est partiellement masqué. */
 .header {
-  padding: 16px 18px 6px;
+  padding: calc(16px + env(safe-area-inset-top)) 18px 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -159,7 +286,7 @@ select {
 
 .day.active .dnum {
   background: var(--text-primary);
-  color: #fff;
+  color: var(--on-solid);
   font-weight: 500;
 }
 
@@ -206,10 +333,24 @@ select {
 
 .shift .card {
   flex: 1;
+  min-width: 0;
   background: var(--surface-1);
   border-radius: 12px;
   padding: 10px 14px;
-  cursor: pointer;
+}
+
+/* Le résumé de la vacation est un vrai bouton (focusable, annoncé par les
+   lecteurs d'écran) ; les actions Itinéraire/Calendrier restent en dehors
+   pour ne pas imbriquer d'interactif dans de l'interactif. */
+.shift .card-main {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
 }
 
 .shift .top {
@@ -284,6 +425,9 @@ select {
   border: none;
   background: none;
   padding: 0;
+  /* Le lien et le bouton voisins sont la même action pour l'utilisateur :
+     ils doivent se ressembler. */
+  text-decoration: none;
 }
 
 .clock-wrap {
@@ -451,7 +595,7 @@ select {
   align-items: center;
   justify-content: center;
   flex: 1;
-  padding: 32px 28px;
+  padding: calc(32px + env(safe-area-inset-top)) 28px calc(32px + env(safe-area-inset-bottom));
   text-align: center;
   min-height: 100svh;
 }
@@ -469,7 +613,7 @@ select {
 
 .login-logo i {
   font-size: 26px;
-  color: #fff;
+  color: var(--on-solid);
 }
 
 .login-title {
@@ -528,7 +672,7 @@ select {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 18px;
+  padding: calc(16px + env(safe-area-inset-top)) 18px 16px;
   background: var(--surface-2);
   border-bottom: 0.5px solid var(--border);
   position: sticky;
@@ -711,7 +855,7 @@ select {
   margin: 14px 18px 0;
   width: calc(100% - 36px);
   background: var(--text-primary);
-  color: #fff;
+  color: var(--on-solid);
   border-radius: 12px;
   padding: 12px 16px;
   display: flex;
@@ -910,8 +1054,14 @@ select {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface-2);
   transition: right 0.15s ease, left 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle::after {
+    transition: none;
+  }
 }
 
 .toggle.off {
@@ -989,7 +1139,7 @@ button.menu-item:last-child {
   border: none;
   border-radius: 10px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 500;
   font-size: 13px;
 }
@@ -1056,7 +1206,7 @@ button.menu-item:last-child {
   margin: 8px 18px 10px;
   border-radius: 14px;
   overflow: hidden;
-  background: #e8eae3;
+  background: var(--surface-1);
   position: relative;
   height: 260px;
 }
@@ -1119,7 +1269,7 @@ button.menu-item:last-child {
   height: 22px;
   border-radius: 50%;
   background: var(--text-primary);
-  color: #fff;
+  color: var(--on-solid);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1165,13 +1315,13 @@ button.menu-item:last-child {
   height: 24px;
   border-radius: 50%;
   background: var(--text-primary);
-  color: #fff;
+  color: var(--on-solid);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   font-weight: 600;
-  border: 2px solid #fff;
+  border: 2px solid var(--surface-2);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 

@@ -1,30 +1,31 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { provider } from '../../providers';
+import { todayIso, addDaysIso } from '../../utils/date';
 import AppHeader from '../../components/AppHeader.vue';
+import DataState from '../../components/DataState.vue';
 
 const DAYS_BACK = 13; // 14 jours affichés, aujourd'hui inclus
 const loading = ref(true);
+const error = ref('');
 const entries = ref([]);
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function addDaysIso(iso, n) {
-  const d = new Date(iso + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-onMounted(async () => {
+async function load() {
+  loading.value = true;
+  error.value = '';
   try {
     const from = addDaysIso(todayIso(), -DAYS_BACK);
     entries.value = await provider.fetchTimeEntries({ from, to: todayIso() });
+  } catch (e) {
+    error.value = e.isNetworkError
+      ? "Pas de connexion — l'historique n'a pas pu être chargé."
+      : e.message || 'Historique indisponible.';
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 
 const byDay = computed(() => {
   const groups = {};
@@ -63,21 +64,23 @@ function fmtTime(iso) {
 <template>
   <AppHeader title="Historique des pointages" />
 
-  <div v-for="d in byDay" :key="d.day" class="history">
-    <p class="history-title day-title">{{ d.label }}</p>
-    <div v-for="e in d.entries" :key="e.id" class="hist-row">
-      <div class="hist-icon" :class="e.type">
-        <i class="ti" :class="entryIcon(e.type)"></i>
-      </div>
-      <div class="hist-text">
-        <p class="lbl">{{ entryLabel(e.type) }}</p>
-        <p class="sub">{{ e.chantier_name }}</p>
-      </div>
-      <span class="hist-time">{{ fmtTime(e.recorded_at) }}</span>
-    </div>
-  </div>
+  <DataState :loading="loading" :error="error" :empty="!byDay.length" @retry="load">
+    <template #empty>Aucun pointage sur les 14 derniers jours.</template>
 
-  <p v-if="!loading && !byDay.length" class="empty">Aucun pointage sur les 14 derniers jours.</p>
+    <div v-for="d in byDay" :key="d.day" class="history">
+      <p class="history-title day-title">{{ d.label }}</p>
+      <div v-for="e in d.entries" :key="e.id" class="hist-row">
+        <div class="hist-icon" :class="e.type" aria-hidden="true">
+          <i class="ti" :class="entryIcon(e.type)"></i>
+        </div>
+        <div class="hist-text">
+          <p class="lbl">{{ entryLabel(e.type) }}</p>
+          <p class="sub">{{ e.chantier_name }}</p>
+        </div>
+        <span class="hist-time">{{ fmtTime(e.recorded_at) }}</span>
+      </div>
+    </div>
+  </DataState>
 </template>
 
 <style scoped>

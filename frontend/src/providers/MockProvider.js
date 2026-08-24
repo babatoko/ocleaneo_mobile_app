@@ -1,4 +1,5 @@
 import { DataProvider } from './DataProvider';
+import { todayIso } from '../utils/date';
 
 const employee = { id: 1, name: 'Sophie Martin' };
 
@@ -29,10 +30,6 @@ const products = [
   { id: 3, name: 'Spray vitres', emoji: '🪟', category: 'Vitres', is_active: 1, packagings: [{ id: 3, label: '750ml', is_default: true }] },
   { id: 4, name: 'Papier toilette', emoji: '🧻', category: 'Consommables', is_active: 1, packagings: [{ id: 4, label: 'Carton 96 rouleaux', is_default: true }] },
 ];
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function shiftsFixture() {
   const today = todayIso();

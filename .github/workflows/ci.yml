@@ -1,0 +1,41 @@
+name: CI
+
+# Le filet qui manquait : la régression du message de connexion (toute panne
+# affichée « Identifiants incorrects ») serait passée en une seconde ici.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests unitaires
+        run: npm run test
+
+      - name: Build web/PWA
+        run: npm run build
+
+      - name: Build avec le provider mock (aucun backend requis)
+        # Vérifie que l'application reste fonctionnelle sans backend : c'est la
+        # garantie que le contrat DataProvider n'a pas été contourné.
+        run: VITE_DATA_PROVIDER=mock npm run build

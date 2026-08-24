@@ -2,13 +2,28 @@
 import { computed, onMounted, ref } from 'vue';
 import { provider } from '../../providers';
 import AppHeader from '../../components/AppHeader.vue';
+import DataState from '../../components/DataState.vue';
 
 const props = defineProps({ id: { type: [String, Number], required: true } });
 const order = ref(null);
+const loading = ref(true);
+const error = ref('');
 
-onMounted(async () => {
-  order.value = await provider.fetchOrder(props.id);
-});
+async function load() {
+  loading.value = true;
+  error.value = '';
+  try {
+    order.value = await provider.fetchOrder(props.id);
+  } catch (e) {
+    error.value = e.isNetworkError
+      ? 'Pas de connexion — le récapitulatif n\'a pas pu être chargé. La commande, elle, est bien partie.'
+      : e.message || 'Récapitulatif indisponible.';
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(load);
 
 const pdfUrl = computed(() => provider.getOrderPdfUrl(props.id));
 
@@ -19,16 +34,19 @@ function downloadPdf() {
 
 <template>
   <AppHeader title="Commande confirmée" />
-  <div v-if="order" class="recap">
-    <p class="success"><i class="ti ti-circle-check"></i> Commande n°{{ order.id }} envoyée pour {{ order.chantier_name }}</p>
-    <ul>
-      <li v-for="item in order.items" :key="item.id">
-        {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
-      </li>
-    </ul>
-    <button v-if="pdfUrl" class="pdf" @click="downloadPdf"><i class="ti ti-file-download"></i> Télécharger le récapitulatif PDF</button>
-    <RouterLink to="/" class="home-link">Retour à l'accueil</RouterLink>
-  </div>
+  <DataState :loading="loading" :error="error" :empty="!order" :skeleton-count="2" @retry="load">
+    <template #empty>Commande introuvable.</template>
+    <div class="recap">
+      <p class="success"><i class="ti ti-circle-check"></i> Commande n°{{ order.id }} envoyée pour {{ order.chantier_name }}</p>
+      <ul>
+        <li v-for="item in order.items" :key="item.id">
+          {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
+        </li>
+      </ul>
+      <button v-if="pdfUrl" class="pdf" @click="downloadPdf"><i class="ti ti-file-download"></i> Télécharger le récapitulatif PDF</button>
+      <RouterLink to="/planning" class="home-link">Retour au planning</RouterLink>
+    </div>
+  </DataState>
 </template>
 
 <style scoped>

@@ -1,11 +1,12 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { provider } from '../../providers';
 import { useChantiersStore } from '../../stores/chantiers';
 import { usePlanningStore } from '../../stores/planning';
 import { iconForProduct } from '../../utils/productIcons';
 import { turnByTurnHref } from '../../services/navigation';
+import { todayIso } from '../../utils/date';
 import AppHeader from '../../components/AppHeader.vue';
 
 const props = defineProps({
@@ -47,6 +48,13 @@ function goToStock() {
   router.push('/commande/catalogue');
 }
 
+// L'inventaire se fait sur place, sur le chantier où l'on se trouve : c'est
+// depuis la vacation en cours qu'il est le plus naturel de le lancer.
+function goToInventaire() {
+  chantiers.select(shift.value.chantier_id);
+  router.push({ name: 'inventaire', query: { chantier: shift.value.chantier_id } });
+}
+
 async function loadStockPreview(chantierId) {
   const [products, inventory] = await Promise.all([
     provider.fetchProducts(),
@@ -75,7 +83,7 @@ onMounted(async () => {
     if (planning.selectedShift && String(planning.selectedShift.id) === props.id) {
       shift.value = planning.selectedShift;
     } else {
-      const date = route.query.date || new Date().toISOString().slice(0, 10);
+      const date = route.query.date || todayIso();
       const data = await provider.fetchShifts({ from: date, to: date });
       shift.value = data.find((s) => String(s.id) === props.id) || null;
     }
@@ -102,6 +110,9 @@ onMounted(async () => {
       </a>
       <button type="button" class="dbtn" @click="goToStock">
         <i class="ti ti-box"></i> Stock
+      </button>
+      <button type="button" class="dbtn" @click="goToInventaire">
+        <i class="ti ti-clipboard-list"></i> Inventaire
       </button>
     </div>
 
