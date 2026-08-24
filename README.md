@@ -52,7 +52,8 @@ ocleaneo_mobile_app/
 │   ├── ios/                    # Projet natif iOS (généré par `cap add ios`)
 │   └── capacitor.config.json   # appId com.ocleaneo.mobile, webDir dist
 ├── docs/
-│   └── mockup-pointage-planning.html   # Mockup de référence (22 écrans, vision produit complète)
+│   ├── mockup-pointage-planning.html   # Mockup de référence (22 écrans, vision produit complète)
+│   └── retour-artefact.html            # Page publique (QR sur porte-clé/porte-carte) : procédure de retour
 └── docker-compose.yml          # Sert la variante web/PWA (VITE_API_URL → Odoo)
 ```
 
@@ -237,9 +238,13 @@ Aucun écran de gestion (création/édition de salariés, chantiers, produits, p
 
 ## Mockup de référence
 
-`docs/mockup-pointage-planning.html` présente la vision produit complète (22 écrans) : au-delà de planning/pointage déjà scaffoldés, elle couvre congés, dossier salarié RH, sécurité travailleur isolé (PTI/SOS), auto-contrôle qualité, déclaration d'anomalies, messagerie interne, formation, dashboard KPI, et **gestion des artefacts** (clés, badges, codes portail/porte, empreintes) — traçabilité de qui détient quoi (Mes artefacts, détail avec historique de détention, registre par site pour un responsable), déclaration de perte et de retrouvaille par l'agent. Priorisation à définir avec le mapping modules Odoo/OCA ci-dessus.
+`docs/mockup-pointage-planning.html` présente la vision produit complète (22 écrans) : au-delà de planning/pointage déjà scaffoldés, elle couvre congés, dossier salarié RH, sécurité travailleur isolé (PTI/SOS), auto-contrôle qualité, déclaration d'anomalies, messagerie interne, formation, dashboard KPI, et **gestion des artefacts** (porte-clés, badges/codes portail-porte, empreintes) — traçabilité de qui détient quoi (Mes artefacts, détail avec historique de détention, registre par site pour un responsable), déclaration de perte et de retrouvaille par l'agent. Priorisation à définir avec le mapping modules Odoo/OCA ci-dessus.
 
-Côté Odoo, ce domaine correspondrait à un modèle type `fsm.equipment` ou `maintenance.equipment` (suite Field Service / Maintenance OCA) avec un salarié ou un site comme détenteur courant, un historique des transferts et un statut (en possession / perdu / retrouvé) — à confirmer une fois le reste de l'intégration Odoo en place.
+L'unité tracée est le **porte-clés** (l'objet physique remis à l'agent, qui peut regrouper les clés de plusieurs sites) plutôt que chaque clé isolément — c'est lui qui se perd ou se retrouve comme un tout. Badges/porte-cartes, codes et empreinte restent des artefacts distincts, chacun avec son propre statut.
+
+Côté Odoo, ce domaine correspondrait à un modèle type `fsm.equipment` ou `maintenance.equipment` (suite Field Service / Maintenance OCA) avec un salarié ou un site comme détenteur courant, un historique des transferts et un statut (en possession / perdu / retrouvé) — à confirmer une fois le reste de l'intégration Odoo en place. **Le backend doit être la source de vérité pour l'ensemble du parc** (tous les porte-clés, badges, codes et empreintes, tous agents et sites confondus) : l'écran "Registre" du mockup (vue responsable, filtrable par type) est une version de terrain simplifiée pour un chef d'équipe en déplacement, pas un remplacement de la vue Odoo — qui reste l'inventaire exhaustif et l'endroit où créer/désactiver un artefact.
+
+**QR code de restitution** : chaque porte-clés et porte-carte physique porte une étiquette avec un QR code menant à une page publique (aucune authentification, utilisable par n'importe qui) expliquant la procédure de retour — prototypée dans `docs/retour-artefact.html`. La page affiche la référence de l'objet (ex. `PC-0142`, imprimée sur l'étiquette et associée à l'artefact dans Odoo) et les coordonnées de contact, sans jamais révéler quels sites les clés ouvrent. Vue dans le mockup mobile : écran "Détail du porte-clé" § Étiquette de retour.
 
 ## Installation frontend (en local, sans backend fonctionnel pour l'instant)
 
