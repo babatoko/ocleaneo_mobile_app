@@ -21,6 +21,8 @@
     --warn-text:#854F0B;
     --success-bg:#EAF3DE;
     --success-text:#3B6D11;
+    --danger-bg:#FBE6E3;
+    --danger-text:#A32D2D;
     --radius:14px;
     --font: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
@@ -683,6 +685,48 @@
   .kpi-bar-fill{height:100%;border-radius:4px;background:var(--accent);}
   .kpi-bar-fill.warn{background:#D9A441;}
   .kpi-bar-val{font-size:11px;font-weight:500;width:32px;text-align:right;flex-shrink:0;}
+
+  /* Artefacts (cles, badges, codes, empreintes) */
+  .badge.lost{background:var(--danger-bg);color:var(--danger-text);}
+  .badge.active{background:var(--success-bg);color:var(--success-text);}
+  .badge.found{background:var(--success-bg);color:var(--success-text);}
+  .badge.replaced{background:var(--warn-bg);color:var(--warn-text);}
+
+  .artefact-row{
+    display:flex;align-items:center;gap:12px;padding:11px 0;
+    border-bottom:0.5px solid var(--border);
+  }
+  .artefact-row:last-child{border-bottom:none;}
+  .artefact-icon{
+    width:38px;height:38px;border-radius:10px;flex-shrink:0;
+    background:var(--accent-bg);color:var(--accent-text);
+    display:flex;align-items:center;justify-content:center;font-size:17px;
+  }
+  .artefact-icon.lost{background:var(--danger-bg);color:var(--danger-text);}
+  .artefact-body{flex:1;min-width:0;}
+  .artefact-body .aname{font-size:13px;font-weight:500;margin:0;}
+  .artefact-body .asite{font-size:11px;color:var(--text-secondary);margin:2px 0 0;}
+  .artefact-row .chev{color:var(--text-muted);font-size:16px;flex-shrink:0;}
+  .artefact-row .badge{flex-shrink:0;}
+
+  .artefact-holder{
+    display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;
+    border-top:0.5px solid var(--border);
+  }
+  .ah-avatar{
+    width:24px;height:24px;border-radius:50%;background:var(--surface-2);color:var(--text-secondary);
+    font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .artefact-holder span{font-size:11px;color:var(--text-secondary);}
+
+  .filter-chips{display:flex;gap:6px;margin:0 18px 12px;overflow-x:auto;}
+  .filter-chip{
+    flex-shrink:0;font-size:12px;padding:6px 12px;border-radius:20px;
+    border:0.5px solid var(--border-strong);color:var(--text-secondary);white-space:nowrap;
+  }
+  .filter-chip.active{background:var(--text-primary);color:#fff;border-color:var(--text-primary);}
+
+  .anomaly-submit.accent{background:var(--accent);}
 </style>
 </head>
 <body>
@@ -1883,6 +1927,408 @@
             <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
             <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
             <div class="nav-item active"><i class="ti ti-chart-bar"></i><span class="lbl">KPI</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN MES ARTEFACTS -->
+  <div>
+    <p class="phone-label">Mes artefacts</p>
+    <div class="phone">
+      <div class="screen" style="position:relative;">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Artefacts</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Cles, badges, codes, empreinte</p>
+            </div>
+          </div>
+
+          <div class="balance-row">
+            <div class="balance-card">
+              <p class="num">4</p>
+              <p class="lbl">en ma possession</p>
+            </div>
+            <div class="balance-card">
+              <p class="num">1</p>
+              <p class="lbl">signale(e) perdu(e)</p>
+            </div>
+          </div>
+
+          <p class="section-title">Cegetel Macon</p>
+          <div class="detail-block">
+            <div class="artefact-row">
+              <div class="artefact-icon"><i class="ti ti-key"></i></div>
+              <div class="artefact-body">
+                <p class="aname">Cle — Portail principal</p>
+                <p class="asite">Remise le 12 mars 2026</p>
+              </div>
+              <span class="badge active">En ma possession</span>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+            <div class="artefact-row">
+              <div class="artefact-icon"><i class="ti ti-id-badge-2"></i></div>
+              <div class="artefact-body">
+                <p class="aname">Badge — Acces bureaux</p>
+                <p class="asite">Remis le 12 mars 2026</p>
+              </div>
+              <span class="badge active">En ma possession</span>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+            <div class="artefact-row">
+              <div class="artefact-icon"><i class="ti ti-fingerprint"></i></div>
+              <div class="artefact-body">
+                <p class="aname">Empreinte enregistree</p>
+                <p class="asite">Lecteur biometrique accueil</p>
+              </div>
+              <span class="badge active">Active</span>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+          </div>
+
+          <p class="section-title">Residence Les Tilleuls</p>
+          <div class="detail-block">
+            <div class="artefact-row">
+              <div class="artefact-icon"><i class="ti ti-lock"></i></div>
+              <div class="artefact-body">
+                <p class="aname">Code portail</p>
+                <p class="asite">Attribue le 3 mars 2026</p>
+              </div>
+              <span class="badge active">En ma possession</span>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+            <div class="artefact-row">
+              <div class="artefact-icon lost"><i class="ti ti-key"></i></div>
+              <div class="artefact-body">
+                <p class="aname">Cle — Local technique</p>
+                <p class="asite">Signalee perdue le 18 aout 2026</p>
+              </div>
+              <span class="badge lost">Perdue</span>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+          </div>
+
+          <div class="fab"><i class="ti ti-flag-3"></i></div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item active"><i class="ti ti-key"></i><span class="lbl">Artefacts</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN DETAIL ARTEFACT (PERDU) -->
+  <div>
+    <p class="phone-label">Detail artefact — perdu</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="detail-header">
+            <div class="back"><i class="ti ti-arrow-left"></i></div>
+            <p class="htitle">Cle — Local technique</p>
+          </div>
+
+          <div class="detail-hero" style="text-align:center;">
+            <div class="artefact-icon lost" style="width:56px;height:56px;font-size:24px;margin:0 auto 10px;">
+              <i class="ti ti-key"></i>
+            </div>
+            <p class="dtime" style="margin-bottom:2px;">Cle — Local technique</p>
+            <p class="dclient" style="margin-bottom:8px;">Residence Les Tilleuls</p>
+            <span class="badge lost">Signalee perdue</span>
+          </div>
+
+          <div class="detail-block">
+            <div class="note-box">
+              <i class="ti ti-alert-circle"></i>
+              <span>Perdue le 18 aout 2026 par Julie Dubois — "Tombee de la poche pendant la tournee, non retrouvee sur place."</span>
+            </div>
+          </div>
+
+          <p class="section-title">Historique de detention</p>
+          <div class="detail-block">
+            <div class="stop-row">
+              <div class="stop-num done">1</div>
+              <div class="stop-card">
+                <div class="stop-top">
+                  <p class="sname">Remise a Sophie Martin</p>
+                </div>
+                <p class="saddr">12 mars 2026</p>
+              </div>
+            </div>
+            <div class="stop-row">
+              <div class="stop-num done">2</div>
+              <div class="stop-card">
+                <div class="stop-top">
+                  <p class="sname">Transferee a Julie Dubois</p>
+                </div>
+                <p class="saddr">2 juin 2026</p>
+              </div>
+            </div>
+            <div class="stop-row">
+              <div class="stop-num" style="background:var(--danger-text);">3</div>
+              <div class="stop-card">
+                <div class="stop-top">
+                  <p class="sname">Signalee perdue par Julie Dubois</p>
+                </div>
+                <p class="saddr">18 aout 2026</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="anomaly-submit accent" style="margin-top:auto;">Declarer retrouvee</div>
+          <div style="height:14px;"></div>
+
+          <div class="nav">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item active"><i class="ti ti-key"></i><span class="lbl">Artefacts</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN DECLARER UNE PERTE -->
+  <div>
+    <p class="phone-label">Declarer une perte</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="detail-header">
+            <div class="back"><i class="ti ti-arrow-left"></i></div>
+            <p class="htitle">Declarer une perte</p>
+          </div>
+
+          <p class="field-label" style="margin-top:10px;">Artefact concerne</p>
+          <div class="site-select" style="margin:0 18px 16px;">
+            <i class="ti ti-key"></i>
+            <span>Cle — Portail principal · Cegetel Macon</span>
+            <i class="ti ti-chevron-down chev"></i>
+          </div>
+
+          <p class="field-label">Date et heure du constat</p>
+          <div class="site-select" style="margin:0 18px 16px;">
+            <i class="ti ti-calendar-event"></i>
+            <span>18 aout 2026 · 14:32</span>
+          </div>
+
+          <p class="field-label">Circonstances</p>
+          <div class="comment-box">Decrivez ou et comment la perte a ete constatee...</div>
+
+          <p class="field-label">Photo (optionnel)</p>
+          <div class="photo-grid">
+            <div class="photo-slot-lg"><i class="ti ti-camera-plus"></i></div>
+          </div>
+
+          <div class="anomaly-submit disabled">Decrivez les circonstances pour envoyer</div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item active"><i class="ti ti-key"></i><span class="lbl">Artefacts</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN DECLARER UN RETROUVE -->
+  <div>
+    <p class="phone-label">Declarer un retrouve</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="detail-header">
+            <div class="back"><i class="ti ti-arrow-left"></i></div>
+            <p class="htitle">Declarer un retrouve</p>
+          </div>
+
+          <div class="detail-block">
+            <div class="note-box" style="background:var(--accent-bg);color:var(--accent-text);">
+              <i class="ti ti-key"></i>
+              <span>Cle — Local technique · Residence Les Tilleuls — perdue depuis 12 jours (18 aout 2026)</span>
+            </div>
+          </div>
+
+          <p class="field-label" style="margin-top:14px;">Ou l'avez-vous retrouvee ?</p>
+          <div class="comment-box">Decrivez le lieu et les circonstances...</div>
+
+          <p class="field-label">Photo (optionnel)</p>
+          <div class="photo-grid">
+            <div class="photo-slot-lg"><i class="ti ti-camera-plus"></i></div>
+          </div>
+
+          <div class="anomaly-submit accent">Confirmer le retrouve</div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item active"><i class="ti ti-key"></i><span class="lbl">Artefacts</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN MES DECLARATIONS ARTEFACTS -->
+  <div>
+    <p class="phone-label">Mes declarations</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Artefacts</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Mes declarations</p>
+            </div>
+          </div>
+
+          <p class="section-title">Historique</p>
+
+          <div class="request-card">
+            <div class="top">
+              <span class="dates">18 aout 2026</span>
+              <span class="badge lost">Perte signalee</span>
+            </div>
+            <p class="type">Cle — Local technique · Residence Les Tilleuls</p>
+          </div>
+
+          <div class="request-card">
+            <div class="top">
+              <span class="dates">2 mai 2026</span>
+              <span class="badge found">Retrouvee</span>
+            </div>
+            <p class="type">Badge — Acces bureaux · Cegetel Macon</p>
+          </div>
+
+          <div class="request-card">
+            <div class="top">
+              <span class="dates">14 janvier 2026</span>
+              <span class="badge replaced">Remplace</span>
+            </div>
+            <p class="type">Code portail · Residence Les Tilleuls</p>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item active"><i class="ti ti-key"></i><span class="lbl">Artefacts</span></div>
+            <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
+            <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECRAN REGISTRE ARTEFACTS (VUE RESPONSABLE) -->
+  <div>
+    <p class="phone-label">Registre des artefacts — vue responsable</p>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
+        <div class="content">
+          <div class="header">
+            <div>
+              <p class="hello">Registre</p>
+              <p class="name" style="font-size:13px;color:var(--text-secondary);font-weight:400;">Tous les sites</p>
+            </div>
+          </div>
+
+          <div class="role-toggle">
+            <div class="role-chip">Agent</div>
+            <div class="role-chip active">Chef d'equipe</div>
+            <div class="role-chip">Resp. exploitation</div>
+          </div>
+
+          <div class="filter-chips">
+            <div class="filter-chip active">Tous</div>
+            <div class="filter-chip">Cles</div>
+            <div class="filter-chip">Badges</div>
+            <div class="filter-chip">Codes</div>
+            <div class="filter-chip">Empreintes</div>
+          </div>
+
+          <div class="qc-item">
+            <div class="qtop">
+              <div>
+                <p class="qname">Cle — Local technique</p>
+                <p class="qzone">Residence Les Tilleuls</p>
+              </div>
+              <span class="qc-status issue">Perdue</span>
+            </div>
+            <div class="artefact-holder">
+              <div class="ah-avatar">JD</div>
+              <span>Julie Dubois · declaree il y a 6 j</span>
+            </div>
+          </div>
+
+          <div class="qc-item">
+            <div class="qtop">
+              <div>
+                <p class="qname">Cle — Portail principal</p>
+                <p class="qzone">Cegetel Macon</p>
+              </div>
+              <span class="qc-status ok">En possession</span>
+            </div>
+            <div class="artefact-holder">
+              <div class="ah-avatar">SM</div>
+              <span>Sophie Martin · depuis le 12 mars 2026</span>
+            </div>
+          </div>
+
+          <div class="qc-item">
+            <div class="qtop">
+              <div>
+                <p class="qname">Badge — Acces bureaux</p>
+                <p class="qzone">Cegetel Macon</p>
+              </div>
+              <span class="qc-status ok">En possession</span>
+            </div>
+            <div class="artefact-holder">
+              <div class="ah-avatar">SM</div>
+              <span>Sophie Martin · depuis le 12 mars 2026</span>
+            </div>
+          </div>
+
+          <div class="qc-item">
+            <div class="qtop">
+              <div>
+                <p class="qname">Empreinte enregistree</p>
+                <p class="qzone">Cegetel Macon · lecteur accueil</p>
+              </div>
+              <span class="qc-status ok">Active</span>
+            </div>
+            <div class="artefact-holder">
+              <div class="ah-avatar">KN</div>
+              <span>K. Nguyen · enregistree le 4 fevrier 2026</span>
+            </div>
+          </div>
+
+          <div class="nav" style="margin-top:auto;">
+            <div class="nav-item"><i class="ti ti-calendar"></i><span class="lbl">Planning</span></div>
+            <div class="nav-item"><i class="ti ti-clock"></i><span class="lbl">Pointage</span></div>
+            <div class="nav-item active"><i class="ti ti-key"></i><span class="lbl">Registre</span></div>
             <div class="nav-item"><i class="ti ti-box"></i><span class="lbl">Stock</span></div>
             <div class="nav-item"><i class="ti ti-user"></i><span class="lbl">Profil</span></div>
           </div>

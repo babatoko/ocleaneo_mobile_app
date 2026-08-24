@@ -52,7 +52,7 @@ ocleaneo_mobile_app/
 │   ├── ios/                    # Projet natif iOS (généré par `cap add ios`)
 │   └── capacitor.config.json   # appId com.ocleaneo.mobile, webDir dist
 ├── docs/
-│   └── mockup-pointage-planning.html   # Mockup de référence (17 écrans, vision produit complète)
+│   └── mockup-pointage-planning.html   # Mockup de référence (22 écrans, vision produit complète)
 └── docker-compose.yml          # Sert la variante web/PWA (VITE_API_URL → Odoo)
 ```
 
@@ -237,7 +237,9 @@ Aucun écran de gestion (création/édition de salariés, chantiers, produits, p
 
 ## Mockup de référence
 
-`docs/mockup-pointage-planning.html` présente la vision produit complète (17 écrans) : au-delà de planning/pointage déjà scaffoldés, elle couvre congés, dossier salarié RH, sécurité travailleur isolé (PTI/SOS), auto-contrôle qualité, déclaration d'anomalies, messagerie interne, formation, dashboard KPI. Priorisation à définir avec le mapping modules Odoo/OCA ci-dessus.
+`docs/mockup-pointage-planning.html` présente la vision produit complète (22 écrans) : au-delà de planning/pointage déjà scaffoldés, elle couvre congés, dossier salarié RH, sécurité travailleur isolé (PTI/SOS), auto-contrôle qualité, déclaration d'anomalies, messagerie interne, formation, dashboard KPI, et **gestion des artefacts** (clés, badges, codes portail/porte, empreintes) — traçabilité de qui détient quoi (Mes artefacts, détail avec historique de détention, registre par site pour un responsable), déclaration de perte et de retrouvaille par l'agent. Priorisation à définir avec le mapping modules Odoo/OCA ci-dessus.
+
+Côté Odoo, ce domaine correspondrait à un modèle type `fsm.equipment` ou `maintenance.equipment` (suite Field Service / Maintenance OCA) avec un salarié ou un site comme détenteur courant, un historique des transferts et un statut (en possession / perdu / retrouvé) — à confirmer une fois le reste de l'intégration Odoo en place.
 
 ## Installation frontend (en local, sans backend fonctionnel pour l'instant)
 
