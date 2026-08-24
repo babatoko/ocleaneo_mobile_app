@@ -189,7 +189,7 @@ Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Dé
 1. **URL et accès de l'instance** — à fournir (endpoint, identifiants/API key de service).
 2. **Protocole d'API** entre l'app Vue et Odoo : **tranché, ce sera OCA `base_rest`** (repo `rest-framework`). Il expose des endpoints REST/JSON propres (verbes HTTP, chemins d'URL clairs, forme de réponse contrôlée côté service plutôt que les champs bruts du modèle Odoo) — c'est ce que `RestProvider.js` sait déjà consommer nativement avec Axios, alors que le JSON-RPC natif (`/web/dataset/call_kw`) aurait demandé un provider dédié pour construire ses enveloppes `call_kw` et déballer les dictionnaires internes d'Odoo. Reste à installer le module côté instance et à définir les services/chemins pour chaque endpoint du contrat `DataProvider`.
    - **Authentification** : Odoo doit vérifier identifiant + mot de passe (stockés sur la fiche employé) et renvoyer un token Bearer — via un module OCA comme `auth_api_key` (repo `server-auth`) ou `auth_jwt`. La biométrie (voir [Authentification](#authentification) ci-dessus) est gérée uniquement côté app, Odoo ne voit jamais que du login/mot de passe classique.
-3. **Mapping métier** — le domaine (chantiers, salariés, planning, pointage, stock par site) correspond de près à la suite **OCA Field Service Management** (repo `field-service`) :
+3. **Mapping métier** — **confirmé : l'instance utilise la suite OCA Field Service Management** (repo `field-service`) :
    - `fsm.location` ↔ chantier
    - `fsm.person` / `hr.employee` ↔ salarié
    - `fsm.order` ↔ intervention/vacation
@@ -197,9 +197,31 @@ Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Dé
    - `fieldservice_stock` ↔ stock produits par site (commande/inventaire)
    - `hr.attendance` ↔ pointage (arrivée/départ)
    - `hr.holidays` ↔ congés
-   - À confirmer si l'instance existante utilise déjà ces modules ou une autre organisation.
 
-Une fois ces points tranchés, seul **`frontend/src/providers/RestProvider.js`** (voir § Architecture backend-agnostique ci-dessus) aura besoin d'être ajusté pour parler au bon protocole/chemins Odoo — les stores et les vues n'ont pas à changer, ils ne connaissent que le contrat `DataProvider`.
+### Contrat API attendu (services `base_rest` à exposer côté Odoo)
+
+`frontend/src/providers/RestProvider.js` appelle déjà ces chemins précis — c'est la spec à implémenter côté Odoo (services `base_rest`, un par ligne) pour que **rien ne change côté frontend**, juste `VITE_API_URL` à pointer vers l'instance :
+
+| Méthode `DataProvider` | Endpoint `base_rest` | Modèle(s) Odoo source |
+|---|---|---|
+| `login` | `POST /auth/login` → `{ token, employee }` | `hr.employee` + `auth_api_key`/`auth_jwt` |
+| `fetchMe` | `GET /auth/me` → employé courant | `hr.employee` |
+| `fetchChantiers` | `GET /chantiers/mine` → `[{ id, name, address, nfc_tag_id, latitude, longitude }]` | `fsm.location` |
+| `fetchShifts` | `GET /shifts/mine?from&to` → `[{ id, chantier_id, chantier_name, chantier_address, start_at, end_at, note }]` | `fsm.order` (+ `fsm.route` pour l'ordre de la tournée) |
+| `fetchTodayTimeEntries` | `GET /time-entries/today` → `{ entries, status }` | `hr.attendance` |
+| `fetchTimeEntries` | `GET /time-entries/mine?from&to` → `[{ id, type, recorded_at, chantier_name }]` | `hr.attendance` |
+| `createTimeEntry` | `POST /time-entries` | `hr.attendance` (create) |
+| `fetchProducts` | `GET /products` → `[{ id, name, packagings: [{ id, label, is_default }] }]` | `product.product` / `fieldservice_stock` |
+| `fetchInventoryLatest` | `GET /inventory/chantier/:id/latest` → `{ items }` ou **404** si aucun inventaire | `fieldservice_stock` |
+| `submitInventory` | `POST /inventory` | `fieldservice_stock` |
+| `createOrder` | `POST /orders` → `{ id }` | à confirmer (commande de produits d'entretien — `fsm.order` dédié ou modèle propre) |
+| `fetchOrder` | `GET /orders/:id` | idem |
+| `fetchMyOrders` | `GET /orders/mine` | idem |
+| PDF commande | `GET /orders/:id/pdf` (binaire) | rapport Odoo standard |
+
+Le type de pointage (`in`/`out`/`pause_start`/`pause_end`) et le statut (`entries`/`status`) sont une couche au-dessus de `hr.attendance`, qui ne connaît nativement que in/out — la distinction pause vs départ définitif doit être portée par un champ ou une catégorie sur l'écriture `hr.attendance` (ou un modèle satellite), à trancher côté implémentation Odoo.
+
+Une fois l'URL/les identifiants de l'instance connus (point 1 ci-dessus) et ces services `base_rest` implémentés avec cette forme exacte, il suffit de renseigner `VITE_API_URL` — aucun changement de code frontend n'est nécessaire. Si un chemin ou une forme de réponse doit différer, seul **`frontend/src/providers/RestProvider.js`** (voir § Architecture backend-agnostique ci-dessus) a besoin d'être ajusté ; les stores et les vues ne connaissent que le contrat `DataProvider`.
 
 ## Fonctionnalités (vues déjà scaffoldées, backend à rebrancher)
 
