@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api } from '../../services/api';
+import { provider } from '../../providers';
 import { useChantiersStore } from '../../stores/chantiers';
 import { usePlanningStore } from '../../stores/planning';
 import { iconForProduct } from '../../utils/productIcons';
+import { turnByTurnHref } from '../../services/navigation';
 import AppHeader from '../../components/AppHeader.vue';
 
 const props = defineProps({
@@ -25,8 +26,13 @@ function timeRange(s) {
   return `${fmt(s.start_at)} - ${fmt(s.end_at)}`;
 }
 
-function mapLink(address) {
-  return `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+function itineraryHref(s) {
+  const chantier = chantiers.list.find((c) => c.id === s.chantier_id);
+  return turnByTurnHref({
+    latitude: chantier?.latitude,
+    longitude: chantier?.longitude,
+    address: s.chantier_address || s.chantier_name,
+  });
 }
 
 function statusLabel(status) {
@@ -42,34 +48,35 @@ function goToStock() {
 }
 
 async function loadStockPreview(chantierId) {
-  try {
-    const [{ data: products }, { data: inventory }] = await Promise.all([
-      api.get('/products'),
-      api.get(`/inventory/chantier/${chantierId}/latest`),
-    ]);
-    const byProductPackaging = {};
-    for (const item of inventory.items) {
-      byProductPackaging[`${item.product_id}-${item.packaging_id}`] = item.quantity_remaining;
-    }
-    stockPreview.value = products.slice(0, 4).map((p) => {
-      const pkg = p.packagings.find((pk) => pk.is_default) || p.packagings[0];
-      const remaining = pkg ? byProductPackaging[`${p.id}-${pkg.id}`] : undefined;
-      const status = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
-      return { name: p.name, icon: iconForProduct(p), status };
-    });
-  } catch {
+  const [products, inventory] = await Promise.all([
+    provider.fetchProducts(),
+    provider.fetchInventoryLatest(chantierId),
+  ]);
+  if (!inventory) {
     stockPreview.value = [];
+    return;
   }
+  const byProductPackaging = {};
+  for (const item of inventory.items) {
+    byProductPackaging[`${item.product_id}-${item.packaging_id}`] = item.quantity_remaining;
+  }
+  stockPreview.value = products.slice(0, 4).map((p) => {
+    const pkg = p.packagings.find((pk) => pk.is_default) || p.packagings[0];
+    const remaining = pkg ? byProductPackaging[`${p.id}-${pkg.id}`] : undefined;
+    const status = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
+    return { name: p.name, icon: iconForProduct(p), status };
+  });
 }
 
 onMounted(async () => {
   loading.value = true;
   try {
+    await chantiers.fetchMine(); // pour le lien Itinéraire avec guidage direct (coordonnées)
     if (planning.selectedShift && String(planning.selectedShift.id) === props.id) {
       shift.value = planning.selectedShift;
     } else {
       const date = route.query.date || new Date().toISOString().slice(0, 10);
-      const { data } = await api.get('/shifts/mine', { params: { from: date, to: date } });
+      const data = await provider.fetchShifts({ from: date, to: date });
       shift.value = data.find((s) => String(s.id) === props.id) || null;
     }
     if (shift.value) await loadStockPreview(shift.value.chantier_id);
@@ -90,7 +97,7 @@ onMounted(async () => {
     </div>
 
     <div class="detail-actions">
-      <a class="dbtn" :href="mapLink(shift.chantier_address || shift.chantier_name)" target="_blank" rel="noopener">
+      <a class="dbtn" :href="itineraryHref(shift)" target="_blank" rel="noopener">
         <i class="ti ti-map-2"></i> Itinéraire
       </a>
       <button type="button" class="dbtn" @click="goToStock">

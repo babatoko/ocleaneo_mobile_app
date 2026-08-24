@@ -12,7 +12,22 @@ Application mobile **Android et iOS** (via Capacitor) Ocleaneo pour le terrain :
 - **Backend : Odoo 14 + modules OCA** (instance existante, à connecter — voir [Intégration Odoo](#intégration-odoo) ci-dessous)
 - **Déploiement web** : Docker + Nginx (pour la variante PWA/navigateur)
 
-> ⚠️ Le backend Node.js/Express + SQLite qui existait dans une version précédente de ce projet a été retiré : le backend réel est une instance Odoo 14. Le frontend décrit ci-dessous appelait cette ancienne API (`/api/...`) et doit être rebranché sur Odoo — voir la section Intégration Odoo.
+> ⚠️ Le backend Node.js/Express + SQLite qui existait dans une version précédente de ce projet a été retiré : le backend réel est une instance Odoo 14. Voir la section Intégration Odoo, et surtout la section suivante — le frontend ne parle plus jamais directement à une API, il passe par un plugin de données.
+
+## Architecture backend-agnostique (plugins de données)
+
+Aucun store ni aucune vue n'appelle un client HTTP ou ne connaît la forme d'une réponse Odoo. Tout passe par **`frontend/src/providers/`**, une couche d'abstraction en forme de plugins :
+
+- **`DataProvider.js`** — le contrat : une classe de base listant toutes les opérations dont l'app a besoin (`login`, `fetchChantiers`, `fetchShifts`, `createTimeEntry`, `fetchProducts`, `createOrder`…), chaque méthode documentée en JSDoc (forme attendue en entrée/sortie). Une méthode non implémentée par un provider concret échoue explicitement plutôt que silencieusement.
+- **`RestProvider.js`** — le plugin branché par défaut : traduit le contrat en appels HTTP JSON vers `VITE_API_URL` (pensé pour une couche `base_rest` Odoo, voir § Intégration Odoo). C'est le seul fichier de l'app qui connaît des chemins d'URL, des query params ou la forme d'une erreur HTTP.
+- **`MockProvider.js`** — un second plugin réel, 100 % en mémoire, **zéro réseau**. Sert à développer ou faire une démo de l'app sans rien avoir à faire tourner, et sert aussi de preuve que le contrat est complet : l'app entière (connexion, planning, pointage, stock, commande, historique) tourne dessus de bout en bout — vérifié en la faisant tourner sans aucun mock d'API, juste `VITE_DATA_PROVIDER=mock`.
+- **`index.js`** — sélectionne le plugin actif selon `VITE_DATA_PROVIDER` (`rest` par défaut, `mock` sinon) et exporte l'instance unique `provider` que tout le reste de l'app importe.
+
+**Ce que ça change concrètement pour brancher un backend différent** (une autre couche Odoo, un JSON-RPC direct, un tout autre ERP) : écrire un nouveau fichier `providers/XyzProvider.js` qui étend `DataProvider` et implémente ses méthodes, l'ajouter à `providers/index.js`, basculer `VITE_DATA_PROVIDER`. Aucune vue, aucun store, aucune logique métier (calcul d'heures, géofence, file hors ligne…) n'a besoin d'être touchée — ils ne connaissent que le contrat.
+
+**Erreurs normalisées** : chaque provider doit lever `ProviderNetworkError` (exporté par `DataProvider.js`, `error.isNetworkError === true`) pour une coupure réseau — c'est ce que vérifient la file d'attente hors ligne du pointage et le cache du planning pour décider de mettre en attente plutôt que d'afficher un écran vide. Toute autre erreur est une erreur métier normale avec un `.message` déjà lisible (pas de `error.response.data.error` à décoder dans les vues).
+
+**Limite assumée** : la persistance de session (`token` + `localStorage`, dans `stores/auth.js`) reste un concept générique partagé par tous les providers — un jeton opaque à renvoyer par `login()` et à présenter ensuite. Un futur provider basé sur des cookies de session devrait quand même renvoyer un jeton logique pour ce mécanisme, ou `stores/auth.js` devra évoluer en conséquence ; ce n'est pas poussé plus loin ici pour ne pas sur-abstraire un besoin hypothétique.
 
 ## Structure
 
@@ -21,16 +36,17 @@ ocleaneo_mobile_app/
 ├── frontend/                  # Application Vue 3 + Vite (PWA)
 │   ├── src/
 │   │   ├── views/
-│   │   │   ├── planning/       # Planning jour/semaine
-│   │   │   ├── pointage/       # Badge virtuel arrivée/départ
+│   │   │   ├── planning/       # Planning Jour/Semaine/Mois/Tournée + détail chantier
+│   │   │   ├── pointage/       # Badge NFC arrivée/départ/pause + historique
 │   │   │   ├── commande/       # Écran Stock (site + catalogue + panier) → récap
 │   │   │   ├── inventaire/    # Saisie du stock restant
 │   │   │   └── historique/    # Historique des commandes
 │   │   ├── components/        # BottomNav, QuantityStepper, AppHeader
-│   │   ├── stores/             # Pinia : auth, chantiers, panier
+│   │   ├── stores/             # Pinia : auth, chantiers, planning, pointage, panier
+│   │   ├── providers/          # Couche données backend-agnostique — voir ci-dessus
+│   │   ├── services/           # NFC, biométrie, notifications, hors ligne, navigation…
 │   │   ├── router/             # Vue Router + garde d'authentification
-│   │   ├── services/api.js     # Client Axios — À REBRANCHER sur Odoo
-│   │   └── services/biometric.js  # Empreinte via @capgo/capacitor-native-biometric
+│   │   └── utils/              # Aides date/semaine/mois, icônes produit
 │   └── Dockerfile / nginx.conf
 │   ├── android/                # Projet natif Android (généré par `cap add android`)
 │   ├── ios/                    # Projet natif iOS (généré par `cap add ios`)
@@ -185,7 +201,7 @@ Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Dé
    - `hr.holidays` ↔ congés
    - À confirmer si l'instance existante utilise déjà ces modules ou une autre organisation.
 
-Une fois ces points tranchés, `frontend/src/services/api.js` et les stores Pinia seront réécrits pour appeler Odoo directement (ou via une fine couche `base_rest`), et les vues n'auront normalement pas besoin de changer en profondeur (elles consomment déjà des listes chantiers/produits/shifts/entries via l'API).
+Une fois ces points tranchés, seul **`frontend/src/providers/RestProvider.js`** (voir § Architecture backend-agnostique ci-dessus) aura besoin d'être ajusté pour parler au bon protocole/chemins Odoo — les stores et les vues n'ont pas à changer, ils ne connaissent que le contrat `DataProvider`.
 
 ## Fonctionnalités (vues déjà scaffoldées, backend à rebrancher)
 

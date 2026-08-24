@@ -1,18 +1,19 @@
 <script setup>
-import { onMounted, ref } from 'vue';
-import { api } from '../../services/api';
+import { computed, onMounted, ref } from 'vue';
+import { provider } from '../../providers';
 import AppHeader from '../../components/AppHeader.vue';
 
 const props = defineProps({ id: { type: [String, Number], required: true } });
 const order = ref(null);
 
 onMounted(async () => {
-  const { data } = await api.get(`/orders/${props.id}`);
-  order.value = data;
+  order.value = await provider.fetchOrder(props.id);
 });
 
+const pdfUrl = computed(() => provider.getOrderPdfUrl(props.id));
+
 function downloadPdf() {
-  window.open(`${api.defaults.baseURL}/orders/${props.id}/pdf`, '_blank');
+  if (pdfUrl.value) window.open(pdfUrl.value, '_blank');
 }
 </script>
 
@@ -25,7 +26,7 @@ function downloadPdf() {
         {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
       </li>
     </ul>
-    <button class="pdf" @click="downloadPdf"><i class="ti ti-file-download"></i> Télécharger le récapitulatif PDF</button>
+    <button v-if="pdfUrl" class="pdf" @click="downloadPdf"><i class="ti ti-file-download"></i> Télécharger le récapitulatif PDF</button>
     <RouterLink to="/" class="home-link">Retour à l'accueil</RouterLink>
   </div>
 </template>

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
-import { api } from '../../services/api';
+import { provider } from '../../providers';
 import AppHeader from '../../components/AppHeader.vue';
 
 const DAYS_BACK = 13; // 14 jours affichés, aujourd'hui inclus
@@ -20,8 +20,7 @@ function addDaysIso(iso, n) {
 onMounted(async () => {
   try {
     const from = addDaysIso(todayIso(), -DAYS_BACK);
-    const { data } = await api.get('/time-entries/mine', { params: { from, to: todayIso() } });
-    entries.value = data;
+    entries.value = await provider.fetchTimeEntries({ from, to: todayIso() });
   } finally {
     loading.value = false;
   }

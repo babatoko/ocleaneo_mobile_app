@@ -1,8 +1,7 @@
 import { defineStore } from 'pinia';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import { api } from '../services/api';
-import { isNetworkError } from '../services/offlineQueue';
+import { provider } from '../providers';
 import { syncShifts } from '../services/planningSync';
 import { startOfMonthIso, endOfMonthIso } from '../utils/week';
 
@@ -12,13 +11,13 @@ import { startOfMonthIso, endOfMonthIso } from '../utils/week';
 async function fetchShiftsCached(from, to) {
   const cacheKey = `ocleaneo_shifts_${from}_${to}`;
   try {
-    const { data } = await api.get('/shifts/mine', { params: { from, to } });
+    const data = await provider.fetchShifts({ from, to });
     if (Capacitor.isNativePlatform()) {
       Preferences.set({ key: cacheKey, value: JSON.stringify(data) }).catch(() => {});
     }
     return data;
   } catch (e) {
-    if (!isNetworkError(e) || !Capacitor.isNativePlatform()) throw e;
+    if (!e.isNetworkError || !Capacitor.isNativePlatform()) throw e;
     const { value } = await Preferences.get({ key: cacheKey });
     if (value) return JSON.parse(value);
     throw e;

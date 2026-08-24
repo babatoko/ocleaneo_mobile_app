@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { api } from '../../services/api';
+import { provider } from '../../providers';
 import { useCartStore } from '../../stores/cart';
 import { useChantiersStore } from '../../stores/chantiers';
 import { iconForProduct } from '../../utils/productIcons';
@@ -33,33 +33,32 @@ function suggestedQty(status) {
 
 async function loadStock() {
   if (!chantiers.selectedId) return;
-  try {
-    const { data } = await api.get(`/inventory/chantier/${chantiers.selectedId}/latest`);
-    const byProductPackaging = {};
-    for (const item of data.items) {
-      byProductPackaging[`${item.product_id}-${item.packaging_id}`] = item.quantity_remaining;
-    }
-    for (const p of products.value) {
-      const pkg = defaultPackaging(p);
-      const remaining = pkg ? byProductPackaging[`${p.id}-${pkg.id}`] : undefined;
-      const status = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
-      stockByProduct[p.id] = { status, quantityRemaining: remaining };
-      if (orderQty[p.id] === undefined) orderQty[p.id] = suggestedQty(status);
-    }
-  } catch {
+  const inventory = await provider.fetchInventoryLatest(chantiers.selectedId);
+  if (!inventory) {
     // Pas d'inventaire enregistré pour ce chantier : aucun statut affiché.
     for (const p of products.value) {
       stockByProduct[p.id] = { status: null, quantityRemaining: undefined };
       if (orderQty[p.id] === undefined) orderQty[p.id] = 0;
     }
+    return;
+  }
+  const byProductPackaging = {};
+  for (const item of inventory.items) {
+    byProductPackaging[`${item.product_id}-${item.packaging_id}`] = item.quantity_remaining;
+  }
+  for (const p of products.value) {
+    const pkg = defaultPackaging(p);
+    const remaining = pkg ? byProductPackaging[`${p.id}-${pkg.id}`] : undefined;
+    const status = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
+    stockByProduct[p.id] = { status, quantityRemaining: remaining };
+    if (orderQty[p.id] === undefined) orderQty[p.id] = suggestedQty(status);
   }
 }
 
 onMounted(async () => {
   await chantiers.fetchMine();
   if (!chantiers.selectedId) chantiers.select(chantiers.list[0]?.id ?? null);
-  const { data } = await api.get('/products');
-  products.value = data;
+  products.value = await provider.fetchProducts();
   await loadStock();
 });
 

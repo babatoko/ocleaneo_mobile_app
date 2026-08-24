@@ -2,7 +2,7 @@ import { Preferences } from '@capacitor/preferences';
 import { Network } from '@capacitor/network';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { api } from './api';
+import { provider } from '../providers';
 
 const QUEUE_KEY = 'ocleaneo_pointage_offline_queue';
 
@@ -18,7 +18,7 @@ async function writeQueue(queue) {
 }
 
 export function isNetworkError(e) {
-  return !e.response; // axios : pas de réponse serveur = coupure réseau, pas une erreur métier
+  return !!e.isNetworkError; // posé par tout DataProvider pour une coupure réseau (voir providers/DataProvider.js)
 }
 
 /** Ajoute un pointage à la file d'attente locale (persistante) et renvoie son id local. */
@@ -47,7 +47,7 @@ export async function flushQueue() {
     try {
       // eslint-disable-next-line no-unused-vars
       const { localId, ...payload } = next;
-      await api.post('/time-entries', payload);
+      await provider.createTimeEntry(payload);
       queue = rest;
       flushed += 1;
       await writeQueue(queue);

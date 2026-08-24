@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import { api } from '../../services/api';
+import { provider } from '../../providers';
 import { useChantiersStore } from '../../stores/chantiers';
 import AppHeader from '../../components/AppHeader.vue';
 
@@ -12,8 +12,7 @@ const done = ref(false);
 
 onMounted(async () => {
   await chantiers.fetchMine();
-  const { data } = await api.get('/products');
-  products.value = data;
+  products.value = await provider.fetchProducts();
 });
 
 function setQty(packagingId, value) {
@@ -33,7 +32,7 @@ async function submit(chantierId) {
   if (!items.length) return;
   submitting.value = true;
   try {
-    await api.post('/inventory', { chantierId, items });
+    await provider.submitInventory({ chantierId, items });
     done.value = true;
   } finally {
     submitting.value = false;

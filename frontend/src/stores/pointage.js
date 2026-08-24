@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { Capacitor } from '@capacitor/core';
 import { NFC } from '@exxili/capacitor-nfc';
-import { api } from '../services/api';
+import { provider } from '../providers';
 import { useAuthStore } from './auth';
 import { useChantiersStore } from './chantiers';
 import {
@@ -12,7 +12,7 @@ import {
 } from '../services/notifications';
 import { hapticSuccess, hapticError, hapticTap } from '../services/haptics';
 import { checkGeofence } from '../services/geofence';
-import { enqueue, queueLength, flushQueue, watchConnectivity, isNetworkError } from '../services/offlineQueue';
+import { enqueue, queueLength, flushQueue, watchConnectivity } from '../services/offlineQueue';
 import { startOfWeekIso } from '../utils/week';
 
 function todayIso() {
@@ -121,9 +121,9 @@ export const usePointageStore = defineStore('pointage', {
   },
   actions: {
     async load() {
-      const [{ data: shiftsData }, { data: entriesData }] = await Promise.all([
-        api.get('/shifts/mine', { params: { from: todayIso(), to: todayIso() } }),
-        api.get('/time-entries/today'),
+      const [shiftsData, entriesData] = await Promise.all([
+        provider.fetchShifts({ from: todayIso(), to: todayIso() }),
+        provider.fetchTodayTimeEntries(),
       ]);
       this.todayShifts = shiftsData;
       this.entries = entriesData.entries;
@@ -135,16 +135,16 @@ export const usePointageStore = defineStore('pointage', {
       try {
         await this.load();
       } catch (e) {
-        if (!isNetworkError(e)) throw e;
+        if (!e.isNetworkError) throw e;
       }
     },
 
     async loadWeekSummary() {
       const from = startOfWeekIso(todayIso());
       const to = todayIso();
-      const [{ data: shiftsData }, { data: entriesData }] = await Promise.all([
-        api.get('/shifts/mine', { params: { from, to } }),
-        api.get('/time-entries/mine', { params: { from, to } }),
+      const [shiftsData, entriesData] = await Promise.all([
+        provider.fetchShifts({ from, to }),
+        provider.fetchTimeEntries({ from, to }),
       ]);
       this.weekShifts = shiftsData;
       this.weekEntries = entriesData;
@@ -177,14 +177,14 @@ export const usePointageStore = defineStore('pointage', {
       };
 
       try {
-        await api.post('/time-entries', payload);
+        await provider.createTimeEntry(payload);
         await this.loadSafe();
         this.lastMessage =
           geo && !geo.withinRange
             ? { type: 'warn', text: `Position à ~${geo.distanceMeters} m du chantier — pointage tout de même enregistré.` }
             : null;
       } catch (e) {
-        if (!isNetworkError(e)) throw e;
+        if (!e.isNetworkError) throw e;
         await enqueue(payload);
         await this.refreshQueueCount();
         // Mise à jour optimiste locale pour un retour immédiat à l'écran, même

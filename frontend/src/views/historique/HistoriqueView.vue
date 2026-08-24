@@ -1,13 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import { api } from '../../services/api';
+import { provider } from '../../providers';
 import AppHeader from '../../components/AppHeader.vue';
 
 const orders = ref([]);
 
 onMounted(async () => {
-  const { data } = await api.get('/orders/mine');
-  orders.value = data;
+  orders.value = await provider.fetchMyOrders();
 });
 </script>
 

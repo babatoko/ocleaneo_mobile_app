@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { api } from '../../services/api';
+import { provider } from '../../providers';
 import { useCartStore } from '../../stores/cart';
 import { useChantiersStore } from '../../stores/chantiers';
 import AppHeader from '../../components/AppHeader.vue';
@@ -17,7 +17,7 @@ async function submit() {
   error.value = '';
   submitting.value = true;
   try {
-    const { data } = await api.post('/orders', {
+    const { id } = await provider.createOrder({
       chantierId: chantiers.selectedId,
       items: cart.items.map((i) => ({
         productId: i.productId,
@@ -26,9 +26,9 @@ async function submit() {
       })),
     });
     cart.clear();
-    router.replace(`/commande/${data.id}/recap`);
+    router.replace(`/commande/${id}/recap`);
   } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur lors de la commande';
+    error.value = e.message || 'Erreur lors de la commande';
   } finally {
     submitting.value = false;
   }
