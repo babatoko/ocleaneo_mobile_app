@@ -1,5 +1,34 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { Preferences } from '@capacitor/preferences';
+
+const NOTIFICATIONS_ENABLED_KEY = 'ocleaneo_notifications_enabled';
+let notificationsEnabledCache = null;
+
+/** Préférence utilisateur (Paramètres du profil) — activées par défaut. */
+export async function areNotificationsEnabled() {
+  if (notificationsEnabledCache !== null) return notificationsEnabledCache;
+  const { value } = await Preferences.get({ key: NOTIFICATIONS_ENABLED_KEY });
+  notificationsEnabledCache = value !== 'false';
+  return notificationsEnabledCache;
+}
+
+/** Change la préférence ; désactiver annule aussi tout ce qui est déjà programmé. */
+export async function setNotificationsEnabled(enabled) {
+  notificationsEnabledCache = enabled;
+  await Preferences.set({ key: NOTIFICATIONS_ENABLED_KEY, value: String(enabled) });
+  if (!enabled) await cancelAllNotifications();
+}
+
+export async function cancelAllNotifications() {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const { notifications } = await LocalNotifications.getPending();
+    if (notifications.length) await LocalNotifications.cancel({ notifications });
+  } catch {
+    // Rien de programmé, ou plateforme non supportée.
+  }
+}
 
 const SHIFT_NOTIFICATION_ID = 1001;
 const REMINDER_NOTIFICATION_ID = 1002;
@@ -58,6 +87,7 @@ async function ensurePermission() {
  */
 export async function showClockedInNotification({ chantierName, arrivalAt, estimatedDeparture, next }) {
   if (!Capacitor.isNativePlatform()) return;
+  if (!(await areNotificationsEnabled())) return;
   if (!(await ensurePermission())) return;
 
   const mainLine = `Arrivée ${fmtTime(arrivalAt)} · Fin prévue ${fmtTime(estimatedDeparture)}`;
@@ -95,6 +125,7 @@ export async function clearClockedInNotification() {
  */
 export async function scheduleDepartureReminder({ chantierName, estimatedDeparture }) {
   if (!Capacitor.isNativePlatform()) return;
+  if (!(await areNotificationsEnabled())) return;
   if (!(await ensurePermission())) return;
 
   const at = new Date(new Date(estimatedDeparture).getTime() + REMINDER_DELAY_MIN * 60000);
@@ -125,6 +156,7 @@ export async function cancelDepartureReminder() {
  */
 export async function scheduleShiftReminder(shift) {
   if (!Capacitor.isNativePlatform()) return;
+  if (!(await areNotificationsEnabled())) return;
   if (!(await ensurePermission())) return;
 
   const at = new Date(new Date(shift.start_at).getTime() - SHIFT_REMINDER_BEFORE_MIN * 60000);
@@ -151,6 +183,7 @@ export async function cancelShiftReminder(shiftId) {
 /** Notification ponctuelle « ton planning a changé », un id différent à chaque appel. */
 export async function notifyPlanningChanged(message) {
   if (!Capacitor.isNativePlatform()) return;
+  if (!(await areNotificationsEnabled())) return;
   if (!(await ensurePermission())) return;
 
   planChangeSeq = (planChangeSeq + 1) % 1000;
