@@ -4,12 +4,20 @@ import App from './App.vue';
 import router from './router';
 import { usePointageStore } from './stores/pointage';
 import { ensureNotificationChannel } from './services/notifications';
+import { initProvider } from './providers';
 import '@tabler/icons-webfont/dist/tabler-icons.css';
 import './style.css';
 
 const app = createApp(App);
 const pinia = createPinia();
 app.use(pinia);
+
+// L'URL de serveur (personnalisable depuis le profil) doit être appliquée
+// avant le premier appel réseau. `app.use(router)` déclenche déjà, en
+// interne, la navigation initiale (donc la garde d'authentification et son
+// fetchMe()) de façon asynchrone — il faut donc terminer ceci avant, pas
+// seulement avant app.mount().
+await initProvider();
 app.use(router);
 
 // Enregistré avant même le montage : un badge peut relancer l'app depuis

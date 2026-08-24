@@ -15,4 +15,9 @@ const factory = factories[selected] || factories.rest;
 
 export const provider = factory();
 
+/** À appeler une fois au démarrage (voir main.js), avant tout appel de données. */
+export function initProvider() {
+  return provider.init();
+}
+
 export { DataProvider, ProviderNetworkError } from './DataProvider';

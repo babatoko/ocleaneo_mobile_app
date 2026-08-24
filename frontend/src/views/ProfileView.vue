@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { provider } from '../providers';
 import { useAuthStore } from '../stores/auth';
 import {
   clearSavedCredentials,
@@ -18,6 +19,16 @@ const biometricSaved = ref(false);
 const notificationsEnabled = ref(true);
 const pendingCount = ref(0);
 const loading = ref(true);
+
+const defaultServerUrl = provider.getDefaultServerUrl();
+const currentServerUrl = ref(provider.getServerUrl());
+const serverUrlInput = ref(currentServerUrl.value || '');
+const serverUrlError = ref('');
+const savingServerUrl = ref(false);
+
+const showServerSetting = currentServerUrl.value !== null;
+const serverUrlOverridden = computed(() => currentServerUrl.value !== defaultServerUrl);
+const serverUrlChanged = computed(() => serverUrlInput.value.trim().replace(/\/+$/, '') !== currentServerUrl.value);
 
 const initials = computed(() => {
   const name = auth.employee?.name || '';
@@ -52,9 +63,45 @@ async function disableBiometric() {
   biometricSaved.value = false;
 }
 
+function isValidUrl(value) {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function logout() {
   auth.logout();
   router.replace('/login');
+}
+
+async function saveServerUrl() {
+  const next = serverUrlInput.value.trim();
+  serverUrlError.value = '';
+  if (!isValidUrl(next)) {
+    serverUrlError.value = 'URL invalide (doit commencer par http:// ou https://).';
+    return;
+  }
+  savingServerUrl.value = true;
+  try {
+    await provider.setServerUrl(next);
+  } finally {
+    savingServerUrl.value = false;
+  }
+  // Le jeton de session n'a aucune raison d'être valide sur un autre serveur.
+  logout();
+}
+
+async function resetServerUrl() {
+  savingServerUrl.value = true;
+  try {
+    await provider.setServerUrl('');
+  } finally {
+    savingServerUrl.value = false;
+  }
+  logout();
 }
 </script>
 
@@ -113,6 +160,47 @@ function logout() {
         <span class="srow-value">{{ pendingCount }}</span>
       </div>
     </div>
+
+    <template v-if="showServerSetting">
+      <p class="section-title">Serveur</p>
+      <div class="detail-block" style="padding: 0 18px;">
+        <div class="server-url-field">
+          <input
+            v-model="serverUrlInput"
+            type="url"
+            inputmode="url"
+            placeholder="https://exemple.odoo.com"
+            autocapitalize="none"
+            autocomplete="off"
+          />
+          <p class="srow-sub">
+            Valeur par défaut : {{ defaultServerUrl }}
+            <template v-if="serverUrlOverridden"> · personnalisée actuellement</template>
+          </p>
+          <p v-if="serverUrlError" class="server-url-error">{{ serverUrlError }}</p>
+          <p class="srow-sub">Changer cette valeur vous déconnectera (le jeton de session n'est valable que sur le serveur d'origine).</p>
+          <div class="server-url-actions">
+            <button
+              type="button"
+              class="server-url-save"
+              :disabled="!serverUrlChanged || savingServerUrl"
+              @click="saveServerUrl"
+            >
+              Enregistrer et se reconnecter
+            </button>
+            <button
+              v-if="serverUrlOverridden"
+              type="button"
+              class="server-url-reset"
+              :disabled="savingServerUrl"
+              @click="resetServerUrl"
+            >
+              Revenir à la valeur par défaut
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <p class="section-title">Compte</p>
     <div class="menu">

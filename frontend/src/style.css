@@ -874,12 +874,12 @@ select {
   border-bottom: none;
 }
 
-.settings-row .srow-label {
+.srow-label {
   font-size: 13px;
   margin: 0;
 }
 
-.settings-row .srow-sub {
+.srow-sub {
   font-size: 11px;
   color: var(--text-secondary);
   margin: 2px 0 0;
@@ -952,6 +952,59 @@ button.menu-item {
 
 button.menu-item:last-child {
   border-bottom: none;
+}
+
+.server-url-field {
+  padding: 12px 0;
+}
+
+.server-url-field input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--surface-1);
+}
+
+.server-url-field .srow-sub {
+  margin: 6px 0 0;
+}
+
+.server-url-error {
+  color: var(--danger);
+  font-size: 11px;
+  margin: 6px 0 0;
+}
+
+.server-url-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.server-url-save {
+  padding: 11px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.server-url-save:disabled {
+  opacity: 0.5;
+}
+
+.server-url-reset {
+  padding: 8px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-decoration: underline;
 }
 
 .stock-mini-row {

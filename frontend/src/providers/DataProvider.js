@@ -12,6 +12,32 @@
  * l'a pas (encore) implémentée, plutôt que d'échouer silencieusement.
  */
 export class DataProvider {
+  // --- Cycle de vie --------------------------------------------------------
+
+  /** Appelé une fois au démarrage de l'app, avant le premier appel de données
+   *  (voir `providers/index.js`). No-op par défaut ; un provider réseau s'en
+   *  sert pour appliquer une config persistée (ex. URL de serveur). */
+  async init() {}
+
+  // --- Configuration -------------------------------------------------------
+
+  /** @returns {string|null} URL du serveur actuellement utilisée, ou null si ce
+   *  provider n'en a pas (ex. MockProvider, 100 % en mémoire) — le profil masque
+   *  alors le réglage correspondant. */
+  getServerUrl() {
+    return null;
+  }
+
+  /** @returns {string|null} URL de serveur par défaut (avant toute personnalisation) */
+  getDefaultServerUrl() {
+    return null;
+  }
+
+  /** @param {string} _url Vide pour revenir à la valeur par défaut. */
+  async setServerUrl(_url) {
+    throw notImplemented('setServerUrl');
+  }
+
   // --- Authentification --------------------------------------------------
 
   /** @returns {Promise<{ token: string, employee: object }>} */

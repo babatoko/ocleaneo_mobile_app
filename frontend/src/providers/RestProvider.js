@@ -1,4 +1,4 @@
-import { restClient } from './restClient';
+import { DEFAULT_BASE_URL, getApiBaseUrl, initApiBaseUrl, restClient, setApiBaseUrl } from './restClient';
 import { DataProvider, ProviderNetworkError } from './DataProvider';
 
 function normalizeError(e) {
@@ -15,6 +15,22 @@ function normalizeError(e) {
  * chemins d'URL vit ici ; rien de ça ne doit fuiter vers les stores/vues.
  */
 export class RestProvider extends DataProvider {
+  async init() {
+    await initApiBaseUrl();
+  }
+
+  getServerUrl() {
+    return getApiBaseUrl();
+  }
+
+  getDefaultServerUrl() {
+    return DEFAULT_BASE_URL;
+  }
+
+  async setServerUrl(url) {
+    await setApiBaseUrl(url);
+  }
+
   async login(username, password) {
     try {
       const { data } = await restClient.post('/auth/login', { username, password });
