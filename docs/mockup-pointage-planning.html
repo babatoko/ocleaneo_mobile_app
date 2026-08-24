@@ -709,6 +709,10 @@
   .artefact-row .chev{color:var(--text-muted);font-size:16px;flex-shrink:0;}
   .artefact-row .badge{flex-shrink:0;}
 
+  .pk-contents{margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border);}
+  .pk-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);padding:3px 0;}
+  .pk-item i{font-size:14px;color:var(--text-muted);flex-shrink:0;}
+
   .artefact-holder{
     display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;
     border-top:0.5px solid var(--border);
@@ -1951,7 +1955,7 @@
 
           <div class="balance-row">
             <div class="balance-card">
-              <p class="num">4</p>
+              <p class="num">3</p>
               <p class="lbl">en ma possession</p>
             </div>
             <div class="balance-card">
@@ -1960,17 +1964,25 @@
             </div>
           </div>
 
-          <p class="section-title">Cegetel Macon</p>
+          <p class="section-title">Porte-cle</p>
           <div class="detail-block">
-            <div class="artefact-row">
-              <div class="artefact-icon"><i class="ti ti-key"></i></div>
+            <div class="artefact-row" style="align-items:flex-start;">
+              <div class="artefact-icon lost"><i class="ti ti-key"></i></div>
               <div class="artefact-body">
-                <p class="aname">Cle — Portail principal</p>
-                <p class="asite">Remise le 12 mars 2026</p>
+                <p class="aname">Porte-cle — Sophie Martin</p>
+                <p class="asite">Signale perdu le 18 aout 2026</p>
+                <div class="pk-contents">
+                  <div class="pk-item"><i class="ti ti-key"></i><span>Portail principal — Cegetel Macon</span></div>
+                  <div class="pk-item"><i class="ti ti-key"></i><span>Local technique — Residence Les Tilleuls</span></div>
+                </div>
               </div>
-              <span class="badge active">En ma possession</span>
+              <span class="badge lost">Perdu</span>
               <i class="ti ti-chevron-right chev"></i>
             </div>
+          </div>
+
+          <p class="section-title">Cegetel Macon</p>
+          <div class="detail-block">
             <div class="artefact-row">
               <div class="artefact-icon"><i class="ti ti-id-badge-2"></i></div>
               <div class="artefact-body">
@@ -2002,15 +2014,6 @@
               <span class="badge active">En ma possession</span>
               <i class="ti ti-chevron-right chev"></i>
             </div>
-            <div class="artefact-row">
-              <div class="artefact-icon lost"><i class="ti ti-key"></i></div>
-              <div class="artefact-body">
-                <p class="aname">Cle — Local technique</p>
-                <p class="asite">Signalee perdue le 18 aout 2026</p>
-              </div>
-              <span class="badge lost">Perdue</span>
-              <i class="ti ti-chevron-right chev"></i>
-            </div>
           </div>
 
           <div class="fab"><i class="ti ti-flag-3"></i></div>
@@ -2027,31 +2030,39 @@
     </div>
   </div>
 
-  <!-- ECRAN DETAIL ARTEFACT (PERDU) -->
+  <!-- ECRAN DETAIL PORTE-CLE (PERDU) -->
   <div>
-    <p class="phone-label">Detail artefact — perdu</p>
+    <p class="phone-label">Detail du porte-cle — perdu</p>
     <div class="phone">
       <div class="screen">
         <div class="status-bar"><span>9:41</span><span>●●● 5G 100%</span></div>
         <div class="content">
           <div class="detail-header">
             <div class="back"><i class="ti ti-arrow-left"></i></div>
-            <p class="htitle">Cle — Local technique</p>
+            <p class="htitle">Porte-cle</p>
           </div>
 
           <div class="detail-hero" style="text-align:center;">
             <div class="artefact-icon lost" style="width:56px;height:56px;font-size:24px;margin:0 auto 10px;">
               <i class="ti ti-key"></i>
             </div>
-            <p class="dtime" style="margin-bottom:2px;">Cle — Local technique</p>
-            <p class="dclient" style="margin-bottom:8px;">Residence Les Tilleuls</p>
-            <span class="badge lost">Signalee perdue</span>
+            <p class="dtime" style="margin-bottom:2px;">Porte-cle — Sophie Martin</p>
+            <p class="dclient" style="margin-bottom:8px;">2 cles · Cegetel Macon, Residence Les Tilleuls</p>
+            <span class="badge lost">Signale perdu</span>
+          </div>
+
+          <p class="section-title">Contenu</p>
+          <div class="detail-block">
+            <div class="pk-contents" style="margin-top:0;padding-top:0;border-top:none;">
+              <div class="pk-item"><i class="ti ti-key"></i><span>Portail principal — Cegetel Macon</span></div>
+              <div class="pk-item"><i class="ti ti-key"></i><span>Local technique — Residence Les Tilleuls</span></div>
+            </div>
           </div>
 
           <div class="detail-block">
             <div class="note-box">
               <i class="ti ti-alert-circle"></i>
-              <span>Perdue le 18 aout 2026 par Julie Dubois — "Tombee de la poche pendant la tournee, non retrouvee sur place."</span>
+              <span>Perdu le 18 aout 2026 — "Tombe de la poche pendant la tournee, non retrouve sur place."</span>
             </div>
           </div>
 
@@ -2061,32 +2072,23 @@
               <div class="stop-num done">1</div>
               <div class="stop-card">
                 <div class="stop-top">
-                  <p class="sname">Remise a Sophie Martin</p>
+                  <p class="sname">Remis a Sophie Martin</p>
                 </div>
                 <p class="saddr">12 mars 2026</p>
               </div>
             </div>
             <div class="stop-row">
-              <div class="stop-num done">2</div>
+              <div class="stop-num" style="background:var(--danger-text);">2</div>
               <div class="stop-card">
                 <div class="stop-top">
-                  <p class="sname">Transferee a Julie Dubois</p>
-                </div>
-                <p class="saddr">2 juin 2026</p>
-              </div>
-            </div>
-            <div class="stop-row">
-              <div class="stop-num" style="background:var(--danger-text);">3</div>
-              <div class="stop-card">
-                <div class="stop-top">
-                  <p class="sname">Signalee perdue par Julie Dubois</p>
+                  <p class="sname">Signale perdu par Sophie Martin</p>
                 </div>
                 <p class="saddr">18 aout 2026</p>
               </div>
             </div>
           </div>
 
-          <div class="anomaly-submit accent" style="margin-top:auto;">Declarer retrouvee</div>
+          <div class="anomaly-submit accent" style="margin-top:auto;">Declarer retrouve</div>
           <div style="height:14px;"></div>
 
           <div class="nav">
@@ -2116,7 +2118,7 @@
           <p class="field-label" style="margin-top:10px;">Artefact concerne</p>
           <div class="site-select" style="margin:0 18px 16px;">
             <i class="ti ti-key"></i>
-            <span>Cle — Portail principal · Cegetel Macon</span>
+            <span>Porte-cle (2 cles) · Sophie Martin</span>
             <i class="ti ti-chevron-down chev"></i>
           </div>
 
@@ -2163,7 +2165,7 @@
           <div class="detail-block">
             <div class="note-box" style="background:var(--accent-bg);color:var(--accent-text);">
               <i class="ti ti-key"></i>
-              <span>Cle — Local technique · Residence Les Tilleuls — perdue depuis 12 jours (18 aout 2026)</span>
+              <span>Porte-cle (2 cles) · Sophie Martin — perdu depuis 12 jours (18 aout 2026)</span>
             </div>
           </div>
 
@@ -2210,7 +2212,7 @@
               <span class="dates">18 aout 2026</span>
               <span class="badge lost">Perte signalee</span>
             </div>
-            <p class="type">Cle — Local technique · Residence Les Tilleuls</p>
+            <p class="type">Porte-cle (2 cles) — Sophie Martin</p>
           </div>
 
           <div class="request-card">
@@ -2272,28 +2274,28 @@
           <div class="qc-item">
             <div class="qtop">
               <div>
-                <p class="qname">Cle — Local technique</p>
-                <p class="qzone">Residence Les Tilleuls</p>
+                <p class="qname">Porte-cle (2 cles)</p>
+                <p class="qzone">Cegetel Macon, Residence Les Tilleuls</p>
               </div>
-              <span class="qc-status issue">Perdue</span>
+              <span class="qc-status issue">Perdu</span>
             </div>
             <div class="artefact-holder">
-              <div class="ah-avatar">JD</div>
-              <span>Julie Dubois · declaree il y a 6 j</span>
+              <div class="ah-avatar">SM</div>
+              <span>Sophie Martin · declare il y a 6 j</span>
             </div>
           </div>
 
           <div class="qc-item">
             <div class="qtop">
               <div>
-                <p class="qname">Cle — Portail principal</p>
-                <p class="qzone">Cegetel Macon</p>
+                <p class="qname">Porte-cle (1 cle)</p>
+                <p class="qzone">Residence Les Tilleuls</p>
               </div>
               <span class="qc-status ok">En possession</span>
             </div>
             <div class="artefact-holder">
-              <div class="ah-avatar">SM</div>
-              <span>Sophie Martin · depuis le 12 mars 2026</span>
+              <div class="ah-avatar">JD</div>
+              <span>Julie Dubois · depuis le 2 juin 2026</span>
             </div>
           </div>
 
