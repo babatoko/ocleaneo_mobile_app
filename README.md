@@ -9,7 +9,7 @@ Application mobile **Android et iOS** (via Capacitor) Ocleaneo pour le terrain :
 - **Frontend** : Vue 3 + Vite, Vue Router, Pinia, Axios
 - **Apps natives** : [Capacitor](https://capacitorjs.com) 8 — enveloppe le build web dans un shell natif Android (`frontend/android/`) et iOS (`frontend/ios/`), donne accès aux API natives (caméra, géolocalisation, NFC, notifications push) nécessaires aux écrans du mockup (pointage NFC, photos d'anomalie, PTI/SOS)
 - **PWA** : `vite-plugin-pwa` en plus, pour un accès web installable indépendant des stores
-- **Backend : Odoo 14 + modules OCA** (instance existante, à connecter — voir [Intégration Odoo](#intégration-odoo) ci-dessous)
+- **Backend : Odoo 14 + modules OCA**, exposé via **`base_rest`** (instance existante, à connecter — voir [Intégration Odoo](#intégration-odoo) ci-dessous)
 - **Déploiement web** : Docker + Nginx (pour la variante PWA/navigateur)
 
 > ⚠️ Le backend Node.js/Express + SQLite qui existait dans une version précédente de ce projet a été retiré : le backend réel est une instance Odoo 14. Voir la section Intégration Odoo, et surtout la section suivante — le frontend ne parle plus jamais directement à une API, il passe par un plugin de données.
@@ -187,9 +187,7 @@ Quatre axes ajoutés au-dessus des vues de base :
 Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Décisions encore ouvertes avant de rebrancher le frontend :
 
 1. **URL et accès de l'instance** — à fournir (endpoint, identifiants/API key de service).
-2. **Protocole d'API** entre l'app Vue et Odoo :
-   - **OCA `base_rest`** (repo `rest-framework`) : expose des endpoints REST/JSON propres, plus simple à consommer depuis Axios que le JSON-RPC natif. Recommandé pour une app mobile/SPA.
-   - **JSON-RPC natif** (`/web/dataset/call_kw`) : zéro dépendance supplémentaire côté Odoo mais payloads plus rigides, moins adapté à un client REST classique.
+2. **Protocole d'API** entre l'app Vue et Odoo : **tranché, ce sera OCA `base_rest`** (repo `rest-framework`). Il expose des endpoints REST/JSON propres (verbes HTTP, chemins d'URL clairs, forme de réponse contrôlée côté service plutôt que les champs bruts du modèle Odoo) — c'est ce que `RestProvider.js` sait déjà consommer nativement avec Axios, alors que le JSON-RPC natif (`/web/dataset/call_kw`) aurait demandé un provider dédié pour construire ses enveloppes `call_kw` et déballer les dictionnaires internes d'Odoo. Reste à installer le module côté instance et à définir les services/chemins pour chaque endpoint du contrat `DataProvider`.
    - **Authentification** : Odoo doit vérifier identifiant + mot de passe (stockés sur la fiche employé) et renvoyer un token Bearer — via un module OCA comme `auth_api_key` (repo `server-auth`) ou `auth_jwt`. La biométrie (voir [Authentification](#authentification) ci-dessus) est gérée uniquement côté app, Odoo ne voit jamais que du login/mot de passe classique.
 3. **Mapping métier** — le domaine (chantiers, salariés, planning, pointage, stock par site) correspond de près à la suite **OCA Field Service Management** (repo `field-service`) :
    - `fsm.location` ↔ chantier
