@@ -12,6 +12,9 @@ vi.mock('../restClient', () => ({
 const { restClient } = await import('../restClient');
 const { RestProvider } = await import('../RestProvider');
 
+const post = vi.mocked(restClient.post);
+const get = vi.mocked(restClient.get);
+
 // Ces tests verrouillent le contrat d'erreur des providers. C'est précisément
 // ce contrat qu'un écran avait cessé de respecter : LoginView lisait encore
 // `e.response.data.error` (forme axios) alors que le provider normalise en
@@ -19,19 +22,19 @@ const { RestProvider } = await import('../RestProvider');
 // incorrects » — y compris une coupure réseau.
 
 describe('normalisation des erreurs du RestProvider', () => {
-  let provider;
+  let provider: InstanceType<typeof RestProvider>;
   beforeEach(() => {
     provider = new RestProvider();
     vi.clearAllMocks();
   });
 
   it('transforme une absence de réponse en ProviderNetworkError', async () => {
-    restClient.post.mockRejectedValue(Object.assign(new Error('Network Error'), { response: undefined }));
+    post.mockRejectedValue(Object.assign(new Error('Network Error'), { response: undefined }));
     await expect(provider.login('a', 'b')).rejects.toMatchObject({ isNetworkError: true });
   });
 
   it('expose le message métier du serveur sur .message', async () => {
-    restClient.post.mockRejectedValue({ response: { status: 401, data: { error: 'Identifiants invalides' } } });
+    post.mockRejectedValue({ response: { status: 401, data: { error: 'Identifiants invalides' } } });
     await expect(provider.login('a', 'b')).rejects.toMatchObject({
       message: 'Identifiants invalides',
       status: 401,
@@ -39,7 +42,7 @@ describe('normalisation des erreurs du RestProvider', () => {
   });
 
   it('n\'expose jamais la forme axios `response` aux appelants', async () => {
-    restClient.post.mockRejectedValue({ response: { status: 500, data: { error: 'boom' } } });
+    post.mockRejectedValue({ response: { status: 500, data: { error: 'boom' } } });
     const err = await provider.login('a', 'b').catch((e) => e);
     // Si `response` réapparaissait, les vues seraient tentées de le lire à
     // nouveau et le couplage à axios reviendrait par la fenêtre.
@@ -49,14 +52,14 @@ describe('normalisation des erreurs du RestProvider', () => {
   });
 
   it('rend une erreur exploitable même sans corps de réponse', async () => {
-    restClient.post.mockRejectedValue({ response: { status: 503, data: null }, message: 'Request failed' });
+    post.mockRejectedValue({ response: { status: 503, data: null }, message: 'Request failed' });
     const err = await provider.login('a', 'b').catch((e) => e);
     expect(err.message).toBeTruthy();
     expect(err.status).toBe(503);
   });
 
   it('traite un 404 d\'inventaire comme « aucun inventaire », pas comme une panne', async () => {
-    restClient.get.mockRejectedValue({ response: { status: 404, data: {} } });
+    get.mockRejectedValue({ response: { status: 404, data: {} } });
     await expect(provider.fetchInventoryLatest(1)).resolves.toBeNull();
   });
 });

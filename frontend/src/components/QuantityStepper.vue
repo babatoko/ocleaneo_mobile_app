@@ -1,11 +1,11 @@
-<script setup>
+<script setup lang="ts">
 const props = defineProps({
   modelValue: { type: Number, default: 0 },
   min: { type: Number, default: 0 },
 });
 const emit = defineEmits(['update:modelValue']);
 
-function step(delta) {
+function step(delta: number) {
   const next = Math.max(props.min, props.modelValue + delta);
   emit('update:modelValue', next);
 }

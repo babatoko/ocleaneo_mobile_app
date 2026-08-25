@@ -1,34 +1,43 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { provider } from '../../providers';
+import { ProviderNetworkError } from '../../providers/DataProvider';
 import { useCartStore } from '../../stores/cart';
 import { useChantiersStore } from '../../stores/chantiers';
 import { iconForProduct } from '../../utils/productIcons';
 import DataState from '../../components/DataState.vue';
+import type { Packaging, Product } from '../../types/models';
+
+type StockStatus = 'ok' | 'low' | 'out' | null;
+
+interface StockInfo {
+  status: StockStatus;
+  quantityRemaining?: number;
+}
 
 const chantiers = useChantiersStore();
 const cart = useCartStore();
 const router = useRouter();
 
-const products = ref([]);
-const stockByProduct = reactive({}); // productId -> { status: 'ok'|'low'|'out', quantityRemaining }
-const orderQty = reactive({}); // productId -> quantity to order
+const products = ref<Product[]>([]);
+const stockByProduct = reactive<Record<number, StockInfo>>({});
+const orderQty = reactive<Record<number, number>>({});
 const loading = ref(true);
 const error = ref('');
 
-function defaultPackaging(product) {
+function defaultPackaging(product: Product): Packaging | undefined {
   return product.packagings.find((pk) => pk.is_default) || product.packagings[0];
 }
 
-function statusLabel(status) {
+function statusLabel(status: StockStatus): string {
   if (status === 'out') return 'Rupture';
   if (status === 'low') return 'Stock faible';
   if (status === 'ok') return 'Stock suffisant';
   return '';
 }
 
-function suggestedQty(status) {
+function suggestedQty(status: StockStatus): number {
   if (status === 'out') return 2;
   if (status === 'low') return 1;
   return 0;
@@ -39,7 +48,7 @@ async function loadStock() {
   // Repartir de zéro à chaque site : sans ça, les quantités saisies pour le
   // chantier précédent restent affichées et partiraient dans la commande du
   // nouveau.
-  for (const key of Object.keys(orderQty)) delete orderQty[key];
+  for (const key of Object.keys(orderQty)) delete orderQty[Number(key)];
 
   const inventory = await provider.fetchInventoryLatest(chantiers.selectedId);
   if (!inventory) {
@@ -50,14 +59,14 @@ async function loadStock() {
     }
     return;
   }
-  const byProductPackaging = {};
+  const byProductPackaging: Record<string, number> = {};
   for (const item of inventory.items) {
     byProductPackaging[`${item.product_id}-${item.packaging_id}`] = item.quantity_remaining;
   }
   for (const p of products.value) {
     const pkg = defaultPackaging(p);
     const remaining = pkg ? byProductPackaging[`${p.id}-${pkg.id}`] : undefined;
-    const status = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
+    const status: StockStatus = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
     stockByProduct[p.id] = { status, quantityRemaining: remaining };
     orderQty[p.id] = suggestedQty(status);
   }
@@ -68,13 +77,13 @@ async function load() {
   error.value = '';
   try {
     await chantiers.fetchMine();
-    if (!chantiers.selectedId) chantiers.select(chantiers.list[0]?.id ?? null);
+    if (!chantiers.selectedId && chantiers.list[0]) chantiers.select(chantiers.list[0].id);
     products.value = await provider.fetchProducts();
     await loadStock();
   } catch (e) {
-    error.value = e.isNetworkError
+    error.value = e instanceof ProviderNetworkError
       ? 'Pas de connexion — le catalogue n\'a pas pu être chargé.'
-      : e.message || 'Catalogue indisponible.';
+      : (e instanceof Error && e.message) || 'Catalogue indisponible.';
   } finally {
     loading.value = false;
   }
@@ -89,16 +98,16 @@ watch(
     try {
       await loadStock();
     } catch (e) {
-      error.value = e.isNetworkError
+      error.value = e instanceof ProviderNetworkError
         ? 'Pas de connexion — le stock de ce site n\'a pas pu être chargé.'
-        : e.message || 'Stock indisponible.';
+        : (e instanceof Error && e.message) || 'Stock indisponible.';
     }
   }
 );
 
 const selectedCount = computed(() => Object.values(orderQty).filter((q) => q > 0).length);
 
-function step(productId, delta) {
+function step(productId: number, delta: number) {
   orderQty[productId] = Math.max(0, (orderQty[productId] || 0) + delta);
 }
 
@@ -108,6 +117,7 @@ function goToOrder() {
     const qty = orderQty[p.id];
     if (!qty) continue;
     const pkg = defaultPackaging(p);
+    if (!pkg) continue;
     cart.addItem({
       productId: p.id,
       productName: p.name,

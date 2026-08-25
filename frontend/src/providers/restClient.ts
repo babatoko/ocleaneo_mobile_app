@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { Preferences } from '@capacitor/preferences';
 
 // Client HTTP interne au RestProvider : rien en dehors de providers/RestProvider.js
@@ -14,17 +14,17 @@ export const restClient = axios.create({
 
 /** À appeler une fois au démarrage, avant le premier appel réseau : applique
  *  une éventuelle URL de serveur personnalisée (réglée depuis le profil). */
-export async function initApiBaseUrl() {
+export async function initApiBaseUrl(): Promise<void> {
   const { value } = await Preferences.get({ key: BASE_URL_PREF_KEY });
   if (value) restClient.defaults.baseURL = value;
 }
 
-export function getApiBaseUrl() {
+export function getApiBaseUrl(): string | undefined {
   return restClient.defaults.baseURL;
 }
 
-/** @param {string} url Vide (ou égale à la valeur par défaut) pour revenir à VITE_API_URL. */
-export async function setApiBaseUrl(url) {
+/** @param url Vide (ou égale à la valeur par défaut) pour revenir à VITE_API_URL. */
+export async function setApiBaseUrl(url: string): Promise<void> {
   const next = (url || '').trim().replace(/\/+$/, '');
   if (!next || next === DEFAULT_BASE_URL) {
     restClient.defaults.baseURL = DEFAULT_BASE_URL;
@@ -37,13 +37,13 @@ export async function setApiBaseUrl(url) {
 
 restClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('ocleaneo_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token) config.headers.set('Authorization', `Bearer ${token}`);
   return config;
 });
 
 restClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  (error: AxiosError) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('ocleaneo_token');
     }

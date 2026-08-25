@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { provider } from '../../providers';
@@ -8,26 +8,35 @@ import { iconForProduct } from '../../utils/productIcons';
 import { turnByTurnHref } from '../../services/navigation';
 import { todayIso } from '../../utils/date';
 import AppHeader from '../../components/AppHeader.vue';
+import type { Shift } from '../../types/models';
 
 const props = defineProps({
   id: { type: String, required: true },
 });
+
+type StockStatus = 'ok' | 'low' | 'out' | null;
+
+interface StockPreviewItem {
+  name: string;
+  icon: string;
+  status: StockStatus;
+}
 
 const route = useRoute();
 const router = useRouter();
 const chantiers = useChantiersStore();
 const planning = usePlanningStore();
 
-const shift = ref(null);
+const shift = ref<Shift | null>(null);
 const loading = ref(true);
-const stockPreview = ref([]); // [{ name, icon, status }]
+const stockPreview = ref<StockPreviewItem[]>([]);
 
-function timeRange(s) {
-  const fmt = (iso) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+function timeRange(s: Shift): string {
+  const fmt = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   return `${fmt(s.start_at)} - ${fmt(s.end_at)}`;
 }
 
-function itineraryHref(s) {
+function itineraryHref(s: Shift): string {
   const chantier = chantiers.list.find((c) => c.id === s.chantier_id);
   return turnByTurnHref({
     latitude: chantier?.latitude,
@@ -36,7 +45,7 @@ function itineraryHref(s) {
   });
 }
 
-function statusLabel(status) {
+function statusLabel(status: StockStatus): string {
   if (status === 'out') return 'Rupture';
   if (status === 'low') return 'Faible';
   if (status === 'ok') return 'OK';
@@ -44,6 +53,7 @@ function statusLabel(status) {
 }
 
 function goToStock() {
+  if (!shift.value) return;
   chantiers.select(shift.value.chantier_id);
   router.push('/commande/catalogue');
 }
@@ -51,11 +61,12 @@ function goToStock() {
 // L'inventaire se fait sur place, sur le chantier où l'on se trouve : c'est
 // depuis la vacation en cours qu'il est le plus naturel de le lancer.
 function goToInventaire() {
+  if (!shift.value) return;
   chantiers.select(shift.value.chantier_id);
-  router.push({ name: 'inventaire', query: { chantier: shift.value.chantier_id } });
+  router.push({ name: 'inventaire', query: { chantier: String(shift.value.chantier_id) } });
 }
 
-async function loadStockPreview(chantierId) {
+async function loadStockPreview(chantierId: number) {
   const [products, inventory] = await Promise.all([
     provider.fetchProducts(),
     provider.fetchInventoryLatest(chantierId),
@@ -64,14 +75,14 @@ async function loadStockPreview(chantierId) {
     stockPreview.value = [];
     return;
   }
-  const byProductPackaging = {};
+  const byProductPackaging: Record<string, number> = {};
   for (const item of inventory.items) {
     byProductPackaging[`${item.product_id}-${item.packaging_id}`] = item.quantity_remaining;
   }
   stockPreview.value = products.slice(0, 4).map((p) => {
     const pkg = p.packagings.find((pk) => pk.is_default) || p.packagings[0];
     const remaining = pkg ? byProductPackaging[`${p.id}-${pkg.id}`] : undefined;
-    const status = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
+    const status: StockStatus = remaining === undefined ? null : remaining <= 0 ? 'out' : remaining <= 2 ? 'low' : 'ok';
     return { name: p.name, icon: iconForProduct(p), status };
   });
 }
@@ -83,7 +94,7 @@ onMounted(async () => {
     if (planning.selectedShift && String(planning.selectedShift.id) === props.id) {
       shift.value = planning.selectedShift;
     } else {
-      const date = route.query.date || todayIso();
+      const date = typeof route.query.date === 'string' ? route.query.date : todayIso();
       const data = await provider.fetchShifts({ from: date, to: date });
       shift.value = data.find((s) => String(s.id) === props.id) || null;
     }

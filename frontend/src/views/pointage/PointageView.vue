@@ -1,22 +1,34 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Capacitor } from '@capacitor/core';
 import { usePointageStore } from '../../stores/pointage';
 import { useChantiersStore } from '../../stores/chantiers';
 import { isNfcSupported, startIosNfcSession, cancelIosNfcSession } from '../../services/nfc';
+import type { TimeEntry, TimeEntryType } from '../../types/models';
+
+interface PlannedDepartureEntry {
+  id: 'planned-departure';
+  type: 'out';
+  planned: true;
+  plannedTime: Date | null;
+  chantier_name?: undefined;
+  recorded_at?: undefined;
+  pending?: undefined;
+}
+type DisplayEntry = (TimeEntry & { planned?: false; plannedTime?: undefined }) | PlannedDepartureEntry;
 
 const router = useRouter();
 const pointage = usePointageStore();
 const chantiers = useChantiersStore();
 const now = ref(new Date());
-const nfcSupported = ref(null); // null = vérification en cours
+const nfcSupported = ref<boolean | null>(null); // null = vérification en cours
 const isIos = Capacitor.getPlatform() === 'ios';
 const justSucceeded = ref(false);
 
-let clockInterval;
-let scanTimeout;
-let messageTimeout;
+let clockInterval: ReturnType<typeof setInterval> | undefined;
+let scanTimeout: ReturnType<typeof setTimeout> | undefined;
+let messageTimeout: ReturnType<typeof setTimeout> | undefined;
 let initialLoadDone = false;
 
 onMounted(async () => {
@@ -59,24 +71,27 @@ watch(
   }
 );
 
-const displayEntries = computed(() => {
-  if (pointage.status !== 'in' || !pointage.lastEntry) return pointage.entries;
-  const shift = pointage.todayShifts.find((s) => s.chantier_id === pointage.lastEntry.chantier_id);
+const displayEntries = computed((): DisplayEntry[] => {
+  const lastEntry = pointage.lastEntry as TimeEntry | undefined;
+  if (pointage.status !== 'in' || !lastEntry) return pointage.entries;
+  const shift = pointage.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
   if (!shift) return pointage.entries;
   return [
     ...pointage.entries,
-    { id: 'planned-departure', type: 'out', planned: true, plannedTime: pointage.estimatedDepartureFor(shift) },
+    { id: 'planned-departure', type: 'out', planned: true, plannedTime: (pointage.estimatedDepartureFor as (s: typeof shift) => Date | null)(shift) },
   ];
 });
 
 // Vacation dépassée depuis longtemps sans départ badgé : renforce le rappel
 // programmé (qui peut être manqué ou retardé par le système).
 const overdueMinutes = computed(() => {
-  if (pointage.status !== 'in' || !pointage.lastEntry) return 0;
-  const shift = pointage.todayShifts.find((s) => s.chantier_id === pointage.lastEntry.chantier_id);
+  const lastEntry = pointage.lastEntry as TimeEntry | undefined;
+  if (pointage.status !== 'in' || !lastEntry) return 0;
+  const shift = pointage.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
   if (!shift) return 0;
-  const estimated = pointage.estimatedDepartureFor(shift);
-  const diffMin = (now.value - estimated) / 60000;
+  const estimated = (pointage.estimatedDepartureFor as (s: typeof shift) => Date | null)(shift);
+  if (!estimated) return 0;
+  const diffMin = (now.value.getTime() - estimated.getTime()) / 60000;
   return diffMin > 20 ? Math.round(diffMin) : 0;
 });
 
@@ -94,15 +109,15 @@ const statusIcon = computed(() =>
       : 'ti-player-stop'
 );
 
-function fmtOverdue(min) {
+function fmtOverdue(min: number): string {
   if (min < 60) return `${min} min`;
   return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
 }
 
 const weekHoursLabel = computed(() => {
-  const worked = pointage.weekWorkedHours;
-  const planned = pointage.weekPlannedHours;
-  const fmt = (h) => `${Math.floor(h)}h${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+  const worked = pointage.weekWorkedHours as number;
+  const planned = pointage.weekPlannedHours as number;
+  const fmt = (h: number) => `${Math.floor(h)}h${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
   return `${fmt(worked)} / ${fmt(planned)} prévues`;
 });
 
@@ -129,25 +144,26 @@ async function onCircleClick() {
     await startIosNfcSession();
   } catch (e) {
     pointage.scanning = false;
-    pointage.scanError = e.message || 'Lecture NFC impossible.';
+    pointage.scanError = (e instanceof Error && e.message) || 'Lecture NFC impossible.';
   }
 }
 
-function entryIcon(type) {
+function entryIcon(type: TimeEntryType): string {
   if (type === 'in') return 'ti-login-2';
   if (type === 'pause_start') return 'ti-player-pause';
   if (type === 'pause_end') return 'ti-player-play';
   return 'ti-logout-2';
 }
 
-function entryLabel(type) {
+function entryLabel(type: TimeEntryType): string {
   if (type === 'in') return 'Arrivée';
   if (type === 'pause_start') return 'Pause';
   if (type === 'pause_end') return 'Reprise';
   return 'Départ';
 }
 
-function fmtTime(iso) {
+function fmtTime(iso: string | Date | null | undefined): string {
+  if (!iso) return '--:--';
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 </script>

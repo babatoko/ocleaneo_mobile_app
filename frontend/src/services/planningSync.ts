@@ -1,6 +1,7 @@
 import { Preferences } from '@capacitor/preferences';
 import { Capacitor } from '@capacitor/core';
 import { scheduleShiftReminder, cancelShiftReminder, notifyPlanningChanged } from './notifications';
+import type { Shift } from '../types/models';
 
 const SNAPSHOT_KEY = 'ocleaneo_planning_snapshot';
 // Fenêtre dans laquelle un changement déclenche une notification et un
@@ -12,26 +13,28 @@ const SNAPSHOT_KEY = 'ocleaneo_planning_snapshot';
 // l'ensemble du planning sans backend dédié (voir README).
 const NEAR_TERM_WINDOW_H = 48;
 
-function fingerprint(s) {
+type Snapshot = Record<number, string>;
+
+function fingerprint(s: Shift): string {
   return `${s.start_at}|${s.end_at}|${s.status}|${s.note || ''}`;
 }
 
-async function readSnapshot() {
+async function readSnapshot(): Promise<Snapshot> {
   if (!Capacitor.isNativePlatform()) return {};
   const { value } = await Preferences.get({ key: SNAPSHOT_KEY });
   return value ? JSON.parse(value) : {};
 }
 
-async function writeSnapshot(snap) {
+async function writeSnapshot(snap: Snapshot): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   await Preferences.set({ key: SNAPSHOT_KEY, value: JSON.stringify(snap) });
 }
 
-function fmtDate(iso) {
+function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-function fmtTime(iso) {
+function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -41,16 +44,16 @@ function fmtTime(iso) {
  * changements détectés sur les vacations proches par rapport à la dernière
  * fois qu'elles ont été vues.
  */
-export async function syncShifts(shifts) {
+export async function syncShifts(shifts: Shift[]): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   const snapshot = await readSnapshot();
-  const changes = [];
+  const changes: string[] = [];
   const now = Date.now();
 
   for (const s of shifts) {
     const fp = fingerprint(s);
     const prev = snapshot[s.id];
-    const hoursUntil = (new Date(s.start_at) - now) / 3600000;
+    const hoursUntil = (new Date(s.start_at).getTime() - now) / 3600000;
     const isNearTerm = hoursUntil > 0 && hoursUntil <= NEAR_TERM_WINDOW_H;
 
     if (isNearTerm && prev !== undefined && prev !== fp) {

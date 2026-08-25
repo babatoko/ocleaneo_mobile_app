@@ -1,10 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { provider } from '../../providers';
+import { ProviderNetworkError } from '../../providers/DataProvider';
 import AppHeader from '../../components/AppHeader.vue';
 import DataState from '../../components/DataState.vue';
+import type { Order } from '../../types/models';
 
-const orders = ref([]);
+const orders = ref<Order[]>([]);
 const loading = ref(true);
 const error = ref('');
 
@@ -14,9 +16,9 @@ async function load() {
   try {
     orders.value = await provider.fetchMyOrders();
   } catch (e) {
-    error.value = e.isNetworkError
+    error.value = e instanceof ProviderNetworkError
       ? "Pas de connexion — l'historique n'a pas pu être chargé."
-      : e.message || 'Historique indisponible.';
+      : (e instanceof Error && e.message) || 'Historique indisponible.';
   } finally {
     loading.value = false;
   }

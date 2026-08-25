@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { computeWorkedHours } from '../pointage';
+import type { TimeEntry, TimeEntryType } from '../../types/models';
 
 // Ce calcul alimente le compteur d'heures de la semaine et l'alerte de
 // dépassement : une erreur ici se traduit en heures fausses sur une fiche de
 // paie. C'est la logique la plus à risque de l'application.
 
-const e = (type, time) => ({ type, recorded_at: `2026-08-24T${time}:00` });
-const at = (time) => new Date(`2026-08-24T${time}:00`);
+let nextId = 1;
+const e = (type: TimeEntryType, time: string): TimeEntry => ({
+  id: nextId++,
+  chantier_id: 1,
+  type,
+  recorded_at: `2026-08-24T${time}:00`,
+});
+const at = (time: string) => new Date(`2026-08-24T${time}:00`);
 
 describe('computeWorkedHours', () => {
   it('compte une vacation simple arrivée/départ', () => {

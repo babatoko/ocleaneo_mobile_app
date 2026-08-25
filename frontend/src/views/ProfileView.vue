@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { provider } from '../providers';
@@ -63,7 +63,7 @@ async function disableBiometric() {
   biometricSaved.value = false;
 }
 
-function isValidUrl(value) {
+function isValidUrl(value: string) {
   try {
     const u = new URL(value);
     return u.protocol === 'http:' || u.protocol === 'https:';

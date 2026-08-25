@@ -1,14 +1,16 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { provider } from '../../providers';
+import { ProviderNetworkError } from '../../providers/DataProvider';
 import { todayIso, addDaysIso } from '../../utils/date';
 import AppHeader from '../../components/AppHeader.vue';
 import DataState from '../../components/DataState.vue';
+import type { TimeEntry, TimeEntryType } from '../../types/models';
 
 const DAYS_BACK = 13; // 14 jours affichés, aujourd'hui inclus
 const loading = ref(true);
 const error = ref('');
-const entries = ref([]);
+const entries = ref<TimeEntry[]>([]);
 
 async function load() {
   loading.value = true;
@@ -17,9 +19,9 @@ async function load() {
     const from = addDaysIso(todayIso(), -DAYS_BACK);
     entries.value = await provider.fetchTimeEntries({ from, to: todayIso() });
   } catch (e) {
-    error.value = e.isNetworkError
+    error.value = e instanceof ProviderNetworkError
       ? "Pas de connexion — l'historique n'a pas pu être chargé."
-      : e.message || 'Historique indisponible.';
+      : (e instanceof Error && e.message) || 'Historique indisponible.';
   } finally {
     loading.value = false;
   }
@@ -28,7 +30,7 @@ async function load() {
 onMounted(load);
 
 const byDay = computed(() => {
-  const groups = {};
+  const groups: Record<string, TimeEntry[]> = {};
   for (const e of entries.value) {
     const day = e.recorded_at.slice(0, 10);
     (groups[day] ||= []).push(e);
@@ -38,25 +40,25 @@ const byDay = computed(() => {
     .map(([day, dayEntries]) => ({
       day,
       label: new Date(day + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }),
-      entries: dayEntries.sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at)),
+      entries: dayEntries.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()),
     }));
 });
 
-function entryIcon(type) {
+function entryIcon(type: TimeEntryType): string {
   if (type === 'in') return 'ti-login-2';
   if (type === 'pause_start') return 'ti-player-pause';
   if (type === 'pause_end') return 'ti-player-play';
   return 'ti-logout-2';
 }
 
-function entryLabel(type) {
+function entryLabel(type: TimeEntryType): string {
   if (type === 'in') return 'Arrivée';
   if (type === 'pause_start') return 'Pause';
   if (type === 'pause_end') return 'Reprise';
   return 'Départ';
 }
 
-function fmtTime(iso) {
+function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 </script>

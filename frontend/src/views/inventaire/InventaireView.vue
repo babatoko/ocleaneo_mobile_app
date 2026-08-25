@@ -1,16 +1,18 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { provider } from '../../providers';
+import { ProviderNetworkError } from '../../providers/DataProvider';
 import { useChantiersStore } from '../../stores/chantiers';
 import { iconForProduct } from '../../utils/productIcons';
 import AppHeader from '../../components/AppHeader.vue';
 import DataState from '../../components/DataState.vue';
+import type { Product } from '../../types/models';
 
 const route = useRoute();
 const chantiers = useChantiersStore();
-const products = ref([]);
-const quantities = ref({}); // packagingId -> quantity (chaîne du champ, '' = non saisi)
+const products = ref<Product[]>([]);
+const quantities = ref<Record<number, string>>({}); // packagingId -> quantity (chaîne du champ, '' = non saisi)
 const loading = ref(true);
 const loadError = ref('');
 const submitting = ref(false);
@@ -26,12 +28,12 @@ async function load() {
     // sinon on garde celui déjà sélectionné dans l'app, ou le premier.
     const fromRoute = route.query.chantier ? Number(route.query.chantier) : null;
     if (fromRoute) chantiers.select(fromRoute);
-    else if (!chantiers.selectedId) chantiers.select(chantiers.list[0]?.id ?? null);
+    else if (!chantiers.selectedId && chantiers.list[0]) chantiers.select(chantiers.list[0].id);
 
     products.value = await provider.fetchProducts();
     await loadExisting();
   } catch (e) {
-    loadError.value = e.message || 'Chargement impossible.';
+    loadError.value = (e instanceof Error && e.message) || 'Chargement impossible.';
   } finally {
     loading.value = false;
   }
@@ -66,14 +68,19 @@ watch(
 
 async function submit() {
   submitError.value = '';
+  if (!chantiers.selectedId) {
+    submitError.value = 'Aucun chantier sélectionné.';
+    return;
+  }
   const items = Object.entries(quantities.value)
     .filter(([, qty]) => qty !== '' && qty !== null && Number(qty) >= 0)
     .map(([packagingId, qty]) => {
       const product = products.value.find((p) =>
         p.packagings.some((pk) => pk.id === Number(packagingId))
       );
-      return { productId: product.id, packagingId: Number(packagingId), quantityRemaining: Number(qty) };
-    });
+      return { productId: product?.id ?? 0, packagingId: Number(packagingId), quantityRemaining: Number(qty) };
+    })
+    .filter((item) => item.productId);
 
   if (!items.length) {
     submitError.value = 'Saisissez au moins une quantité avant de valider.';
@@ -85,9 +92,9 @@ async function submit() {
     await provider.submitInventory({ chantierId: chantiers.selectedId, items });
     done.value = true;
   } catch (e) {
-    submitError.value = e.isNetworkError
+    submitError.value = e instanceof ProviderNetworkError
       ? "Pas de connexion — l'inventaire n'a pas pu être envoyé."
-      : e.message || "Envoi impossible.";
+      : (e instanceof Error && e.message) || "Envoi impossible.";
   } finally {
     submitting.value = false;
   }

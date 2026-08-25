@@ -23,29 +23,29 @@ describe('checkGeofence', () => {
   });
 
   it('ne vérifie rien si le chantier n\'a pas de coordonnées', () => {
-    expect(checkGeofence(cegetel, { name: 'Sans GPS' })).toBeNull();
+    expect(checkGeofence(cegetel, {})).toBeNull();
   });
 
   it('accepte une position sur le site', () => {
     const res = checkGeofence(cegetel, { ...cegetel });
-    expect(res.withinRange).toBe(true);
-    expect(res.distanceMeters).toBe(0);
+    expect(res!.withinRange).toBe(true);
+    expect(res!.distanceMeters).toBe(0);
   });
 
   it('accepte une position dans la tolérance (parking, sous-sol)', () => {
     // ~100 m au nord, sous la tolérance de 150 m.
     const proche = { latitude: cegetel.latitude + 0.0009, longitude: cegetel.longitude };
     const res = checkGeofence(proche, { ...cegetel });
-    expect(res.distanceMeters).toBeLessThan(GEOFENCE_TOLERANCE_M);
-    expect(res.withinRange).toBe(true);
+    expect(res!.distanceMeters).toBeLessThan(GEOFENCE_TOLERANCE_M);
+    expect(res!.withinRange).toBe(true);
   });
 
   it('signale une position nettement hors zone sans la bloquer', () => {
     const loin = { latitude: cegetel.latitude + 0.01, longitude: cegetel.longitude };
     const res = checkGeofence(loin, { ...cegetel });
-    expect(res.withinRange).toBe(false);
+    expect(res!.withinRange).toBe(false);
     // Le résultat reste informatif : c'est l'appelant qui décide, et il
     // enregistre le pointage malgré tout.
-    expect(res.distanceMeters).toBeGreaterThan(GEOFENCE_TOLERANCE_M);
+    expect(res!.distanceMeters).toBeGreaterThan(GEOFENCE_TOLERANCE_M);
   });
 });

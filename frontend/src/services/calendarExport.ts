@@ -1,16 +1,17 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import type { Shift } from '../types/models';
 
-function toIcsDate(iso) {
+function toIcsDate(iso: string): string {
   return new Date(iso).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 
-function escapeIcs(text) {
+function escapeIcs(text: string | null | undefined): string {
   return String(text || '').replace(/([,;])/g, '\\$1').replace(/\n/g, '\\n');
 }
 
-function buildIcs(shifts) {
+function buildIcs(shifts: Shift[]): string {
   const events = shifts.map((s) =>
     [
       'BEGIN:VEVENT',
@@ -36,7 +37,7 @@ function buildIcs(shifts) {
  * .ics standard, partagé via la feuille système, fait le même travail sans
  * cette permission.
  */
-export async function exportShiftsToCalendar(shifts, filename = 'ocleaneo-planning.ics') {
+export async function exportShiftsToCalendar(shifts: Shift[], filename = 'ocleaneo-planning.ics'): Promise<void> {
   if (!Capacitor.isNativePlatform()) {
     throw new Error("L'export calendrier n'est disponible que dans l'app installée sur le téléphone.");
   }

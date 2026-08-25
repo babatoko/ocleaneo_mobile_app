@@ -1,14 +1,27 @@
 import { defineStore } from 'pinia';
 
+export interface CartItem {
+  productId: number;
+  productName: string;
+  productEmoji?: string;
+  packagingId: number;
+  packagingLabel: string;
+  quantity: number;
+}
+
+interface CartState {
+  items: CartItem[];
+}
+
 export const useCartStore = defineStore('cart', {
-  state: () => ({
-    items: [], // { productId, productName, productEmoji, packagingId, packagingLabel, quantity }
+  state: (): CartState => ({
+    items: [],
   }),
   getters: {
-    totalItems: (state) => state.items.reduce((sum, i) => sum + i.quantity, 0),
+    totalItems: (state): number => state.items.reduce((sum, i) => sum + i.quantity, 0),
   },
   actions: {
-    addItem(item) {
+    addItem(item: CartItem): void {
       const existing = this.items.find(
         (i) => i.productId === item.productId && i.packagingId === item.packagingId
       );
@@ -18,7 +31,7 @@ export const useCartStore = defineStore('cart', {
         this.items.push({ ...item });
       }
     },
-    updateQuantity(productId, packagingId, quantity) {
+    updateQuantity(productId: number, packagingId: number, quantity: number): void {
       const item = this.items.find(
         (i) => i.productId === productId && i.packagingId === packagingId
       );
@@ -29,12 +42,12 @@ export const useCartStore = defineStore('cart', {
         item.quantity = quantity;
       }
     },
-    removeItem(productId, packagingId) {
+    removeItem(productId: number, packagingId: number): void {
       this.items = this.items.filter(
         (i) => !(i.productId === productId && i.packagingId === packagingId)
       );
     },
-    clear() {
+    clear(): void {
       this.items = [];
     },
   },

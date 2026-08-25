@@ -1,9 +1,25 @@
 import { DataProvider } from './DataProvider';
 import { todayIso } from '../utils/date';
+import type {
+  Chantier,
+  CreateOrderPayload,
+  CreateOrderResult,
+  CreateTimeEntryPayload,
+  DateRange,
+  Employee,
+  InventoryLatest,
+  LoginResult,
+  Order,
+  Product,
+  Shift,
+  SubmitInventoryPayload,
+  TimeEntry,
+  TodayTimeEntries,
+} from '../types/models';
 
-const employee = { id: 1, name: 'Sophie Martin' };
+const employee: Employee = { id: 1, name: 'Sophie Martin' };
 
-const chantiers = [
+const chantiers: Chantier[] = [
   {
     id: 1,
     name: 'Cegetel Macon',
@@ -24,14 +40,14 @@ const chantiers = [
   },
 ];
 
-const products = [
+const products: Product[] = [
   { id: 1, name: 'Javel', emoji: '🧴', category: 'Sol', is_active: 1, packagings: [{ id: 1, label: '5L', is_default: true }] },
   { id: 2, name: 'Dégraissant sol', emoji: '🧹', category: 'Sol', is_active: 1, packagings: [{ id: 2, label: '5L', is_default: true }] },
   { id: 3, name: 'Spray vitres', emoji: '🪟', category: 'Vitres', is_active: 1, packagings: [{ id: 3, label: '750ml', is_default: true }] },
   { id: 4, name: 'Papier toilette', emoji: '🧻', category: 'Consommables', is_active: 1, packagings: [{ id: 4, label: 'Carton 96 rouleaux', is_default: true }] },
 ];
 
-function shiftsFixture() {
+function shiftsFixture(): Shift[] {
   const today = todayIso();
   return [
     {
@@ -59,13 +75,13 @@ function shiftsFixture() {
   ];
 }
 
-function delay(ms = 150) {
+function delay(ms = 150): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-let timeEntries = [];
-let orders = [];
-let inventoryByChantier = {};
+const timeEntries: TimeEntry[] = [];
+const orders: Order[] = [];
+const inventoryByChantier: Record<number, InventoryLatest> = {};
 let nextEntryId = 1;
 let nextOrderId = 1;
 
@@ -74,26 +90,26 @@ let nextOrderId = 1;
  * une démo de l'app sans backend Odoo branché. Sert aussi de preuve que le
  * contrat DataProvider est complet — si l'app tourne de bout en bout dessus,
  * n'importe quel backend qui l'implémente le fera aussi. Activé via
- * VITE_DATA_PROVIDER=mock (voir providers/index.js). L'état est perdu au
+ * VITE_DATA_PROVIDER=mock (voir providers/index.ts). L'état est perdu au
  * rechargement de la page (mémoire du module JS, pas de persistance).
  */
 export class MockProvider extends DataProvider {
-  async login(username) {
+  async login(username: string): Promise<LoginResult> {
     await delay();
     return { token: 'mock-token', employee: { ...employee, name: username || employee.name } };
   }
 
-  async fetchMe() {
+  async fetchMe(): Promise<Employee> {
     await delay();
     return employee;
   }
 
-  async fetchChantiers() {
+  async fetchChantiers(): Promise<Chantier[]> {
     await delay();
     return chantiers;
   }
 
-  async fetchShifts({ from, to }) {
+  async fetchShifts({ from, to }: DateRange): Promise<Shift[]> {
     await delay();
     return shiftsFixture().filter((s) => {
       const day = s.start_at.slice(0, 10);
@@ -101,7 +117,7 @@ export class MockProvider extends DataProvider {
     });
   }
 
-  async fetchTodayTimeEntries() {
+  async fetchTodayTimeEntries(): Promise<TodayTimeEntries> {
     await delay();
     const today = todayIso();
     const entries = timeEntries.filter((e) => e.recorded_at.startsWith(today));
@@ -110,7 +126,7 @@ export class MockProvider extends DataProvider {
     return { entries, status };
   }
 
-  async fetchTimeEntries({ from, to }) {
+  async fetchTimeEntries({ from, to }: DateRange): Promise<TimeEntry[]> {
     await delay();
     return timeEntries.filter((e) => {
       const day = e.recorded_at.slice(0, 10);
@@ -118,10 +134,10 @@ export class MockProvider extends DataProvider {
     });
   }
 
-  async createTimeEntry(payload) {
+  async createTimeEntry(payload: CreateTimeEntryPayload): Promise<TimeEntry> {
     await delay();
     const chantier = chantiers.find((c) => c.id === payload.chantierId);
-    const entry = {
+    const entry: TimeEntry = {
       id: nextEntryId++,
       type: payload.type,
       chantier_id: payload.chantierId,
@@ -132,17 +148,17 @@ export class MockProvider extends DataProvider {
     return entry;
   }
 
-  async fetchProducts() {
+  async fetchProducts(): Promise<Product[]> {
     await delay();
     return products;
   }
 
-  async fetchInventoryLatest(chantierId) {
+  async fetchInventoryLatest(chantierId: number): Promise<InventoryLatest | null> {
     await delay();
     return inventoryByChantier[chantierId] || null;
   }
 
-  async submitInventory({ chantierId, items }) {
+  async submitInventory({ chantierId, items }: SubmitInventoryPayload): Promise<void> {
     await delay();
     inventoryByChantier[chantierId] = {
       items: items.map((i) => ({
@@ -153,10 +169,10 @@ export class MockProvider extends DataProvider {
     };
   }
 
-  async createOrder({ chantierId, items }) {
+  async createOrder({ chantierId, items }: CreateOrderPayload): Promise<CreateOrderResult> {
     await delay();
     const chantier = chantiers.find((c) => c.id === chantierId);
-    const order = {
+    const order: Order = {
       id: nextOrderId++,
       chantier_name: chantier?.name || '',
       status: 'confirmed',
@@ -177,17 +193,17 @@ export class MockProvider extends DataProvider {
     return { id: order.id };
   }
 
-  async fetchOrder(id) {
+  async fetchOrder(id: number | string): Promise<Order | null> {
     await delay();
     return orders.find((o) => String(o.id) === String(id)) || null;
   }
 
-  async fetchMyOrders() {
+  async fetchMyOrders(): Promise<Order[]> {
     await delay();
     return orders;
   }
 
-  getOrderPdfUrl() {
+  getOrderPdfUrl(): null {
     return null; // pas de génération de PDF côté mock
   }
 }

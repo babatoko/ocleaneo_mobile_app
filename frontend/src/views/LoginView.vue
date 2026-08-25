@@ -1,8 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { usePointageStore } from '../stores/pointage';
+import { ProviderNetworkError, ProviderError } from '../providers/DataProvider';
 import {
   clearSavedCredentials,
   getSavedCredentials,
@@ -40,13 +41,13 @@ onMounted(async () => {
 // de réseau (fréquent en sous-sol/local technique), mauvais identifiants, ou
 // serveur en panne. Les confondre sous « Identifiants incorrects » envoie
 // l'agent retaper un mot de passe correct.
-function loginErrorMessage(e) {
-  if (e.isNetworkError) return 'Pas de connexion — vérifiez votre réseau puis réessayez.';
-  if (e.status === 401 || e.status === 403) return 'Identifiants incorrects.';
-  return e.message || 'Connexion impossible pour le moment.';
+function loginErrorMessage(e: unknown): string {
+  if (e instanceof ProviderNetworkError) return 'Pas de connexion — vérifiez votre réseau puis réessayez.';
+  if (e instanceof ProviderError && (e.status === 401 || e.status === 403)) return 'Identifiants incorrects.';
+  return e instanceof Error ? e.message || 'Connexion impossible pour le moment.' : 'Connexion impossible pour le moment.';
 }
 
-async function afterLogin(loggedInUsername) {
+async function afterLogin(loggedInUsername: string) {
   localStorage.setItem(LAST_USERNAME_KEY, loggedInUsername);
   if (pointage.pendingTagUid) {
     // L'app vient d'être ouverte par ce badge : on traite la lecture en
@@ -54,7 +55,8 @@ async function afterLogin(loggedInUsername) {
     await pointage.consumePendingTag(router);
     return;
   }
-  router.replace(route.query.redirect || '/planning');
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/planning';
+  router.replace(redirect);
 }
 
 async function tryBiometric() {
@@ -67,7 +69,7 @@ async function tryBiometric() {
   } catch (e) {
     // Le réseau peut tomber après une empreinte pourtant valide : ne pas
     // laisser croire que le capteur a échoué.
-    error.value = e.isNetworkError
+    error.value = e instanceof ProviderNetworkError
       ? loginErrorMessage(e)
       : "Authentification par empreinte annulée ou impossible.";
   } finally {

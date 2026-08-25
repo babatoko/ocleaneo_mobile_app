@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { NFC } from '@exxili/capacitor-nfc';
 
-export async function isNfcSupported() {
+export async function isNfcSupported(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
   try {
     const { supported } = await NFC.isSupported();
@@ -15,16 +15,16 @@ export async function isNfcSupported() {
  * Sur iOS, lire un badge exige d'ouvrir explicitement une session NFC suite à un
  * geste de l'utilisateur (contrainte Apple) : appelée par le bouton de l'écran
  * Pointage. Sur Android, la lecture est automatique dès que l'app est au premier
- * plan (voir stores/pointage.js) — appeler startScan() y échoue systématiquement
+ * plan (voir stores/pointage.ts) — appeler startScan() y échoue systématiquement
  * ("Android NFC scanning does not require 'startScan' method"), donc on ne
  * l'appelle que sur iOS.
  */
-export async function startIosNfcSession() {
+export async function startIosNfcSession(): Promise<void> {
   if (Capacitor.getPlatform() !== 'ios') return;
   await NFC.startScan();
 }
 
-export function cancelIosNfcSession() {
+export function cancelIosNfcSession(): void {
   if (Capacitor.getPlatform() !== 'ios') return;
   NFC.cancelScan().catch(() => {});
 }

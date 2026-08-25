@@ -1,13 +1,15 @@
 import { defineStore } from 'pinia';
 import { Preferences } from '@capacitor/preferences';
 import { provider } from '../providers';
+import { ProviderNetworkError } from '../providers/DataProvider';
 import { syncShifts } from '../services/planningSync';
 import { startOfMonthIso, endOfMonthIso } from '../utils/week';
+import type { Shift } from '../types/models';
 
 // Cache local par plage de dates exacte (from/to) : hors ligne, on retombe
 // sur la dernière réponse connue pour cette même plage plutôt que sur un
 // écran vide.
-async function fetchShiftsCached(from, to) {
+async function fetchShiftsCached(from: string, to: string): Promise<Shift[]> {
   const cacheKey = `ocleaneo_shifts_${from}_${to}`;
   try {
     const data = await provider.fetchShifts({ from, to });
@@ -17,15 +19,24 @@ async function fetchShiftsCached(from, to) {
     Preferences.set({ key: cacheKey, value: JSON.stringify(data) }).catch(() => {});
     return data;
   } catch (e) {
-    if (!e.isNetworkError) throw e;
+    if (!(e instanceof ProviderNetworkError)) throw e;
     const { value } = await Preferences.get({ key: cacheKey }).catch(() => ({ value: null }));
     if (value) return JSON.parse(value);
     throw e;
   }
 }
 
+interface PlanningState {
+  selectedShift: Shift | null;
+  dayShifts: Shift[];
+  weekShiftsByDay: Record<string, Shift[]>;
+  monthShifts: Shift[];
+  loading: boolean;
+  error: string;
+}
+
 export const usePlanningStore = defineStore('planning', {
-  state: () => ({
+  state: (): PlanningState => ({
     selectedShift: null,
     dayShifts: [],
     weekShiftsByDay: {},
@@ -36,17 +47,16 @@ export const usePlanningStore = defineStore('planning', {
     error: '',
   }),
   actions: {
-    selectShift(shift) {
+    selectShift(shift: Shift): void {
       this.selectedShift = shift;
     },
 
-    errorMessage(e) {
-      return e.isNetworkError
-        ? 'Pas de connexion — le planning n\'a pas pu être chargé.'
-        : e.message || 'Planning indisponible.';
+    errorMessage(e: unknown): string {
+      if (e instanceof ProviderNetworkError) return 'Pas de connexion — le planning n\'a pas pu être chargé.';
+      return e instanceof Error ? e.message || 'Planning indisponible.' : 'Planning indisponible.';
     },
 
-    async loadDay(dateIso) {
+    async loadDay(dateIso: string): Promise<void> {
       this.loading = true;
       this.error = '';
       try {
@@ -60,12 +70,12 @@ export const usePlanningStore = defineStore('planning', {
       }
     },
 
-    async loadWeek(startIso, endIso) {
+    async loadWeek(startIso: string, endIso: string): Promise<void> {
       this.loading = true;
       this.error = '';
       try {
         const data = await fetchShiftsCached(startIso, endIso);
-        const byDay = {};
+        const byDay: Record<string, Shift[]> = {};
         for (const s of data) {
           const day = s.start_at.slice(0, 10);
           (byDay[day] ||= []).push(s);
@@ -80,7 +90,7 @@ export const usePlanningStore = defineStore('planning', {
       }
     },
 
-    async loadMonth(dateIso) {
+    async loadMonth(dateIso: string): Promise<void> {
       this.loading = true;
       this.error = '';
       try {

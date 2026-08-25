@@ -1,22 +1,25 @@
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { useChantiersStore } from '../../stores/chantiers';
 import { usePlanningStore } from '../../stores/planning';
-import { getCurrentPosition, getOptimizedTrip } from '../../services/osrm';
+import { getCurrentPosition, getOptimizedTrip, type TripPoint } from '../../services/osrm';
 import { turnByTurnHref } from '../../services/navigation';
 import { exportShiftsToCalendar } from '../../services/calendarExport';
 import { startOfWeekIso, startOfMonthIso, endOfMonthIso } from '../../utils/week';
 import { toLocalIso, todayIso, addDaysIso } from '../../utils/date';
 import { provider } from '../../providers';
 import DataState from '../../components/DataState.vue';
+import type { Shift } from '../../types/models';
+
+type PlanningTab = 'jour' | 'semaine' | 'mois' | 'tournee';
 
 const router = useRouter();
 const auth = useAuthStore();
 const chantiers = useChantiersStore();
 const planning = usePlanningStore();
-const view = ref('jour'); // 'jour' | 'semaine' | 'mois' | 'tournee'
+const view = ref<PlanningTab>('jour');
 const selectedDate = ref(todayIso());
 const monthAnchor = ref(todayIso());
 const exportError = ref('');
@@ -24,7 +27,7 @@ const todayIsoValue = todayIso();
 
 const toIso = toLocalIso;
 
-function startOfWeek(dateIso) {
+function startOfWeek(dateIso: string): Date {
   return new Date(startOfWeekIso(dateIso) + 'T00:00:00');
 }
 
@@ -53,14 +56,14 @@ const dayStrip = computed(() => {
 
 // Nombre de vacations par jour sur la fenêtre du bandeau : permet d'afficher
 // la pastille « ce jour-là a du travail » sans avoir à ouvrir chaque journée.
-const stripCounts = ref({}); // 'AAAA-MM-JJ' -> nombre de vacations
+const stripCounts = ref<Record<string, number>>({}); // 'AAAA-MM-JJ' -> nombre de vacations
 
 async function loadStripCounts() {
   const from = todayIsoValue;
   const to = addDaysIso(from, 6);
   try {
     const shifts = await provider.fetchShifts({ from, to });
-    const counts = {};
+    const counts: Record<string, number> = {};
     for (const s of shifts) {
       const day = s.start_at.slice(0, 10);
       counts[day] = (counts[day] || 0) + 1;
@@ -72,14 +75,14 @@ async function loadStripCounts() {
   }
 }
 
-function dayCellLabel(d) {
+function dayCellLabel(d: Date): string {
   const n = shiftsCountForDay(toIso(d));
   const date = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   if (!n) return `${date}, aucune vacation`;
   return `${date}, ${n} vacation${n > 1 ? 's' : ''}`;
 }
 
-function dayStripLabel(d) {
+function dayStripLabel(d: Date): string {
   const n = stripCounts.value[toIso(d)] || 0;
   const date = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   if (!n) return `${date}, aucune vacation`;
@@ -135,15 +138,15 @@ const monthLabel = computed(() =>
   new Date(monthAnchor.value + 'T00:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 );
 
-function shiftsCountForDay(dateIso) {
+function shiftsCountForDay(dateIso: string): number {
   return planning.monthShifts.filter((s) => s.start_at.slice(0, 10) === dateIso).length;
 }
 
-function isCurrentMonth(date) {
+function isCurrentMonth(date: Date): boolean {
   return toIso(date).slice(0, 7) === monthAnchor.value.slice(0, 7);
 }
 
-function shiftMonth(delta) {
+function shiftMonth(delta: number) {
   const d = new Date(monthAnchor.value + 'T00:00:00');
   d.setMonth(d.getMonth() + delta, 1);
   monthAnchor.value = toIso(d);
@@ -161,20 +164,20 @@ function refresh() {
   else loadTournee();
 }
 
-function pickDay(date) {
+function pickDay(date: Date) {
   selectedDate.value = toIso(date);
   view.value = 'jour';
 }
 
-function timeRange(shift) {
-  const fmt = (iso) =>
+function timeRange(shift: Shift): string {
+  const fmt = (iso: string) =>
     new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   return `${fmt(shift.start_at)} - ${fmt(shift.end_at)}`;
 }
 
 // Coordonnées du chantier si connues (guidage direct) — sinon repli sur
 // l'adresse texte (simple recherche, pas de guidage).
-function itineraryHref(shift) {
+function itineraryHref(shift: Shift): string {
   const chantier = chantiers.list.find((c) => c.id === shift.chantier_id);
   return turnByTurnHref({
     latitude: chantier?.latitude,
@@ -183,43 +186,57 @@ function itineraryHref(shift) {
   });
 }
 
-async function exportToCalendar(shiftsToExport, filename) {
+async function exportToCalendar(shiftsToExport: Shift[], filename: string) {
   exportError.value = '';
   try {
     await exportShiftsToCalendar(shiftsToExport, filename);
   } catch (e) {
-    exportError.value = e.message || "Export impossible.";
+    exportError.value = (e instanceof Error && e.message) || "Export impossible.";
   }
 }
 
-function openDetail(shift) {
+function openDetail(shift: Shift) {
   planning.selectShift(shift);
   router.push({ name: 'planning-chantier', params: { id: shift.id }, query: { date: selectedDate.value } });
 }
 
 // --- Tournée : itinéraire optimisé (OSRM) -------------------------------
 
+interface TrippablePoint extends TripPoint {
+  address?: string;
+  shiftDurationSeconds?: number;
+  startAt?: string;
+}
+
+interface TripStopWithSchedule extends TrippablePoint {
+  tripIndex: number;
+  legDurationSeconds: number;
+  legDistanceMeters: number;
+  arrival: Date;
+  departure: Date;
+}
+
 const tripLoading = ref(false);
 const tripError = ref('');
-const tripStops = ref([]); // stops avec ETA/départ calculés, dans l'ordre optimisé
+const tripStops = ref<TripStopWithSchedule[]>([]); // stops avec ETA/départ calculés, dans l'ordre optimisé
 const tripDistanceMeters = ref(0);
 const tripDurationSeconds = ref(0);
-const missingCoords = ref([]);
-const mapEl = ref(null);
-let map = null;
-let L = null;
+const missingCoords = ref<string[]>([]);
+const mapEl = ref<HTMLElement | null>(null);
+let map: import('leaflet').Map | null = null;
+let L: typeof import('leaflet') | null = null;
 
-function fmtKm(meters) {
+function fmtKm(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(0)} km` : `${Math.round(meters)} m`;
 }
 
-function fmtDuration(seconds) {
+function fmtDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.round((seconds % 3600) / 60);
   return h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`;
 }
 
-function fmtTime(date) {
+function fmtTime(date: Date): string {
   return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -239,7 +256,7 @@ async function loadTournee() {
     }
     const dayShifts = planning.dayShifts;
 
-    const withCoords = [];
+    const withCoords: Required<Pick<TrippablePoint, 'id' | 'name' | 'address' | 'latitude' | 'longitude' | 'shiftDurationSeconds' | 'startAt'>>[] = [];
     for (const s of dayShifts) {
       const chantier = chantiers.list.find((c) => c.id === s.chantier_id);
       if (chantier?.latitude && chantier?.longitude) {
@@ -264,7 +281,7 @@ async function loadTournee() {
     }
 
     const current = await getCurrentPosition();
-    const points = current
+    const points: TrippablePoint[] = current
       ? [{ id: 'me', name: 'Position actuelle', ...current }, ...withCoords]
       : withCoords;
 
@@ -274,7 +291,7 @@ async function loadTournee() {
       ? new Date()
       : new Date(withCoords.sort((a, b) => a.startAt.localeCompare(b.startAt))[0].startAt);
 
-    const stops = [];
+    const stops: TripStopWithSchedule[] = [];
     for (const stop of trip.order) {
       if (stop.id === 'me') {
         // Pas un arrêt à afficher : juste avancer l'horloge du trajet vers le 1er site.
@@ -295,13 +312,17 @@ async function loadTournee() {
     await nextTick();
     renderMap(trip.geometry, stops, current);
   } catch (e) {
-    tripError.value = e.message || "Impossible de calculer l'itinéraire.";
+    tripError.value = (e instanceof Error && e.message) || "Impossible de calculer l'itinéraire.";
   } finally {
     tripLoading.value = false;
   }
 }
 
-async function renderMap(geometry, stops, current) {
+async function renderMap(
+  geometry: [number, number][],
+  stops: TripStopWithSchedule[],
+  current: { latitude: number; longitude: number } | null
+) {
   if (!mapEl.value) return;
   if (!L) {
     await import('leaflet/dist/leaflet.css');
@@ -318,7 +339,7 @@ async function renderMap(geometry, stops, current) {
     maxZoom: 19,
   }).addTo(map);
 
-  const points = [];
+  const points: [number, number][] = [];
   if (current) {
     L.marker([current.latitude, current.longitude], {
       icon: L.divIcon({
@@ -331,13 +352,13 @@ async function renderMap(geometry, stops, current) {
   }
 
   stops.forEach((stop, i) => {
-    L.marker([stop.latitude, stop.longitude], {
-      icon: L.divIcon({
+    L!.marker([stop.latitude, stop.longitude], {
+      icon: L!.divIcon({
         className: '',
         html: `<div class="trip-marker">${i + 1}</div>`,
         iconSize: [24, 24],
       }),
-    }).addTo(map);
+    }).addTo(map!);
     points.push([stop.latitude, stop.longitude]);
   });
 
@@ -356,7 +377,7 @@ function destroyMap() {
   }
 }
 
-watch(view, (v, prev) => {
+watch(view, (_v, prev) => {
   if (prev === 'tournee') destroyMap();
   refresh();
 });

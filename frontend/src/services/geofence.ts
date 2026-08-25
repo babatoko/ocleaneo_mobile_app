@@ -1,11 +1,13 @@
+import type { Chantier, Position } from '../types/models';
+
 const EARTH_RADIUS_M = 6371000;
 
-function toRad(deg) {
+function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
 /** Distance à vol d'oiseau entre deux points GPS, en mètres (formule de Haversine). */
-export function distanceMeters(a, b) {
+export function distanceMeters(a: Position, b: Position): number {
   const dLat = toRad(b.latitude - a.latitude);
   const dLon = toRad(b.longitude - a.longitude);
   const lat1 = toRad(a.latitude);
@@ -20,11 +22,19 @@ export function distanceMeters(a, b) {
 // que Odoo puisse le passer en revue (anti-fraude sans pénaliser le terrain).
 export const GEOFENCE_TOLERANCE_M = 150;
 
+export interface GeofenceResult {
+  withinRange: boolean;
+  distanceMeters: number;
+}
+
 /**
  * Renvoie null si la position ou les coordonnées du chantier sont inconnues
  * (rien à vérifier), sinon { withinRange, distanceMeters }.
  */
-export function checkGeofence(position, chantier) {
+export function checkGeofence(
+  position: Position | null | undefined,
+  chantier: Pick<Chantier, 'latitude' | 'longitude'> | null | undefined
+): GeofenceResult | null {
   if (!position || !chantier?.latitude || !chantier?.longitude) return null;
   const d = distanceMeters(position, { latitude: chantier.latitude, longitude: chantier.longitude });
   return { withinRange: d <= GEOFENCE_TOLERANCE_M, distanceMeters: Math.round(d) };

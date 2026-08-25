@@ -1,11 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { provider } from '../../providers';
+import { ProviderNetworkError } from '../../providers/DataProvider';
 import AppHeader from '../../components/AppHeader.vue';
 import DataState from '../../components/DataState.vue';
+import type { Order } from '../../types/models';
 
 const props = defineProps({ id: { type: [String, Number], required: true } });
-const order = ref(null);
+const order = ref<Order | null>(null);
 const loading = ref(true);
 const error = ref('');
 
@@ -15,9 +17,9 @@ async function load() {
   try {
     order.value = await provider.fetchOrder(props.id);
   } catch (e) {
-    error.value = e.isNetworkError
+    error.value = e instanceof ProviderNetworkError
       ? 'Pas de connexion — le récapitulatif n\'a pas pu être chargé. La commande, elle, est bien partie.'
-      : e.message || 'Récapitulatif indisponible.';
+      : (e instanceof Error && e.message) || 'Récapitulatif indisponible.';
   } finally {
     loading.value = false;
   }
@@ -37,9 +39,9 @@ function downloadPdf() {
   <DataState :loading="loading" :error="error" :empty="!order" :skeleton-count="2" @retry="load">
     <template #empty>Commande introuvable.</template>
     <div class="recap">
-      <p class="success"><i class="ti ti-circle-check"></i> Commande n°{{ order.id }} envoyée pour {{ order.chantier_name }}</p>
+      <p class="success"><i class="ti ti-circle-check"></i> Commande n°{{ order!.id }} envoyée pour {{ order!.chantier_name }}</p>
       <ul>
-        <li v-for="item in order.items" :key="item.id">
+        <li v-for="item in order!.items" :key="item.id">
           {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
         </li>
       </ul>

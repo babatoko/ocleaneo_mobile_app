@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * États d'un écran alimenté par des données distantes : chargement, erreur,
  * vide, contenu. Existe pour qu'aucun écran ne puisse plus afficher « vide »

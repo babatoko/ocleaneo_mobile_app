@@ -1,6 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 
+declare module 'vue-router' {
+  interface RouteMeta {
+    public?: boolean;
+  }
+}
+
 const routes = [
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
   // L'ancien écran d'accueil dupliquait la barre de navigation et n'avait plus

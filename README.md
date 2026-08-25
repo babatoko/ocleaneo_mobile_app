@@ -6,7 +6,7 @@ Application mobile **Android et iOS** (via Capacitor) Ocleaneo pour le terrain :
 
 ## Stack
 
-- **Frontend** : Vue 3 + Vite, Vue Router, Pinia, Axios
+- **Frontend** : Vue 3 + Vite, **TypeScript** (`strict: true`), Vue Router, Pinia, Axios
 - **Apps natives** : [Capacitor](https://capacitorjs.com) 8 — enveloppe le build web dans un shell natif Android (`frontend/android/`) et iOS (`frontend/ios/`), donne accès aux API natives (caméra, géolocalisation, NFC, notifications push) nécessaires aux écrans du mockup (pointage NFC, photos d'anomalie, PTI/SOS)
 - **PWA** : `vite-plugin-pwa` en plus, pour un accès web installable indépendant des stores
 - **Backend : Odoo 14 + modules OCA**, exposé via **`base_rest`** (instance existante, à connecter — voir [Intégration Odoo](#intégration-odoo) ci-dessous)
@@ -18,16 +18,16 @@ Application mobile **Android et iOS** (via Capacitor) Ocleaneo pour le terrain :
 
 Aucun store ni aucune vue n'appelle un client HTTP ou ne connaît la forme d'une réponse Odoo. Tout passe par **`frontend/src/providers/`**, une couche d'abstraction en forme de plugins :
 
-- **`DataProvider.js`** — le contrat : une classe de base listant toutes les opérations dont l'app a besoin (`login`, `fetchChantiers`, `fetchShifts`, `createTimeEntry`, `fetchProducts`, `createOrder`…), chaque méthode documentée en JSDoc (forme attendue en entrée/sortie). Une méthode non implémentée par un provider concret échoue explicitement plutôt que silencieusement.
-- **`RestProvider.js`** — le plugin branché par défaut : traduit le contrat en appels HTTP JSON vers une URL de serveur (pensé pour une couche `base_rest` Odoo, voir § Intégration Odoo). C'est le seul fichier de l'app qui connaît des chemins d'URL, des query params ou la forme d'une erreur HTTP. Cette URL a une valeur par défaut (`VITE_API_URL`, fixée au build) mais reste **modifiable à l'exécution depuis le profil de l'utilisateur** (`ProfileView.vue` § Serveur) — utile pour changer d'instance sans reconstruire l'app ; le réglage est persisté (`@capacitor/preferences`) et rechargé au démarrage via `provider.init()` (voir `providers/index.js`), avant tout appel réseau. Changer cette URL déconnecte l'utilisateur (un jeton de session n'est valable que sur le serveur qui l'a émis).
-- **`MockProvider.js`** — un second plugin réel, 100 % en mémoire, **zéro réseau**. Sert à développer ou faire une démo de l'app sans rien avoir à faire tourner, et sert aussi de preuve que le contrat est complet : l'app entière (connexion, planning, pointage, stock, commande, historique) tourne dessus de bout en bout — vérifié en la faisant tourner sans aucun mock d'API, juste `VITE_DATA_PROVIDER=mock`.
-- **`index.js`** — sélectionne le plugin actif selon `VITE_DATA_PROVIDER` (`rest` par défaut, `mock` sinon) et exporte l'instance unique `provider` que tout le reste de l'app importe.
+- **`DataProvider.ts`** — le contrat : une classe abstraite listant toutes les opérations dont l'app a besoin (`login`, `fetchChantiers`, `fetchShifts`, `createTimeEntry`, `fetchProducts`, `createOrder`…), chaque méthode typée sur les interfaces de `types/models.ts` (forme exacte attendue en entrée/sortie, vérifiée à la compilation). Une méthode non implémentée par un provider concret échoue explicitement plutôt que silencieusement.
+- **`RestProvider.ts`** — le plugin branché par défaut : traduit le contrat en appels HTTP JSON vers une URL de serveur (pensé pour une couche `base_rest` Odoo, voir § Intégration Odoo). C'est le seul fichier de l'app qui connaît des chemins d'URL, des query params ou la forme d'une erreur HTTP. Cette URL a une valeur par défaut (`VITE_API_URL`, fixée au build) mais reste **modifiable à l'exécution depuis le profil de l'utilisateur** (`ProfileView.vue` § Serveur) — utile pour changer d'instance sans reconstruire l'app ; le réglage est persisté (`@capacitor/preferences`) et rechargé au démarrage via `provider.init()` (voir `providers/index.ts`), avant tout appel réseau. Changer cette URL déconnecte l'utilisateur (un jeton de session n'est valable que sur le serveur qui l'a émis).
+- **`MockProvider.ts`** — un second plugin réel, 100 % en mémoire, **zéro réseau**. Sert à développer ou faire une démo de l'app sans rien avoir à faire tourner, et sert aussi de preuve que le contrat est complet : l'app entière (connexion, planning, pointage, stock, commande, historique) tourne dessus de bout en bout — vérifié en la faisant tourner sans aucun mock d'API, juste `VITE_DATA_PROVIDER=mock`.
+- **`index.ts`** — sélectionne le plugin actif selon `VITE_DATA_PROVIDER` (`rest` par défaut, `mock` sinon) et exporte l'instance unique `provider` que tout le reste de l'app importe.
 
-**Ce que ça change concrètement pour brancher un backend différent** (une autre couche Odoo, un JSON-RPC direct, un tout autre ERP) : écrire un nouveau fichier `providers/XyzProvider.js` qui étend `DataProvider` et implémente ses méthodes, l'ajouter à `providers/index.js`, basculer `VITE_DATA_PROVIDER`. Aucune vue, aucun store, aucune logique métier (calcul d'heures, géofence, file hors ligne…) n'a besoin d'être touchée — ils ne connaissent que le contrat.
+**Ce que ça change concrètement pour brancher un backend différent** (une autre couche Odoo, un JSON-RPC direct, un tout autre ERP) : écrire un nouveau fichier `providers/XyzProvider.ts` qui étend `DataProvider` et implémente ses méthodes, l'ajouter à `providers/index.ts`, basculer `VITE_DATA_PROVIDER`. Aucune vue, aucun store, aucune logique métier (calcul d'heures, géofence, file hors ligne…) n'a besoin d'être touchée — ils ne connaissent que le contrat. Le compilateur TypeScript refuse de construire si un provider concret oublie un champ du contrat ou renvoie la mauvaise forme : c'est la frontière où le typage rapporte le plus, exactement celle qu'un provider mal aligné cassait en silence avant la conversion.
 
-**Erreurs normalisées** : chaque provider doit lever `ProviderNetworkError` (exporté par `DataProvider.js`, `error.isNetworkError === true`) pour une coupure réseau — c'est ce que vérifient la file d'attente hors ligne du pointage et le cache du planning pour décider de mettre en attente plutôt que d'afficher un écran vide. Toute autre erreur est une erreur métier normale avec un `.message` déjà lisible (pas de `error.response.data.error` à décoder dans les vues).
+**Erreurs normalisées** : chaque provider doit lever `ProviderNetworkError` (exportée par `DataProvider.ts`, `instanceof ProviderNetworkError`) pour une coupure réseau — c'est ce que vérifient la file d'attente hors ligne du pointage et le cache du planning pour décider de mettre en attente plutôt que d'afficher un écran vide. Toute autre erreur métier normalisée est une `ProviderError` avec un `.message` déjà lisible et un `.status` optionnel (pas de `error.response.data.error` à décoder dans les vues).
 
-**Limite assumée** : la persistance de session (`token` + `localStorage`, dans `stores/auth.js`) reste un concept générique partagé par tous les providers — un jeton opaque à renvoyer par `login()` et à présenter ensuite. Un futur provider basé sur des cookies de session devrait quand même renvoyer un jeton logique pour ce mécanisme, ou `stores/auth.js` devra évoluer en conséquence ; ce n'est pas poussé plus loin ici pour ne pas sur-abstraire un besoin hypothétique.
+**Limite assumée** : la persistance de session (`token` + `localStorage`, dans `stores/auth.ts`) reste un concept générique partagé par tous les providers — un jeton opaque à renvoyer par `login()` et à présenter ensuite. Un futur provider basé sur des cookies de session devrait quand même renvoyer un jeton logique pour ce mécanisme, ou `stores/auth.ts` devra évoluer en conséquence ; ce n'est pas poussé plus loin ici pour ne pas sur-abstraire un besoin hypothétique.
 
 ## Structure
 
@@ -47,7 +47,9 @@ ocleaneo_mobile_app/
 │   │   ├── providers/          # Couche données backend-agnostique — voir ci-dessus
 │   │   ├── services/           # NFC, biométrie, notifications, hors ligne, navigation…
 │   │   ├── router/             # Vue Router + garde d'authentification
+│   │   ├── types/models.ts     # Interfaces du domaine (Shift, Chantier, TimeEntry, Product, Order…)
 │   │   └── utils/              # Dates locales, semaine/mois, icônes produit
+│   ├── tsconfig*.json          # TypeScript strict — voir § Qualité
 │   ├── eslint.config.js        # Lint (préréglage vue/essential : vrais défauts, pas de mise en forme)
 │   └── Dockerfile / nginx.conf
 │   ├── android/                # Projet natif Android (généré par `cap add android`)
@@ -64,16 +66,19 @@ ocleaneo_mobile_app/
 
 ```bash
 cd frontend
-npm run lint     # ESLint (préréglage vue/essential)
-npm run test     # Vitest — logique de calcul et contrat des providers
-npm run check    # lint + test + build, ce que lance la CI
+npm run lint       # ESLint (préréglage vue/essential + règles TypeScript)
+npm run typecheck  # vue-tsc -b — tout le projet est en TypeScript strict
+npm run test       # Vitest — logique de calcul et contrat des providers
+npm run check      # lint + typecheck + test + build, ce que lance la CI
 ```
+
+**TypeScript** : tout le frontend (`.vue` en `<script setup lang="ts">`, tous les modules `.ts`) est typé en mode `strict`. Le domaine métier vit dans `types/models.ts` (`Shift`, `Chantier`, `TimeEntry`, `Product`, `Order`…) et c'est cette même forme que `DataProvider` impose à tout provider concret — voir § Architecture backend-agnostique pour ce que ça change à la frontière la plus fragile de l'app. `npm run build` fait tourner `vue-tsc -b` avant `vite build` : un provider ou une vue qui dévie du contrat casse le build, pas seulement l'écran en production.
 
 Les tests ciblent la logique où une erreur coûte cher plutôt que la couverture pour elle-même :
 
 - **`computeWorkedHours`** — le total d'heures de la semaine et l'alerte de dépassement. Couvre les pauses, une pause close par un départ (reprise oubliée), une session encore ouverte, les entrées désordonnées.
 - **`utils/date`** — les dates seules doivent rester dans le fuseau du salarié. `toISOString().slice(0,10)` datait en UTC : en France, tout ce qui se passe entre minuit et 2h était rattaché à la veille, or les équipes démarrent avant l'aube.
-- **`providers/errors`** — verrouille le contrat d'erreur (`.message` lisible, `.status`, `.isNetworkError`, jamais la forme axios `.response`). Une vue qui lisait encore `e.response.data.error` affichait « Identifiants incorrects » pour *toute* panne, y compris une coupure réseau ; ce test rend la régression impossible.
+- **`providers/errors`** — verrouille le contrat d'erreur (`.message` lisible, `.status`, `instanceof ProviderNetworkError`, jamais la forme axios `.response`). Une vue qui lisait encore `e.response.data.error` affichait « Identifiants incorrects » pour *toute* panne, y compris une coupure réseau ; ce test rend la régression impossible.
 - **`services/geofence`** — distances et tolérance de l'anti-fraude au pointage.
 
 ### États d'écran
@@ -113,11 +118,11 @@ Identifiant + mot de passe, stockés sur la fiche employé (côté Odoo). L'empr
 3. Aux connexions suivantes sur cet appareil, l'écran affiche directement le cercle d'empreinte (`getSecureCredentials`, qui déclenche le prompt biométrique du système) au lieu du formulaire ; un lien « Utiliser le mot de passe » reste disponible en repli.
 4. Sur le web (PWA, pas de plateforme native), `isAvailable()` retourne `false` et l'app retombe simplement sur le formulaire — aucun crash, aucune dépendance à un lecteur.
 
-`frontend/src/services/biometric.js` encapsule tous les appels au plugin ; `LoginView.vue` ne fait que consommer `isBiometricAvailable()` / `hasSavedCredentials()` / `getSavedCredentials()` / `saveCredentials()`.
+`frontend/src/services/biometric.ts` encapsule tous les appels au plugin ; `LoginView.vue` ne fait que consommer `isBiometricAvailable()` / `hasSavedCredentials()` / `getSavedCredentials()` / `saveCredentials()`.
 
 ## Pointage — sélection du chantier par badge NFC
 
-Le chantier n'est **pas choisi manuellement** : il est déterminé par la lecture du badge NFC posé sur site, via [`@exxili/capacitor-nfc`](https://github.com/Exxili/capacitor-nfc). La logique de correspondance badge → chantier → type de pointage (arrivée/départ) vit dans **`frontend/src/stores/pointage.js`** (`clockWithTag(uid)`), pas dans l'écran, pour pouvoir être déclenchée depuis n'importe où dans l'app (voir ci-dessous).
+Le chantier n'est **pas choisi manuellement** : il est déterminé par la lecture du badge NFC posé sur site, via [`@exxili/capacitor-nfc`](https://github.com/Exxili/capacitor-nfc). La logique de correspondance badge → chantier → type de pointage (arrivée/départ) vit dans **`frontend/src/stores/pointage.ts`** (`clockWithTag(uid)`), pas dans l'écran, pour pouvoir être déclenchée depuis n'importe où dans l'app (voir ci-dessous).
 
 1. L'UID lu est comparé au champ `nfc_tag_id` de chaque chantier (`chantiers.list`, renvoyé par `/api/chantiers/mine`). Un badge non reconnu affiche une erreur claire plutôt que d'échouer silencieusement.
 2. Le type de pointage est déduit du dernier pointage du jour **pour ce chantier précis** (un salarié peut visiter plusieurs sites dans la journée, chacun avec son propre badge).
@@ -127,15 +132,15 @@ Le chantier n'est **pas choisi manuellement** : il est déterminé par la lectur
 
 L'app ne demande pas d'ouvrir l'écran Pointage avant de scanner : **un badge lu n'importe quand déclenche le pointage**, où que soit le salarié dans l'app, y compris si l'app vient d'être relancée par ce même tap.
 
-- `pointage.initGlobalListener(router)` est enregistré une seule fois, dès `main.js` (avant même le montage de l'app), et écoute `NFC.onRead` pour toute la durée de vie du processus.
+- `pointage.initGlobalListener(router)` est enregistré une seule fois, dès `main.ts` (avant même le montage de l'app), et écoute `NFC.onRead` pour toute la durée de vie du processus.
 - Badge lu **et** salarié déjà authentifié → `clockWithTag()` s'exécute immédiatement et l'app navigue vers `/pointage` pour montrer le résultat, quel que soit l'écran affiché au moment du tap.
 - Badge lu **et** salarié non authentifié (app tout juste relancée par le tap) → l'UID est gardé en attente (`pendingTagUid`) et l'app ouvre l'écran de connexion ; une fois authentifié, `LoginView.afterLogin()` traite ce badge en attente automatiquement — pas besoin de re-scanner.
 
 **Android** : `AndroidManifest.xml` déclare un `<intent-filter>` `TECH_DISCOVERED` (+ `res/xml/nfc_tech_filter.xml` couvrant les technologies NFC courantes) sur l'activité principale, donc **approcher le badge relance l'app si elle est fermée**, sans action préalable. Le plugin active de plus un `enableForegroundDispatch` permanent tant que l'app est au premier plan : toute lecture y est automatique, `NFC.startScan()` n'est jamais appelé côté Android (il échoue systématiquement par conception du plugin — « Android NFC scanning does not require 'startScan' »).
 
-**iOS** : Apple exige un geste explicite de l'utilisateur pour ouvrir une session de lecture NFC — impossible de relancer l'app silencieusement par un simple tap de badge brut (UID). Le bouton de l'écran Pointage appelle `startIosNfcSession()` (`frontend/src/services/nfc.js`) pour ouvrir cette session ; le tag lu remonte ensuite par le même écouteur global `onRead`. Un vrai lancement d'app par tap sur iOS demanderait de reformater les badges en NDEF avec un enregistrement d'URI pointant vers un Universal Link (domaine associé + `apple-app-site-association` hébergé), ce qui n'est pas en place ici.
+**iOS** : Apple exige un geste explicite de l'utilisateur pour ouvrir une session de lecture NFC — impossible de relancer l'app silencieusement par un simple tap de badge brut (UID). Le bouton de l'écran Pointage appelle `startIosNfcSession()` (`frontend/src/services/nfc.ts`) pour ouvrir cette session ; le tag lu remonte ensuite par le même écouteur global `onRead`. Un vrai lancement d'app par tap sur iOS demanderait de reformater les badges en NDEF avec un enregistrement d'URI pointant vers un Universal Link (domaine associé + `apple-app-site-association` hébergé), ce qui n'est pas en place ici.
 
-**Limite connue** : sur Android, l'événement de lecture au lancement à froid peut théoriquement arriver avant que le JS de l'app n'ait fini de s'initialiser et de s'abonner (le plugin ne fournit pas d'API de récupération a posteriori de l'intent de lancement) — le listener est enregistré le plus tôt possible dans `main.js` pour minimiser cette fenêtre, mais ce n'est pas une garantie à 100 % sur tous les appareils.
+**Limite connue** : sur Android, l'événement de lecture au lancement à froid peut théoriquement arriver avant que le JS de l'app n'ait fini de s'initialiser et de s'abonner (le plugin ne fournit pas d'API de récupération a posteriori de l'intent de lancement) — le listener est enregistré le plus tôt possible dans `main.ts` pour minimiser cette fenêtre, mais ce n'est pas une garantie à 100 % sur tous les appareils.
 
 **Côté Odoo** : chaque chantier (`fsm.location` / partenaire associé) doit exposer un `nfc_tag_id` (UID du badge programmé sur site) dans la réponse de `/api/chantiers/mine` — à ajouter comme champ personnalisé si la suite Field Service ne l'a pas nativement. L'association badge ↔ chantier (programmation des tags NFC) se fait dans Odoo, pas dans cette app.
 
@@ -143,7 +148,7 @@ L'app ne demande pas d'ouvrir l'écran Pointage avant de scanner : **un badge lu
 
 ### Notification « chantier en cours »
 
-Dès qu'un pointage d'arrivée réussit, `frontend/src/services/notifications.js` affiche une notification locale ([`@capacitor/local-notifications`](https://capacitorjs.com/docs/apis/local-notifications)) tant que le salarié est présent :
+Dès qu'un pointage d'arrivée réussit, `frontend/src/services/notifications.ts` affiche une notification locale ([`@capacitor/local-notifications`](https://capacitorjs.com/docs/apis/local-notifications)) tant que le salarié est présent :
 
 - **Titre** : nom du chantier (« Cegetel Macon — en cours »).
 - **Corps** : heure d'arrivée réelle + départ estimé (même calcul retard/avance que l'écran Pointage, via `pointage.estimatedDepartureFor()`).
@@ -151,19 +156,19 @@ Dès qu'un pointage d'arrivée réussit, `frontend/src/services/notifications.js
 - **`ongoing: true`** (Android) : la notification ne peut pas être balayée tant que le salarié est pointé présent, pour rappeler l'état en cours.
 - Elle est annulée (`clearClockedInNotification()`) dès le pointage de départ.
 
-La permission est demandée au premier pointage (`ensurePermission()`), pas au démarrage de l'app. Le canal Android (`pointage`, importance par défaut) est créé une fois au boot (`main.js`).
+La permission est demandée au premier pointage (`ensurePermission()`), pas au démarrage de l'app. Le canal Android (`pointage`, importance par défaut) est créé une fois au boot (`main.ts`).
 
 **Limite honnête** : la notification native ne reproduit pas exactement la maquette (carte à deux colonnes, badge « En cours », ligne « Prochain » en transparence) — c'est le système (iOS/Android) qui gère la mise en page réelle d'une notification, avec un gabarit beaucoup plus limité (titre/corps/corps étendu). Non testable dans ce bac à sable (pas de matériel Android/iOS) : à valider sur device.
 
 ### Fiabilité, confiance et suivi — vers un pointage « best in class »
 
-Six axes ajoutés au-dessus du pointage NFC de base, tous dans `stores/pointage.js` sauf mention contraire :
+Six axes ajoutés au-dessus du pointage NFC de base, tous dans `stores/pointage.ts` sauf mention contraire :
 
-**Mode hors ligne** (`services/offlineQueue.js`) — si `POST /time-entries` échoue par coupure réseau (pas une erreur métier — `!error.response`), le pointage est mis en file d'attente locale persistante (`@capacitor/preferences`) au lieu d'être perdu, avec une mise à jour optimiste immédiate de l'écran (marquée « en attente de synchronisation »). La file est rejouée dans l'ordre dès que `@capacitor/network` signale un retour de connexion ou que `@capacitor/app` signale un retour au premier plan (`watchConnectivity()`), en s'arrêtant à la première entrée qui échoue encore pour ne pas désynchroniser l'alternance arrivée/départ. `stores/chantiers.js` met aussi en cache la liste des chantiers (même mécanisme) pour que le badge reste reconnaissable même hors ligne. *Limite* : sans avoir jamais eu de réseau au moins une fois dans la session (chantiers jamais mis en cache), un badge ne peut pas être matché — couvre le cas réel (perte de réseau sur site après une ouverture d'app le matin), pas un premier lancement hors ligne.
+**Mode hors ligne** (`services/offlineQueue.ts`) — si `POST /time-entries` échoue par coupure réseau (pas une erreur métier — `!error.response`), le pointage est mis en file d'attente locale persistante (`@capacitor/preferences`) au lieu d'être perdu, avec une mise à jour optimiste immédiate de l'écran (marquée « en attente de synchronisation »). La file est rejouée dans l'ordre dès que `@capacitor/network` signale un retour de connexion ou que `@capacitor/app` signale un retour au premier plan (`watchConnectivity()`), en s'arrêtant à la première entrée qui échoue encore pour ne pas désynchroniser l'alternance arrivée/départ. `stores/chantiers.ts` met aussi en cache la liste des chantiers (même mécanisme) pour que le badge reste reconnaissable même hors ligne. *Limite* : sans avoir jamais eu de réseau au moins une fois dans la session (chantiers jamais mis en cache), un badge ne peut pas être matché — couvre le cas réel (perte de réseau sur site après une ouverture d'app le matin), pas un premier lancement hors ligne.
 
-**Anti-fraude par géofence** (`services/geofence.js`) — la position captée au scan est comparée aux `latitude`/`longitude` du chantier (distance de Haversine, tolérance `GEOFENCE_TOLERANCE_M = 150` m pour absorber l'imprécision GPS en intérieur). Un dépassement ne bloque **jamais** le pointage (un salarié ne doit pas être pénalisé par une dérive GPS) — il est seulement signalé (`outOfRange: true` envoyé au serveur, message à l'écran) pour permettre une revue a posteriori côté Odoo.
+**Anti-fraude par géofence** (`services/geofence.ts`) — la position captée au scan est comparée aux `latitude`/`longitude` du chantier (distance de Haversine, tolérance `GEOFENCE_TOLERANCE_M = 150` m pour absorber l'imprécision GPS en intérieur). Un dépassement ne bloque **jamais** le pointage (un salarié ne doit pas être pénalisé par une dérive GPS) — il est seulement signalé (`outOfRange: true` envoyé au serveur, message à l'écran) pour permettre une revue a posteriori côté Odoo.
 
-**Retour haptique + animation** (`services/haptics.js`) — `Haptics.notification()` sur succès/échec de scan (guard `Capacitor.isNativePlatform()`, aucun effet web). Un check ✓ animé remplace brièvement l'icône NFC sur le cercle après un pointage réussi.
+**Retour haptique + animation** (`services/haptics.ts`) — `Haptics.notification()` sur succès/échec de scan (guard `Capacitor.isNativePlatform()`, aucun effet web). Un check ✓ animé remplace brièvement l'icône NFC sur le cercle après un pointage réussi.
 
 **Historique complet des pointages** — `/api/time-entries/mine?from&to` (nouveau contrat, à côté de `/time-entries/today`) alimente `views/pointage/PointageHistoryView.vue` (`/pointage/historique`), qui liste les 14 derniers jours groupés par date. L'écran Pointage n'affichait jusque-là que le jour même.
 
@@ -183,14 +188,14 @@ Le Planning a quatre onglets : Jour, Semaine, **Mois**, et **Tournée**. La Tour
 
 1. Récupère les vacations du jour (`/shifts/mine`) et croise chaque `chantier_id` avec `chantiers.list` pour obtenir ses coordonnées GPS (`latitude`/`longitude` — voir ci-dessous).
 2. Récupère la position actuelle (`navigator.geolocation`) comme point de départ si l'utilisateur l'autorise ; sinon le départ est le premier chantier.
-3. Appelle le service `/trip` d'OSRM (résolution du voyageur de commerce) : `frontend/src/services/osrm.js`, fonction `getOptimizedTrip()`.
+3. Appelle le service `/trip` d'OSRM (résolution du voyageur de commerce) : `frontend/src/services/osrm.ts`, fonction `getOptimizedTrip()`.
 4. Affiche la carte (marqueurs numérotés + tracé), la distance/durée totale, et la liste des arrêts avec horaires estimés (arrivée/départ cumulés à partir des temps de trajet OSRM et de la durée de chaque vacation).
 
 **Coordonnées GPS des chantiers** : champ obligatoire pour que la Tournée fonctionne, géré côté **Odoo**, pas dans cette app — `latitude`/`longitude` sont simplement consommées telles que renvoyées par `/api/chantiers`. Elles correspondent à `partner_latitude`/`partner_longitude` sur `res.partner` (géolocalisation native d'Odoo, ou module OCA `base_geolocalize`).
 
-**⚠️ Serveur OSRM** : `frontend/src/services/osrm.js` pointe par défaut vers le serveur de démo public `router.project-osrm.org`. Ce serveur est explicitement documenté par le projet OSRM comme **non destiné à la production** (pas de garantie de disponibilité, débit limité). Pour la prod, définir `VITE_OSRM_URL` vers une instance OSRM auto-hébergée (le binaire OSRM est open source, se déploie facilement en Docker avec un extrait OpenStreetMap de la région). Idem pour les tuiles de carte (`tile.openstreetmap.org`), à remplacer par un fournisseur de tuiles adapté à un usage production (la [politique d'usage OSM](https://operations.osmfoundation.org/policies/tiles/) interdit aussi l'usage intensif du serveur de tuiles public).
+**⚠️ Serveur OSRM** : `frontend/src/services/osrm.ts` pointe par défaut vers le serveur de démo public `router.project-osrm.org`. Ce serveur est explicitement documenté par le projet OSRM comme **non destiné à la production** (pas de garantie de disponibilité, débit limité). Pour la prod, définir `VITE_OSRM_URL` vers une instance OSRM auto-hébergée (le binaire OSRM est open source, se déploie facilement en Docker avec un extrait OpenStreetMap de la région). Idem pour les tuiles de carte (`tile.openstreetmap.org`), à remplacer par un fournisseur de tuiles adapté à un usage production (la [politique d'usage OSM](https://operations.osmfoundation.org/policies/tiles/) interdit aussi l'usage intensif du serveur de tuiles public).
 
-**Tournée — démarrer la navigation** : un bouton au-dessus de la liste des arrêts ouvre le guidage turn-by-turn natif (`services/navigation.js`, `turnByTurnHref()`) vers le premier arrêt — Apple Plans sur iOS (`maps.apple.com`), Google Maps sinon (`google.com/maps/dir`). Ce sont des liens `https://` standards (Universal/App Links), pas un schéma personnalisé : ils ouvrent l'app native si installée, sinon fonctionnent quand même dans le navigateur. Même mécanisme derrière chaque lien « Itinéraire » (vues Jour et Semaine), avec repli sur une simple recherche par adresse si les coordonnées du chantier sont inconnues.
+**Tournée — démarrer la navigation** : un bouton au-dessus de la liste des arrêts ouvre le guidage turn-by-turn natif (`services/navigation.ts`, `turnByTurnHref()`) vers le premier arrêt — Apple Plans sur iOS (`maps.apple.com`), Google Maps sinon (`google.com/maps/dir`). Ce sont des liens `https://` standards (Universal/App Links), pas un schéma personnalisé : ils ouvrent l'app native si installée, sinon fonctionnent quand même dans le navigateur. Même mécanisme derrière chaque lien « Itinéraire » (vues Jour et Semaine), avec repli sur une simple recherche par adresse si les coordonnées du chantier sont inconnues.
 
 ### Vue Mois
 
@@ -200,24 +205,24 @@ Grille calendaire classique (semaines lundi→dimanche, jours hors mois grisés)
 
 Quatre axes ajoutés au-dessus des vues de base :
 
-**Hors ligne** — `stores/planning.js` met en cache chaque réponse `/shifts/mine` (`@capacitor/preferences`), clé par plage de dates exacte (`from`/`to`). Une coupure réseau retombe sur la dernière réponse connue pour cette même plage plutôt que sur un écran vide — même logique que le cache chantiers du pointage.
+**Hors ligne** — `stores/planning.ts` met en cache chaque réponse `/shifts/mine` (`@capacitor/preferences`), clé par plage de dates exacte (`from`/`to`). Une coupure réseau retombe sur la dernière réponse connue pour cette même plage plutôt que sur un écran vide — même logique que le cache chantiers du pointage.
 
-**Rappel avant une vacation** (`services/planningSync.js`, `syncShifts()`) — appelée après chaque chargement de vacations (jour/semaine/mois), elle programme une notification locale 30 min avant le début de toute vacation dans les 48 h à venir (`scheduleShiftReminder()`, id dérivé de `shift.id` pour se remplacer sans doublon plutôt que de s'accumuler).
+**Rappel avant une vacation** (`services/planningSync.ts`, `syncShifts()`) — appelée après chaque chargement de vacations (jour/semaine/mois), elle programme une notification locale 30 min avant le début de toute vacation dans les 48 h à venir (`scheduleShiftReminder()`, id dérivé de `shift.id` pour se remplacer sans doublon plutôt que de s'accumuler).
 
 **Notification de changement de planning** — la même fonction compare chaque vacation proche (< 48 h) à sa dernière version connue (empreinte `start_at|end_at|status|note`) ; un écart déclenche une notification « Planning mis à jour ». *Portée volontairement limitée* : seules les vacations **proches** sont comparées — au-delà, une vacation absente d'un appel donné peut simplement être hors de la plage demandée (jour ≠ semaine ≠ mois), pas annulée ; détecter fiablement une nouvelle vacation ou une annulation sur l'ensemble du planning demanderait soit un flux de changement fourni par le serveur, soit une notification **push** envoyée par Odoo (FCM/APNs) — aucun des deux n'est en place ici. Ce qui existe est donc une détection **au moment où l'app est ouverte**, pas une vraie notification push en tâche de fond.
 
-**Export vers le calendrier natif** (`services/calendarExport.js`) — génère un fichier `.ics` standard (une vacation, ou toute la semaine d'un coup via le bouton dédié en vue Semaine) et ouvre la feuille de partage native (`@capacitor/share`) pour que le salarié l'ajoute à son agenda personnel. Écrit délibérément **pas** dans le calendrier du téléphone directement (`@capacitor/filesystem` + `Directory.Cache` seulement) — une écriture directe demanderait la permission « accès complet au calendrier », intrusive pour ce que ça apporte ici ; le `.ics` standard fait le même travail sans cette permission.
+**Export vers le calendrier natif** (`services/calendarExport.ts`) — génère un fichier `.ics` standard (une vacation, ou toute la semaine d'un coup via le bouton dédié en vue Semaine) et ouvre la feuille de partage native (`@capacitor/share`) pour que le salarié l'ajoute à son agenda personnel. Écrit délibérément **pas** dans le calendrier du téléphone directement (`@capacitor/filesystem` + `Directory.Cache` seulement) — une écriture directe demanderait la permission « accès complet au calendrier », intrusive pour ce que ça apporte ici ; le `.ics` standard fait le même travail sans cette permission.
 
 **Non testable dans ce bac à sable** : cache hors ligne, rappels programmés et notifications de changement nécessitent du matériel réel (pas de notifications système ni de vraie coupure réseau dans Chromium headless) — vérifiés par relecture de code et par tout ce qui est testable en navigateur (build propre, les 4 vues, export calendrier — son repli web affiche une erreur claire au lieu d'échouer silencieusement). À valider sur device.
 
-**Dates seules** : toutes les conversions passent par `utils/date.js` (`toLocalIso`, `todayIso`, `addDaysIso`), qui construit la chaîne à partir des composantes locales. L'ancienne forme `Date.toISOString().slice(0, 10)` datait en UTC et décalait d'un jour entre minuit et 2h du matin en Europe/Paris — un vrai problème pour des équipes qui démarrent avant l'aube. Ne pas la réintroduire : le comportement est verrouillé par `utils/__tests__/date.test.js`.
+**Dates seules** : toutes les conversions passent par `utils/date.ts` (`toLocalIso`, `todayIso`, `addDaysIso`), qui construit la chaîne à partir des composantes locales. L'ancienne forme `Date.toISOString().slice(0, 10)` datait en UTC et décalait d'un jour entre minuit et 2h du matin en Europe/Paris — un vrai problème pour des équipes qui démarrent avant l'aube. Ne pas la réintroduire : le comportement est verrouillé par `utils/__tests__/date.test.ts`.
 
 ## Intégration Odoo
 
 Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Décisions encore ouvertes avant de rebrancher le frontend :
 
 1. **URL et accès de l'instance** — instance confirmée : `https://www.entretien-maconnais.fr/`. Reste à fournir des identifiants/API key de service, et à savoir si le module `base_rest` (point 2 ci-dessous) y est déjà installé.
-2. **Protocole d'API** entre l'app Vue et Odoo : **tranché, ce sera OCA `base_rest`** (repo `rest-framework`). Il expose des endpoints REST/JSON propres (verbes HTTP, chemins d'URL clairs, forme de réponse contrôlée côté service plutôt que les champs bruts du modèle Odoo) — c'est ce que `RestProvider.js` sait déjà consommer nativement avec Axios, alors que le JSON-RPC natif (`/web/dataset/call_kw`) aurait demandé un provider dédié pour construire ses enveloppes `call_kw` et déballer les dictionnaires internes d'Odoo. Reste à installer le module côté instance et à définir les services/chemins pour chaque endpoint du contrat `DataProvider`.
+2. **Protocole d'API** entre l'app Vue et Odoo : **tranché, ce sera OCA `base_rest`** (repo `rest-framework`). Il expose des endpoints REST/JSON propres (verbes HTTP, chemins d'URL clairs, forme de réponse contrôlée côté service plutôt que les champs bruts du modèle Odoo) — c'est ce que `RestProvider.ts` sait déjà consommer nativement avec Axios, alors que le JSON-RPC natif (`/web/dataset/call_kw`) aurait demandé un provider dédié pour construire ses enveloppes `call_kw` et déballer les dictionnaires internes d'Odoo. Reste à installer le module côté instance et à définir les services/chemins pour chaque endpoint du contrat `DataProvider`.
    - **Authentification** : Odoo doit vérifier identifiant + mot de passe (stockés sur la fiche employé) et renvoyer un token Bearer — via un module OCA comme `auth_api_key` (repo `server-auth`) ou `auth_jwt`. La biométrie (voir [Authentification](#authentification) ci-dessus) est gérée uniquement côté app, Odoo ne voit jamais que du login/mot de passe classique.
 3. **Mapping métier** — **confirmé : l'instance utilise la suite OCA Field Service Management** (repo `field-service`) :
    - `fsm.location` ↔ chantier
@@ -230,7 +235,7 @@ Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Dé
 
 ### Contrat API attendu (services `base_rest` à exposer côté Odoo)
 
-`frontend/src/providers/RestProvider.js` appelle déjà ces chemins précis — c'est la spec à implémenter côté Odoo (services `base_rest`, un par ligne) pour que **rien ne change côté frontend**, juste `VITE_API_URL` à pointer vers l'instance :
+`frontend/src/providers/RestProvider.ts` appelle déjà ces chemins précis — c'est la spec à implémenter côté Odoo (services `base_rest`, un par ligne) pour que **rien ne change côté frontend**, juste `VITE_API_URL` à pointer vers l'instance :
 
 | Méthode `DataProvider` | Endpoint `base_rest` | Modèle(s) Odoo source |
 |---|---|---|
@@ -251,7 +256,7 @@ Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Dé
 
 Le type de pointage (`in`/`out`/`pause_start`/`pause_end`) et le statut (`entries`/`status`) sont une couche au-dessus de `hr.attendance`, qui ne connaît nativement que in/out — la distinction pause vs départ définitif doit être portée par un champ ou une catégorie sur l'écriture `hr.attendance` (ou un modèle satellite), à trancher côté implémentation Odoo.
 
-Une fois l'URL/les identifiants de l'instance connus (point 1 ci-dessus) et ces services `base_rest` implémentés avec cette forme exacte, il suffit de renseigner `VITE_API_URL` — aucun changement de code frontend n'est nécessaire. Si un chemin ou une forme de réponse doit différer, seul **`frontend/src/providers/RestProvider.js`** (voir § Architecture backend-agnostique ci-dessus) a besoin d'être ajusté ; les stores et les vues ne connaissent que le contrat `DataProvider`.
+Une fois l'URL/les identifiants de l'instance connus (point 1 ci-dessus) et ces services `base_rest` implémentés avec cette forme exacte, il suffit de renseigner `VITE_API_URL` — aucun changement de code frontend n'est nécessaire. Si un chemin ou une forme de réponse doit différer, seul **`frontend/src/providers/RestProvider.ts`** (voir § Architecture backend-agnostique ci-dessus) a besoin d'être ajusté ; les stores et les vues ne connaissent que le contrat `DataProvider`.
 
 ## Fonctionnalités (vues déjà scaffoldées, backend à rebrancher)
 

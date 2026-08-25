@@ -1,15 +1,29 @@
 import js from '@eslint/js';
 import pluginVue from 'eslint-plugin-vue';
+import tseslint from 'typescript-eslint';
 import globals from 'globals';
 
 export default [
   { ignores: ['dist/**', 'android/**', 'ios/**', 'dev-dist/**', 'node_modules/**'] },
 
   js.configs.recommended,
+  ...tseslint.configs.recommended,
   // `essential` et non `recommended` : on veut que le linter signale de vrais
   // défauts (variable morte, clé de v-for manquante, prop inexistante), pas
   // des préférences de mise en forme sur les sauts de ligne des attributs.
   ...pluginVue.configs['flat/essential'],
+
+  // vue-eslint-parser délègue le contenu de <script> à un sous-parseur : sans
+  // ceci, il utilise espree par défaut, qui ne comprend pas la syntaxe TS
+  // (annotations de type, `as`, etc.) des blocs `<script setup lang="ts">`.
+  {
+    files: ['**/*.vue'],
+    languageOptions: {
+      parserOptions: {
+        parser: tseslint.parser,
+      },
+    },
+  },
 
   {
     languageOptions: {
@@ -27,12 +41,19 @@ export default [
       // il est toujours accompagné d'un commentaire.
       'no-empty': ['error', { allowEmptyCatch: true }],
 
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      // Version TS de la règle : le natif ne comprend pas les types.
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+
+      // `any` explicite reste parfois nécessaire aux frontières (plugins
+      // Capacitor sans types, réponses de payload dynamiques) ; le contrat
+      // de types utile est sur le domaine métier, pas sur ces bords-là.
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 
   {
-    files: ['**/__tests__/**/*.js'],
+    files: ['**/__tests__/**/*.ts'],
     languageOptions: { globals: { ...globals.node } },
   },
 ];

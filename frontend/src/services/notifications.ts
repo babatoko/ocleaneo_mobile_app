@@ -1,12 +1,13 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Preferences } from '@capacitor/preferences';
+import type { Shift } from '../types/models';
 
 const NOTIFICATIONS_ENABLED_KEY = 'ocleaneo_notifications_enabled';
-let notificationsEnabledCache = null;
+let notificationsEnabledCache: boolean | null = null;
 
 /** Préférence utilisateur (Paramètres du profil) — activées par défaut. */
-export async function areNotificationsEnabled() {
+export async function areNotificationsEnabled(): Promise<boolean> {
   if (notificationsEnabledCache !== null) return notificationsEnabledCache;
   const { value } = await Preferences.get({ key: NOTIFICATIONS_ENABLED_KEY });
   notificationsEnabledCache = value !== 'false';
@@ -14,13 +15,13 @@ export async function areNotificationsEnabled() {
 }
 
 /** Change la préférence ; désactiver annule aussi tout ce qui est déjà programmé. */
-export async function setNotificationsEnabled(enabled) {
+export async function setNotificationsEnabled(enabled: boolean): Promise<void> {
   notificationsEnabledCache = enabled;
   await Preferences.set({ key: NOTIFICATIONS_ENABLED_KEY, value: String(enabled) });
   if (!enabled) await cancelAllNotifications();
 }
 
-export async function cancelAllNotifications() {
+export async function cancelAllNotifications(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
     const { notifications } = await LocalNotifications.getPending();
@@ -42,11 +43,11 @@ let planChangeSeq = 0;
 
 let permissionGranted = false;
 
-function fmtTime(date) {
+function fmtTime(date: string | Date): string {
   return new Date(date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export async function ensureNotificationChannel() {
+export async function ensureNotificationChannel(): Promise<void> {
   if (Capacitor.getPlatform() !== 'android') return;
   try {
     await LocalNotifications.createChannel({
@@ -66,7 +67,7 @@ export async function ensureNotificationChannel() {
   }
 }
 
-async function ensurePermission() {
+async function ensurePermission(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
   if (permissionGranted) return true;
   const { display } = await LocalNotifications.checkPermissions();
@@ -79,13 +80,25 @@ async function ensurePermission() {
   return permissionGranted;
 }
 
+interface ClockedInNotificationNext {
+  chantierName: string;
+  startAt: string;
+}
+
+interface ClockedInNotificationParams {
+  chantierName: string;
+  arrivalAt: string;
+  estimatedDeparture: string | Date;
+  next: ClockedInNotificationNext | null;
+}
+
 /**
  * Affiche (ou met à jour) une notification permanente tant que le salarié est
  * pointé présent sur un chantier : heure d'arrivée réelle, fin estimée
  * (ajustée du retard/de l'avance pris à l'arrivée) et prochaine vacation du
  * jour si elle existe.
  */
-export async function showClockedInNotification({ chantierName, arrivalAt, estimatedDeparture, next }) {
+export async function showClockedInNotification({ chantierName, arrivalAt, estimatedDeparture, next }: ClockedInNotificationParams): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   if (!(await areNotificationsEnabled())) return;
   if (!(await ensurePermission())) return;
@@ -112,9 +125,14 @@ export async function showClockedInNotification({ chantierName, arrivalAt, estim
   });
 }
 
-export async function clearClockedInNotification() {
+export async function clearClockedInNotification(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.cancel({ notifications: [{ id: SHIFT_NOTIFICATION_ID }] }).catch(() => {});
+}
+
+interface DepartureReminderParams {
+  chantierName: string;
+  estimatedDeparture: string | Date | null;
 }
 
 /**
@@ -123,8 +141,9 @@ export async function clearClockedInNotification() {
  * estimée de sa vacation. Annulé au pointage de départ (voir ci-dessous) ou
  * remplacé par le prochain appel si un nouveau pointage d'arrivée est fait.
  */
-export async function scheduleDepartureReminder({ chantierName, estimatedDeparture }) {
+export async function scheduleDepartureReminder({ chantierName, estimatedDeparture }: DepartureReminderParams): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
+  if (!estimatedDeparture) return;
   if (!(await areNotificationsEnabled())) return;
   if (!(await ensurePermission())) return;
 
@@ -144,7 +163,7 @@ export async function scheduleDepartureReminder({ chantierName, estimatedDepartu
   });
 }
 
-export async function cancelDepartureReminder() {
+export async function cancelDepartureReminder(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.cancel({ notifications: [{ id: REMINDER_NOTIFICATION_ID }] }).catch(() => {});
 }
@@ -154,7 +173,7 @@ export async function cancelDepartureReminder() {
  * vacation. Un id dérivé de shift.id permet de ré-appeler cette fonction sans
  * créer de doublon : la notification existante est simplement remplacée.
  */
-export async function scheduleShiftReminder(shift) {
+export async function scheduleShiftReminder(shift: Shift): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   if (!(await areNotificationsEnabled())) return;
   if (!(await ensurePermission())) return;
@@ -175,13 +194,13 @@ export async function scheduleShiftReminder(shift) {
   });
 }
 
-export async function cancelShiftReminder(shiftId) {
+export async function cancelShiftReminder(shiftId: number | string): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.cancel({ notifications: [{ id: SHIFT_REMINDER_BASE_ID + Number(shiftId) }] }).catch(() => {});
 }
 
 /** Notification ponctuelle « ton planning a changé », un id différent à chaque appel. */
-export async function notifyPlanningChanged(message) {
+export async function notifyPlanningChanged(message: string): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   if (!(await areNotificationsEnabled())) return;
   if (!(await ensurePermission())) return;

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { provider } from '../../providers';
@@ -15,6 +15,10 @@ const error = ref('');
 
 async function submit() {
   error.value = '';
+  if (!chantiers.selectedId) {
+    error.value = 'Aucun chantier sélectionné.';
+    return;
+  }
   submitting.value = true;
   try {
     const { id } = await provider.createOrder({
@@ -28,7 +32,7 @@ async function submit() {
     cart.clear();
     router.replace(`/commande/${id}/recap`);
   } catch (e) {
-    error.value = e.message || 'Erreur lors de la commande';
+    error.value = (e instanceof Error && e.message) || 'Erreur lors de la commande';
   } finally {
     submitting.value = false;
   }

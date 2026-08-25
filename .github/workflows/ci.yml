@@ -29,6 +29,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Vérification des types
+        run: npm run typecheck
+
       - name: Tests unitaires
         run: npm run test
 
