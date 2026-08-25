@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { IonButton, IonContent, IonIcon, IonInput, IonPage, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
+import {
+  IonButton,
+  IonContent,
+  IonIcon,
+  IonInput,
+  IonItem,
+  IonItemDivider,
+  IonItemGroup,
+  IonLabel,
+  IonList,
+  IonPage,
+  IonSelect,
+  IonSelectOption,
+  IonSpinner,
+} from '@ionic/vue';
 import { alertCircleOutline, businessOutline, checkmarkCircleOutline, chevronDownOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
@@ -119,7 +133,7 @@ const filledCount = () =>
         <ion-icon :icon="checkmarkCircleOutline"></ion-icon>
         <p class="d-title">Inventaire enregistré</p>
         <p class="d-sub">Les niveaux de stock du site sont à jour.</p>
-        <button type="button" class="d-again" @click="restart">Modifier la saisie</button>
+        <ion-button class="d-again" fill="clear" @click="restart">Modifier la saisie</ion-button>
       </div>
 
       <template v-else>
@@ -136,26 +150,27 @@ const filledCount = () =>
 
           <p class="inv-hint">Indiquez ce qu'il reste sur place. Les valeurs du dernier inventaire sont préremplies.</p>
 
-          <div class="inv-list">
-            <div v-for="p in products" :key="p.id" class="inv-product">
-              <div class="ip-head">
-                <ion-icon :icon="iconForProduct(p)"></ion-icon>
-                <span class="ip-name">{{ p.name }}</span>
-              </div>
-              <div v-for="pk in p.packagings" :key="pk.id" class="ip-row">
-                <label :for="`pk-${pk.id}`">{{ pk.label }}</label>
+          <ion-list class="inv-list">
+            <ion-item-group v-for="p in products" :key="p.id" class="inv-product">
+              <ion-item-divider class="ip-head">
+                <ion-icon slot="start" :icon="iconForProduct(p)"></ion-icon>
+                <ion-label class="ip-name">{{ p.name }}</ion-label>
+              </ion-item-divider>
+              <ion-item v-for="pk in p.packagings" :key="pk.id" class="ip-row" lines="full">
+                <ion-label>{{ pk.label }}</ion-label>
                 <ion-input
-                  :id="`pk-${pk.id}`"
+                  slot="end"
                   v-model="quantities[pk.id]"
                   type="number"
                   min="0"
                   inputmode="numeric"
                   fill="outline"
                   placeholder="—"
+                  :aria-label="pk.label"
                 ></ion-input>
-              </div>
-            </div>
-          </div>
+              </ion-item>
+            </ion-item-group>
+          </ion-list>
 
           <p v-if="submitError" class="inv-error"><ion-icon :icon="alertCircleOutline"></ion-icon> {{ submitError }}</p>
 
@@ -177,23 +192,24 @@ const filledCount = () =>
 }
 
 .inv-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  background: transparent;
   padding: 0 18px;
 }
 
 .inv-product {
   background: var(--surface-1);
   border-radius: 12px;
-  padding: 12px 14px;
+  margin-bottom: 10px;
+  overflow: hidden;
 }
 
 .ip-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  --background: transparent;
+  --color: var(--text-secondary);
+  --padding-start: 14px;
+  --inner-padding-end: 14px;
+  min-height: 0;
+  padding: 12px 0 6px;
 }
 
 .ip-head ion-icon {
@@ -204,17 +220,15 @@ const filledCount = () =>
 .ip-name {
   font-size: 13px;
   font-weight: 500;
+  color: var(--text-primary);
 }
 
 .ip-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-top: 0.5px solid var(--border);
-}
-
-.ip-row label {
+  --background: transparent;
+  --padding-start: 14px;
+  --inner-padding-end: 14px;
+  --border-color: var(--border);
+  --min-height: 0;
   font-size: 12px;
   color: var(--text-secondary);
 }
@@ -278,11 +292,11 @@ const filledCount = () =>
 
 .d-again {
   margin-top: 16px;
-  background: var(--surface-1);
-  border: none;
-  border-radius: 10px;
-  padding: 10px 18px;
+  --background: var(--surface-1);
+  --border-radius: 10px;
+  --color: var(--text-primary);
+  --box-shadow: none;
   font-size: 13px;
-  color: var(--text-primary);
+  text-transform: none;
 }
 </style>

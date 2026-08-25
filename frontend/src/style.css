@@ -217,10 +217,6 @@ input[type='number'] {
 .login-alt,
 .day,
 .month-cell,
-.stepper button,
-.card-actions a,
-.card-actions button,
-.ws-itin,
 .ws-info,
 .week-day-head,
 .card-main,
@@ -383,122 +379,9 @@ input[type='number'] {
   text-transform: uppercase;
 }
 
-.shift {
-  display: flex;
-  gap: 10px;
-  padding: 0 18px;
-  margin-bottom: 10px;
-}
-
-.shift .bar {
-  width: 3px;
-  border-radius: 2px;
-  flex-shrink: 0;
-  background: var(--border-strong);
-}
-
-.shift .bar.confirmed {
-  background: var(--accent);
-}
-
-.shift .card {
-  flex: 1;
-  min-width: 0;
-  background: var(--surface-1);
-  border-radius: 12px;
-  padding: 10px 14px;
-}
-
-/* Le résumé de la vacation est un vrai bouton (focusable, annoncé par les
-   lecteurs d'écran) ; les actions Itinéraire/Calendrier restent en dehors
-   pour ne pas imbriquer d'interactif dans de l'interactif. */
-.shift .card-main {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-}
-
-.shift .top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.shift .time {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.badge {
-  font-size: 11px;
-  padding: 2px 9px;
-  border-radius: 8px;
-}
-
-.badge.confirmed {
-  background: var(--success-bg);
-  color: var(--success-text);
-}
-
-.badge.modified {
-  background: var(--warn-bg);
-  color: var(--warn-text);
-}
-
-.badge.pending {
-  background: var(--warn-bg);
-  color: var(--warn-text);
-}
-
-.badge.cancelled {
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-
-.shift .client {
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0 0 2px;
-}
-
-.shift .place,
-.shift .meta {
-  font-size: 12px;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-}
-
-.shift .card-actions {
-  display: flex;
-  gap: 14px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 0.5px solid var(--border);
-}
-
-.shift .card-actions a,
-.shift .card-actions button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--accent-text);
-  border: none;
-  background: none;
-  padding: 0;
-  /* Le lien et le bouton voisins sont la même action pour l'utilisateur :
-     ils doivent se ressembler. */
-  text-decoration: none;
-}
+/* Les styles de la carte vacation (ion-card) vivent maintenant dans
+   PlanningView.vue — plus utilisées ailleurs, elles n'ont plus leur place
+   ici comme « design system partagé ». */
 
 .clock-wrap {
   display: flex;
@@ -569,28 +452,25 @@ input[type='number'] {
   margin: 0 0 8px;
 }
 
+/* ion-item (hist-row) + ion-avatar (hist-icon) + ion-label (lbl/sub) +
+   ion-note (hist-time) — partagés par PointageView et PointageHistoryView. */
 .hist-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 0;
-  border-bottom: 0.5px solid var(--border);
-}
-
-.hist-row:last-child {
-  border-bottom: none;
+  --background: transparent;
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --border-color: var(--border);
+  --min-height: 0;
 }
 
 .hist-icon {
   width: 30px;
   height: 30px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   background: var(--surface-1);
   color: var(--text-muted);
+  margin: 9px 10px 9px 0;
 }
 
 .hist-icon.in {
@@ -598,16 +478,12 @@ input[type='number'] {
   color: var(--success-text);
 }
 
-.hist-text {
-  flex: 1;
-}
-
-.hist-text .lbl {
+.hist-row .lbl {
   font-size: 13px;
   margin: 0;
 }
 
-.hist-text .sub {
+.hist-row .sub {
   font-size: 11px;
   color: var(--text-secondary);
   margin: 1px 0 0;
@@ -618,7 +494,7 @@ input[type='number'] {
   font-weight: 500;
 }
 
-.hist-text .lbl.muted {
+.hist-row .lbl.muted {
   color: var(--text-muted);
 }
 
@@ -776,38 +652,9 @@ input[type='number'] {
   margin: 0;
 }
 
-.menu {
-  padding: 0 16px;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 4px;
-  border-bottom: 0.5px solid var(--border);
-  min-height: 44px;
-  text-decoration: none;
-  color: var(--text-primary);
-}
-
-.menu-item ion-icon:first-child {
-  font-size: 18px;
-  color: var(--text-secondary);
-  width: 20px;
-  text-align: center;
-}
-
-.menu-item span {
-  font-size: 14px;
-  flex: 1;
-}
-
-.menu-item .chev {
-  color: var(--text-muted);
-  font-size: 16px;
-  width: auto;
-}
+/* .menu/.menu-item, .settings-row/.srow-*, .app-toggle et .server-url-*
+   vivent maintenant dans ProfileView.vue (ion-list/ion-item), seul écran
+   qui les utilise. */
 
 /* Stock screen (product ordering) */
 
@@ -847,190 +694,19 @@ input[type='number'] {
   color: var(--text-muted);
 }
 
-.stock-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  padding: 0 18px;
-}
-
-.stock-item {
-  background: var(--surface-1);
-  border-radius: 12px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.stock-item .icon-wrap {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.stock-item .icon-wrap ion-icon {
-  font-size: 18px;
-  color: var(--text-secondary);
-}
-
-.stock-item .pname {
-  font-size: 12px;
-  font-weight: 500;
-  margin: 0;
-}
-
-.stock-item .plevel {
-  font-size: 11px;
-  margin: 0;
-  min-height: 14px;
-}
-
-.plevel.ok {
-  color: var(--success-text);
-}
-
-.plevel.low {
-  color: var(--warn-text);
-}
-
-.plevel.out {
-  color: var(--danger);
-}
-
-.stepper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface-2);
-  border-radius: 8px;
-  padding: 4px 6px;
-  margin-top: 2px;
-}
-
-.stepper button {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  border: none;
-  background: var(--surface-1);
-  color: var(--text-secondary);
-  font-size: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.stepper .qty {
-  font-size: 13px;
-  font-weight: 500;
-  min-width: 18px;
-  text-align: center;
-}
-
-.stock-cart-bar {
-  margin: 14px 18px 0;
-  width: calc(100% - 36px);
-  background: var(--text-primary);
-  color: var(--on-solid);
-  border-radius: 12px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: none;
-}
-
-.stock-cart-bar span {
-  font-size: 13px;
-}
-
-.stock-cart-bar .cta {
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+/* .stock-grid (ion-grid/ion-card), .stepper (QuantityStepper.vue) et
+   .stock-cart-bar (ion-button) vivent maintenant dans CatalogueView.vue,
+   seul écran qui les utilise. */
 
 /* Détail chantier (planning) */
 
-.detail-hero {
-  margin: 10px 18px;
-  background: var(--surface-1);
-  border-radius: 14px;
-  padding: 14px 16px;
-}
-
-.detail-hero .dtime {
-  font-size: 18px;
-  font-weight: 500;
-  margin: 0 0 2px;
-}
-
-.detail-hero .dclient {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 0 0 10px;
-}
-
-.detail-hero .daddr {
-  font-size: 13px;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-}
-
-.detail-actions {
-  display: flex;
-  gap: 10px;
-  margin: 0 18px 6px;
-}
-
-.detail-actions .dbtn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  background: var(--surface-1);
-  border-radius: 12px;
-  padding: 10px 0;
-  font-size: 11px;
-  color: var(--text-secondary);
-  border: none;
-  text-decoration: none;
-}
-
-.detail-actions .dbtn ion-icon {
-  font-size: 19px;
-  color: var(--text-primary);
-}
+/* .detail-hero, .detail-actions/.dbtn et .note-box vivent maintenant dans
+   ChantierDetailView.vue (ion-card/ion-button/ion-item), seul écran qui les
+   utilise. .detail-block, .block-head et .see-all restent ici : partagés
+   avec ProfileView.vue et PointageView.vue. */
 
 .detail-block {
   padding: 6px 18px;
-}
-
-.note-box {
-  background: var(--warn-bg);
-  color: var(--warn-text);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 12px;
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.note-box ion-icon {
-  font-size: 15px;
-  margin-top: 1px;
 }
 
 .block-head {
@@ -1051,198 +727,11 @@ input[type='number'] {
   padding: 0;
 }
 
-/* Profil / Paramètres */
+/* Profil / Paramètres : tout vit maintenant dans ProfileView.vue
+   (ion-list/ion-item/ion-toggle), seul écran qui les utilise. */
 
-.profile-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px 16px 16px;
-}
-
-.profile-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: var(--accent-bg);
-  color: var(--accent-text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: 500;
-  margin-bottom: 10px;
-}
-
-.profile-name {
-  font-size: 16px;
-  font-weight: 500;
-  margin: 0;
-}
-
-.profile-role {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
-}
-
-.settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  border-bottom: 0.5px solid var(--border);
-  gap: 12px;
-}
-
-.settings-row:last-child {
-  border-bottom: none;
-}
-
-.srow-label {
-  font-size: 13px;
-  margin: 0;
-}
-
-.srow-sub {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
-}
-
-.settings-row .srow-value {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-/* ion-toggle : le comportement (piste, poignée, animation, disabled,
-   `prefers-reduced-motion`) vient d'Ionic — seule la couleur suit la palette
-   Ocleaneo au lieu du bleu par défaut. */
-.app-toggle {
-  --track-background: var(--border-strong);
-  --track-background-checked: var(--accent);
-  --handle-background: var(--surface-2);
-  --handle-background-checked: var(--surface-2);
-  flex-shrink: 0;
-}
-
-.menu-item.danger {
-  color: var(--danger);
-}
-
-.menu-item.danger ion-icon:first-child {
-  color: var(--danger);
-}
-
-.menu-item.no-chev {
-  cursor: pointer;
-}
-
-button.menu-item {
-  width: 100%;
-  background: none;
-  border: none;
-  border-bottom: 0.5px solid var(--border);
-  border-radius: 0;
-  font-family: inherit;
-  text-align: left;
-}
-
-button.menu-item:last-child {
-  border-bottom: none;
-}
-
-.server-url-field {
-  padding: 12px 0;
-}
-
-.server-url-field ion-input {
-  --background: var(--surface-1);
-  --border-color: var(--border);
-  --border-radius: 10px;
-  --color: var(--text-primary);
-  --padding-start: 12px;
-  --padding-end: 12px;
-  font-size: 13px;
-}
-
-.server-url-field .srow-sub {
-  margin: 6px 0 0;
-}
-
-.server-url-error {
-  color: var(--danger);
-  font-size: 11px;
-  margin: 6px 0 0;
-}
-
-.server-url-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.server-url-save {
-  --border-radius: 10px;
-  --background: var(--accent);
-  --color: var(--on-accent);
-  --box-shadow: none;
-  font-weight: 500;
-  font-size: 13px;
-  text-transform: none;
-  margin: 0;
-}
-
-.server-url-reset {
-  --color: var(--text-secondary);
-  font-size: 12px;
-  text-decoration: underline;
-  margin: 0;
-}
-
-.stock-mini-row {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.stock-mini {
-  flex-shrink: 0;
-  min-width: 76px;
-  background: var(--surface-1);
-  border-radius: 10px;
-  padding: 8px;
-  text-align: center;
-}
-
-.stock-mini ion-icon {
-  font-size: 16px;
-  color: var(--text-secondary);
-}
-
-.stock-mini .sname {
-  font-size: 10px;
-  margin: 4px 0 2px;
-}
-
-.stock-mini .slevel {
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.slevel.ok {
-  color: var(--success-text);
-}
-
-.slevel.low {
-  color: var(--warn-text);
-}
-
-.slevel.out {
-  color: var(--danger);
-}
+/* .stock-mini-row/.stock-mini/.slevel vivent maintenant dans
+   ChantierDetailView.vue (ion-card), seul écran qui les utilise. */
 
 /* Tournée (route view) */
 
@@ -1255,104 +744,8 @@ button.menu-item:last-child {
   height: 260px;
 }
 
-.map-summary-bar {
-  margin: 0 18px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface-1);
-  border-radius: 10px;
-  padding: 10px 14px;
-}
-
-.map-summary-bar .sitem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.map-summary-bar .sitem ion-icon {
-  font-size: 15px;
-}
-
-.map-summary-bar .optimize-badge {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--success-text);
-  background: var(--success-bg);
-  padding: 3px 9px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.stop-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 0 18px;
-  margin-bottom: 8px;
-  position: relative;
-}
-
-.stop-row:not(:last-child)::before {
-  content: '';
-  position: absolute;
-  left: 29px;
-  top: 26px;
-  bottom: -8px;
-  width: 1.5px;
-  background: var(--border-strong);
-}
-
-.stop-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--text-primary);
-  color: var(--on-solid);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 500;
-  flex-shrink: 0;
-  z-index: 1;
-}
-
-.stop-card {
-  flex: 1;
-  background: var(--surface-1);
-  border-radius: 12px;
-  padding: 9px 12px;
-}
-
-.stop-card .stop-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.stop-card .sname {
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0;
-}
-
-.stop-card .seta {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.stop-card .saddr {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
-}
+/* .map-summary-bar (ion-chip) et .stop-row/.stop-num/.stop-card (ion-item)
+   vivent maintenant dans PlanningView.vue, seul écran qui les utilise. */
 
 .trip-marker {
   width: 24px;

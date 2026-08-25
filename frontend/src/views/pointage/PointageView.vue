@@ -2,7 +2,23 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Capacitor } from '@capacitor/core';
-import { IonContent, IonIcon, IonPage, IonSpinner } from '@ionic/vue';
+import {
+  IonAvatar,
+  IonBadge,
+  IonButton,
+  IonCard,
+  IonCardContent,
+  IonChip,
+  IonContent,
+  IonIcon,
+  IonItem,
+  IonLabel,
+  IonList,
+  IonNote,
+  IonPage,
+  IonProgressBar,
+  IonSpinner,
+} from '@ionic/vue';
 import {
   alarmOutline,
   alertCircleOutline,
@@ -188,26 +204,26 @@ function fmtTime(iso: string | Date | null | undefined): string {
       <p class="hello">Pointage</p>
       <p class="name sub-name">{{ now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
     </div>
-    <div class="status-pill" :class="pointage.status">
+    <ion-chip class="status-pill" :class="pointage.status">
       <ion-icon :icon="statusIcon"></ion-icon>
       <span>{{ statusText }}</span>
-    </div>
+    </ion-chip>
   </div>
 
-  <div v-if="pointage.offlineQueueCount > 0" class="offline-banner">
-    <ion-icon :icon="cloudOfflineOutline"></ion-icon>
-    <span>{{ pointage.offlineQueueCount }} pointage{{ pointage.offlineQueueCount > 1 ? 's' : '' }} en attente de synchronisation</span>
-  </div>
+  <ion-item v-if="pointage.offlineQueueCount > 0" class="offline-banner" lines="none">
+    <ion-icon slot="start" :icon="cloudOfflineOutline"></ion-icon>
+    <ion-label class="ion-text-wrap">{{ pointage.offlineQueueCount }} pointage{{ pointage.offlineQueueCount > 1 ? 's' : '' }} en attente de synchronisation</ion-label>
+  </ion-item>
 
-  <div v-if="pointage.lastMessage" class="soft-banner" :class="pointage.lastMessage.type">
-    <ion-icon :icon="pointage.lastMessage.type === 'warn' ? warningOutline : cloudUploadOutline"></ion-icon>
-    <span>{{ pointage.lastMessage.text }}</span>
-  </div>
+  <ion-item v-if="pointage.lastMessage" class="soft-banner" :class="pointage.lastMessage.type" lines="none">
+    <ion-icon slot="start" :icon="pointage.lastMessage.type === 'warn' ? warningOutline : cloudUploadOutline"></ion-icon>
+    <ion-label class="ion-text-wrap">{{ pointage.lastMessage.text }}</ion-label>
+  </ion-item>
 
-  <div v-if="overdueMinutes" class="soft-banner warn">
-    <ion-icon :icon="alarmOutline"></ion-icon>
-    <span>Vacation dépassée de {{ fmtOverdue(overdueMinutes) }} — n'oubliez pas de badger votre départ.</span>
-  </div>
+  <ion-item v-if="overdueMinutes" class="soft-banner warn" lines="none">
+    <ion-icon slot="start" :icon="alarmOutline"></ion-icon>
+    <ion-label class="ion-text-wrap">Vacation dépassée de {{ fmtOverdue(overdueMinutes) }} — n'oubliez pas de badger votre départ.</ion-label>
+  </ion-item>
 
   <div class="clock-wrap">
     <button
@@ -230,43 +246,51 @@ function fmtTime(iso: string | Date | null | undefined): string {
     </p>
 
     <div v-if="pointage.status === 'in'" class="pause-actions">
-      <button type="button" class="pause-btn" @click="pointage.startPause()">
-        <ion-icon :icon="pauseOutline"></ion-icon> Pause
-      </button>
+      <ion-button class="pause-btn" fill="solid" @click="pointage.startPause()">
+        <ion-icon slot="start" :icon="pauseOutline"></ion-icon> Pause
+      </ion-button>
     </div>
     <div v-else-if="pointage.status === 'paused'" class="pause-actions">
-      <button type="button" class="pause-btn resume" @click="pointage.endPause()">
-        <ion-icon :icon="playOutline"></ion-icon> Reprendre
-      </button>
+      <ion-button class="pause-btn resume" fill="solid" @click="pointage.endPause()">
+        <ion-icon slot="start" :icon="playOutline"></ion-icon> Reprendre
+      </ion-button>
     </div>
   </div>
 
-  <div class="week-summary">
-    <div class="ws-top">
-      <span class="ws-lbl">Heures cette semaine</span>
-      <span v-if="pointage.weekOvertimeHours > 0" class="ws-overtime">Dépassement</span>
-    </div>
-    <p class="ws-value">{{ weekHoursLabel }}</p>
-    <div class="hours-bar"><div class="hours-bar-fill" :class="{ over: pointage.weekOvertimeHours > 0 }" :style="{ width: weekProgressPct + '%' }"></div></div>
-  </div>
+  <ion-card class="week-summary">
+    <ion-card-content>
+      <div class="ws-top">
+        <span class="ws-lbl">Heures cette semaine</span>
+        <ion-badge v-if="pointage.weekOvertimeHours > 0" color="warning" class="ws-overtime">Dépassement</ion-badge>
+      </div>
+      <p class="ws-value">{{ weekHoursLabel }}</p>
+      <ion-progress-bar
+        class="hours-bar"
+        :class="{ over: pointage.weekOvertimeHours > 0 }"
+        :value="weekProgressPct / 100"
+      ></ion-progress-bar>
+    </ion-card-content>
+  </ion-card>
 
   <div class="history">
     <div class="history-head">
       <p class="history-title">Historique du jour</p>
       <RouterLink to="/pointage/historique" class="see-all">Tout voir <ion-icon :icon="chevronForwardOutline"></ion-icon></RouterLink>
     </div>
-    <div v-for="e in displayEntries" :key="e.id" class="hist-row">
-      <div class="hist-icon" :class="e.type">
-        <ion-icon :icon="entryIcon(e.type)"></ion-icon>
-      </div>
-      <div class="hist-text">
-        <p class="lbl" :class="{ muted: e.planned }">{{ entryLabel(e.type) }}</p>
-        <p class="sub">
-          {{ e.planned ? `Prévu ${fmtTime(e.plannedTime)}` : e.pending ? 'En attente de synchronisation' : e.chantier_name }}
-        </p>
-      </div>
-      <span class="hist-time" :class="{ muted: e.planned || e.pending }">{{ e.planned ? '--:--' : fmtTime(e.recorded_at) }}</span>
-    </div>
+    <ion-list v-if="pointage.entries.length || displayEntries.length" lines="none">
+      <ion-item v-for="e in displayEntries" :key="e.id" class="hist-row">
+        <ion-avatar slot="start" class="hist-icon" :class="e.type">
+          <ion-icon :icon="entryIcon(e.type)"></ion-icon>
+        </ion-avatar>
+        <ion-label>
+          <p class="lbl" :class="{ muted: e.planned }">{{ entryLabel(e.type) }}</p>
+          <p class="sub">
+            {{ e.planned ? `Prévu ${fmtTime(e.plannedTime)}` : e.pending ? 'En attente de synchronisation' : e.chantier_name }}
+          </p>
+        </ion-label>
+        <ion-note slot="end" class="hist-time" :class="{ muted: e.planned || e.pending }">{{ e.planned ? '--:--' : fmtTime(e.recorded_at) }}</ion-note>
+      </ion-item>
+    </ion-list>
     <p v-if="!pointage.entries.length" class="empty">Aucun pointage aujourd'hui.</p>
   </div>
     </ion-content>
@@ -282,16 +306,12 @@ function fmtTime(iso: string | Date | null | undefined): string {
 }
 
 .status-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
   flex-shrink: 0;
-  background: var(--surface-1);
+  --background: var(--surface-1);
   color: var(--text-secondary);
+  margin: 0;
 }
 
 .status-pill ion-icon {
@@ -299,26 +319,27 @@ function fmtTime(iso: string | Date | null | undefined): string {
 }
 
 .status-pill.in {
-  background: var(--success-bg);
+  --background: var(--success-bg);
   color: var(--success-text);
 }
 
 .status-pill.paused {
-  background: var(--warn-bg);
+  --background: var(--warn-bg);
   color: var(--warn-text);
 }
 
 .offline-banner,
 .soft-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0 18px 10px;
-  padding: 9px 12px;
   border-radius: 10px;
   font-size: 12px;
-  background: var(--surface-1);
-  color: var(--text-secondary);
+  --background: var(--surface-1);
+  --color: var(--text-secondary);
+  --min-height: 0;
+  --padding-start: 12px;
+  --inner-padding-end: 12px;
+  --padding-top: 9px;
+  --padding-bottom: 9px;
 }
 
 .offline-banner ion-icon,
@@ -328,13 +349,13 @@ function fmtTime(iso: string | Date | null | undefined): string {
 }
 
 .soft-banner.warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  --background: var(--warn-bg);
+  --color: var(--warn-text);
 }
 
 .soft-banner.queued {
-  background: var(--accent-bg);
-  color: var(--accent-text);
+  --background: var(--accent-bg);
+  --color: var(--accent-text);
 }
 
 .nfc-circle {
@@ -389,27 +410,28 @@ function fmtTime(iso: string | Date | null | undefined): string {
 }
 
 .pause-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-primary);
-  background: var(--surface-1);
-  border: none;
-  border-radius: 10px;
-  padding: 9px 16px;
+  --color: var(--text-primary);
+  --background: var(--surface-1);
+  --border-radius: 10px;
+  --box-shadow: none;
+  text-transform: none;
+  margin: 0;
 }
 
 .pause-btn.resume {
-  background: var(--accent-bg);
-  color: var(--accent-text);
+  --background: var(--accent-bg);
+  --color: var(--accent-text);
 }
 
 .week-summary {
   margin: 4px 18px 14px;
-  background: var(--surface-1);
-  border-radius: 12px;
+  --background: var(--surface-1);
+  box-shadow: none;
+}
+
+.week-summary ion-card-content {
   padding: 12px 14px;
 }
 
@@ -426,11 +448,6 @@ function fmtTime(iso: string | Date | null | undefined): string {
 
 .ws-overtime {
   font-size: 10.5px;
-  font-weight: 600;
-  color: var(--warn-text);
-  background: var(--warn-bg);
-  padding: 2px 8px;
-  border-radius: 7px;
 }
 
 .ws-value {
@@ -440,20 +457,13 @@ function fmtTime(iso: string | Date | null | undefined): string {
 }
 
 .hours-bar {
-  height: 6px;
+  --background: var(--surface-2);
+  --progress-background: var(--accent);
   border-radius: 4px;
-  background: var(--surface-2);
-  overflow: hidden;
 }
 
-.hours-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--accent);
-}
-
-.hours-bar-fill.over {
-  background: var(--warn-text);
+.hours-bar.over {
+  --progress-background: var(--warn-text);
 }
 
 .history-head {

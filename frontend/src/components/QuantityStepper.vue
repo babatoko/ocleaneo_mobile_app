@@ -4,6 +4,8 @@ import { IonButton } from '@ionic/vue';
 const props = defineProps({
   modelValue: { type: Number, default: 0 },
   min: { type: Number, default: 0 },
+  /** Nom du produit, pour des libellés Retirer un/Ajouter un explicites. */
+  label: { type: String, default: '' },
 });
 const emit = defineEmits(['update:modelValue']);
 
@@ -15,9 +17,21 @@ function step(delta: number) {
 
 <template>
   <div class="stepper">
-    <ion-button class="step-btn" fill="outline" shape="round" @click="step(-1)">−</ion-button>
-    <span>{{ modelValue }}</span>
-    <ion-button class="step-btn" fill="outline" shape="round" @click="step(1)">+</ion-button>
+    <ion-button
+      class="step-btn"
+      fill="outline"
+      shape="round"
+      :aria-label="label ? `Retirer un ${label}` : 'Retirer'"
+      @click="step(-1)"
+    >−</ion-button>
+    <span aria-live="polite" :aria-label="label ? `${modelValue} ${label}` : undefined">{{ modelValue }}</span>
+    <ion-button
+      class="step-btn"
+      fill="outline"
+      shape="round"
+      :aria-label="label ? `Ajouter un ${label}` : 'Ajouter'"
+      @click="step(1)"
+    >+</ion-button>
   </div>
 </template>
 

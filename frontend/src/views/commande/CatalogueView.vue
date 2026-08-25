@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage, IonSelect, IonSelectOption } from '@ionic/vue';
+import {
+  IonButton,
+  IonCard,
+  IonCardContent,
+  IonCol,
+  IonContent,
+  IonGrid,
+  IonIcon,
+  IonPage,
+  IonRow,
+  IonSelect,
+  IonSelectOption,
+} from '@ionic/vue';
 import { arrowForwardOutline, businessOutline, chevronDownOutline, chevronForwardOutline, clipboardOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
@@ -9,6 +21,7 @@ import { useCartStore } from '../../stores/cart';
 import { useChantiersStore } from '../../stores/chantiers';
 import { iconForProduct } from '../../utils/productIcons';
 import DataState from '../../components/DataState.vue';
+import QuantityStepper from '../../components/QuantityStepper.vue';
 import type { Packaging, Product } from '../../types/models';
 
 type StockStatus = 'ok' | 'low' | 'out' | null;
@@ -109,10 +122,6 @@ watch(
 
 const selectedCount = computed(() => Object.values(orderQty).filter((q) => q > 0).length);
 
-function step(productId: number, delta: number) {
-  orderQty[productId] = Math.max(0, (orderQty[productId] || 0) + delta);
-}
-
 function goToOrder() {
   cart.clear();
   for (const p of products.value) {
@@ -164,27 +173,32 @@ function goToOrder() {
   <DataState :loading="loading" :error="error" :empty="!products.length" @retry="load">
     <template #empty>Aucun produit au catalogue.</template>
 
-    <div class="stock-grid">
-      <div v-for="p in products" :key="p.id" class="stock-item">
-        <div class="icon-wrap"><ion-icon :icon="iconForProduct(p)"></ion-icon></div>
-        <p class="pname">{{ p.name }}</p>
-        <p class="plevel" :class="stockByProduct[p.id]?.status">
-          {{ statusLabel(stockByProduct[p.id]?.status) }}
-        </p>
-        <div class="stepper">
-          <button type="button" :aria-label="`Retirer un ${p.name}`" @click="step(p.id, -1)">−</button>
-          <span class="qty" aria-live="polite" :aria-label="`${orderQty[p.id] || 0} ${p.name}`">
-            {{ orderQty[p.id] || 0 }}
-          </span>
-          <button type="button" :aria-label="`Ajouter un ${p.name}`" @click="step(p.id, 1)">+</button>
-        </div>
-      </div>
-    </div>
+    <ion-grid class="stock-grid">
+      <ion-row>
+        <ion-col size="6" v-for="p in products" :key="p.id">
+          <ion-card class="stock-item">
+            <ion-card-content>
+              <div class="icon-wrap"><ion-icon :icon="iconForProduct(p)"></ion-icon></div>
+              <p class="pname">{{ p.name }}</p>
+              <p class="plevel" :class="stockByProduct[p.id]?.status">
+                {{ statusLabel(stockByProduct[p.id]?.status) }}
+              </p>
+              <QuantityStepper
+                :model-value="orderQty[p.id] || 0"
+                :min="0"
+                :label="p.name"
+                @update:model-value="(q) => (orderQty[p.id] = q)"
+              />
+            </ion-card-content>
+          </ion-card>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
 
-    <button v-if="selectedCount" class="stock-cart-bar" @click="goToOrder">
+    <ion-button v-if="selectedCount" class="stock-cart-bar" expand="block" @click="goToOrder">
       <span>{{ selectedCount }} produit{{ selectedCount > 1 ? 's' : '' }} sélectionné{{ selectedCount > 1 ? 's' : '' }}</span>
       <span class="cta">Commander <ion-icon :icon="arrowForwardOutline"></ion-icon></span>
-    </button>
+    </ion-button>
   </DataState>
     </ion-content>
   </ion-page>
@@ -198,7 +212,86 @@ function goToOrder() {
 }
 
 .stock-grid {
-  padding-bottom: 16px;
+  padding: 0 12px 16px;
+}
+
+.stock-item {
+  --background: var(--surface-1);
+  border-radius: 12px;
+  box-shadow: none;
+  height: 100%;
+}
+
+.stock-item ion-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-wrap ion-icon {
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.pname {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.plevel {
+  font-size: 11px;
+  margin: 0;
+  min-height: 14px;
+}
+
+.plevel.ok {
+  color: var(--success-text);
+}
+
+.plevel.low {
+  color: var(--warn-text);
+}
+
+.plevel.out {
+  color: var(--danger);
+}
+
+.stock-cart-bar {
+  margin: 14px 18px 0;
+  --background: var(--text-primary);
+  --color: var(--on-solid);
+  --border-radius: 12px;
+  --box-shadow: none;
+  text-transform: none;
+}
+
+.stock-cart-bar::part(native) {
+  display: flex;
+  justify-content: space-between;
+}
+
+.stock-cart-bar span {
+  font-size: 13px;
+}
+
+.stock-cart-bar .cta {
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .inventaire-link {

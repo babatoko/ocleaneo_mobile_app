@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonButton, IonContent, IonIcon, IonInput, IonPage, IonToggle } from '@ionic/vue';
+import { IonButton, IonContent, IonIcon, IonInput, IonItem, IonLabel, IonList, IonNote, IonPage, IonToggle } from '@ionic/vue';
 import { logOutOutline } from 'ionicons/icons';
 import { provider } from '../providers';
 import { useAuthStore } from '../stores/auth';
@@ -117,47 +117,49 @@ async function resetServerUrl() {
 
       <template v-if="!loading">
         <p class="section-title">Paramètres</p>
-        <div class="detail-block" style="padding: 0 18px;">
-          <div class="settings-row">
-            <div>
+        <ion-list class="detail-block settings-list" lines="full">
+          <ion-item class="settings-row">
+            <ion-label class="ion-text-wrap">
               <p class="srow-label">Notifications</p>
               <p class="srow-sub">Chantier en cours, rappels de vacation, changements de planning</p>
-            </div>
+            </ion-label>
             <ion-toggle
+              slot="end"
               class="app-toggle"
               :checked="notificationsEnabled"
               aria-label="Notifications"
               @ion-change="toggleNotifications"
             ></ion-toggle>
-          </div>
+          </ion-item>
 
-          <div v-if="biometricAvailable" class="settings-row">
-            <div>
+          <ion-item v-if="biometricAvailable" class="settings-row">
+            <ion-label class="ion-text-wrap">
               <p class="srow-label">Connexion biométrique</p>
               <p class="srow-sub">
                 {{ biometricSaved ? 'Activée à la dernière connexion' : 'Reconnectez-vous avec votre mot de passe pour l’activer' }}
               </p>
-            </div>
+            </ion-label>
             <ion-toggle
+              slot="end"
               class="app-toggle"
               :checked="biometricSaved"
               :disabled="!biometricSaved"
               aria-label="Connexion biométrique"
               @ion-change="disableBiometric"
             ></ion-toggle>
-          </div>
-        </div>
+          </ion-item>
+        </ion-list>
 
         <p class="section-title">Hors ligne</p>
-        <div class="detail-block" style="padding: 0 18px;">
-          <div class="settings-row">
-            <div>
+        <ion-list class="detail-block settings-list" lines="full">
+          <ion-item class="settings-row">
+            <ion-label class="ion-text-wrap">
               <p class="srow-label">File d'attente pointage</p>
               <p class="srow-sub">Pointages enregistrés localement, en attente d'envoi</p>
-            </div>
-            <span class="srow-value">{{ pendingCount }}</span>
-          </div>
-        </div>
+            </ion-label>
+            <ion-note slot="end" class="srow-value">{{ pendingCount }}</ion-note>
+          </ion-item>
+        </ion-list>
 
         <template v-if="showServerSetting">
           <p class="section-title">Serveur</p>
@@ -202,13 +204,150 @@ async function resetServerUrl() {
         </template>
 
         <p class="section-title">Compte</p>
-        <div class="menu">
-          <button type="button" class="menu-item danger no-chev" @click="logout">
-            <ion-icon :icon="logOutOutline"></ion-icon>
-            <span>Déconnexion</span>
-          </button>
-        </div>
+        <ion-list class="menu" lines="none">
+          <ion-item class="menu-item" button :detail="false" color="danger" @click="logout">
+            <ion-icon slot="start" :icon="logOutOutline"></ion-icon>
+            <ion-label>Déconnexion</ion-label>
+          </ion-item>
+        </ion-list>
       </template>
     </ion-content>
   </ion-page>
 </template>
+
+<style scoped>
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 16px;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.profile-name {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.settings-list {
+  --ion-item-background: transparent;
+  background: transparent;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.settings-row {
+  --background: var(--surface-1);
+  --border-color: var(--border);
+  --padding-start: 18px;
+  --inner-padding-end: 18px;
+}
+
+.srow-label {
+  font-size: 13px;
+  margin: 0;
+}
+
+.srow-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+
+.srow-value {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ion-toggle : le comportement (piste, poignée, animation, disabled,
+   `prefers-reduced-motion`) vient d'Ionic — seule la couleur suit la palette
+   Ocleaneo au lieu du bleu par défaut. */
+.app-toggle {
+  --track-background: var(--border-strong);
+  --track-background-checked: var(--accent);
+  --handle-background: var(--surface-2);
+  --handle-background-checked: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.menu {
+  padding: 0 16px;
+  background: transparent;
+}
+
+.menu-item {
+  --background: transparent;
+  --color: var(--danger);
+  --padding-start: 4px;
+  --inner-padding-end: 4px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.menu-item ion-icon {
+  color: var(--danger);
+}
+
+.server-url-field {
+  padding: 12px 0;
+}
+
+.server-url-field ion-input {
+  --background: var(--surface-1);
+  --border-color: var(--border);
+  --border-radius: 10px;
+  --color: var(--text-primary);
+  --padding-start: 12px;
+  --padding-end: 12px;
+  font-size: 13px;
+}
+
+.server-url-field .srow-sub {
+  margin: 6px 0 0;
+}
+
+.server-url-error {
+  color: var(--danger);
+  font-size: 11px;
+  margin: 6px 0 0;
+}
+
+.server-url-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.server-url-save {
+  --border-radius: 10px;
+  --background: var(--accent);
+  --color: var(--on-accent);
+  --box-shadow: none;
+  font-weight: 500;
+  font-size: 13px;
+  text-transform: none;
+  margin: 0;
+}
+
+.server-url-reset {
+  --color: var(--text-secondary);
+  font-size: 12px;
+  text-decoration: underline;
+  margin: 0;
+}
+</style>

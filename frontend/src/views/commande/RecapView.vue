@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { IonContent, IonIcon, IonPage } from '@ionic/vue';
+import { IonButton, IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage } from '@ionic/vue';
 import { checkmarkCircleOutline, downloadOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
@@ -44,12 +44,16 @@ function downloadPdf() {
         <template #empty>Commande introuvable.</template>
         <div class="recap">
           <p class="success"><ion-icon :icon="checkmarkCircleOutline"></ion-icon> Commande n°{{ order!.id }} envoyée pour {{ order!.chantier_name }}</p>
-          <ul>
-            <li v-for="item in order!.items" :key="item.id">
-              {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
-            </li>
-          </ul>
-          <button v-if="pdfUrl" class="pdf" @click="downloadPdf"><ion-icon :icon="downloadOutline"></ion-icon> Télécharger le récapitulatif PDF</button>
+          <ion-list class="items" lines="full">
+            <ion-item v-for="item in order!.items" :key="item.id">
+              <ion-label class="ion-text-wrap">
+                {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
+              </ion-label>
+            </ion-item>
+          </ion-list>
+          <ion-button v-if="pdfUrl" class="pdf" fill="outline" expand="block" @click="downloadPdf">
+            <ion-icon slot="start" :icon="downloadOutline"></ion-icon> Télécharger le récapitulatif PDF
+          </ion-button>
           <RouterLink to="/planning" class="home-link">Retour au planning</RouterLink>
         </div>
       </DataState>
@@ -76,32 +80,22 @@ function downloadPdf() {
   color: var(--success-text);
 }
 
-ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-li {
+.items {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px 12px;
+  overflow: hidden;
 }
 
 .pdf {
-  padding: 12px;
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--accent-text);
+  --border-radius: 8px;
+  --border-color: var(--accent);
+  --background: var(--surface);
+  --color: var(--accent-text);
+  --box-shadow: none;
   font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  text-transform: none;
+  margin: 0;
 }
 
 .home-link {

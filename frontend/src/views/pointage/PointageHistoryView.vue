@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { IonContent, IonIcon, IonPage } from '@ionic/vue';
+import { IonAvatar, IonContent, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonPage } from '@ionic/vue';
 import { logInOutline, logOutOutline, pauseOutline, playOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
@@ -72,19 +72,19 @@ function fmtTime(iso: string): string {
       <DataState :loading="loading" :error="error" :empty="!byDay.length" @retry="load">
         <template #empty>Aucun pointage sur les 14 derniers jours.</template>
 
-        <div v-for="d in byDay" :key="d.day" class="history">
-          <p class="history-title day-title">{{ d.label }}</p>
-          <div v-for="e in d.entries" :key="e.id" class="hist-row">
-            <div class="hist-icon" :class="e.type" aria-hidden="true">
+        <ion-list v-for="d in byDay" :key="d.day" class="history" lines="none">
+          <ion-list-header class="day-title"><ion-label>{{ d.label }}</ion-label></ion-list-header>
+          <ion-item v-for="e in d.entries" :key="e.id" class="hist-row">
+            <ion-avatar slot="start" class="hist-icon" :class="e.type" aria-hidden="true">
               <ion-icon :icon="entryIcon(e.type)"></ion-icon>
-            </div>
-            <div class="hist-text">
+            </ion-avatar>
+            <ion-label>
               <p class="lbl">{{ entryLabel(e.type) }}</p>
               <p class="sub">{{ e.chantier_name }}</p>
-            </div>
-            <span class="hist-time">{{ fmtTime(e.recorded_at) }}</span>
-          </div>
-        </div>
+            </ion-label>
+            <ion-note slot="end" class="hist-time">{{ fmtTime(e.recorded_at) }}</ion-note>
+          </ion-item>
+        </ion-list>
       </DataState>
     </ion-content>
   </ion-page>
@@ -92,7 +92,11 @@ function fmtTime(iso: string): string {
 
 <style scoped>
 .day-title {
+  --color: var(--text-muted);
+  font-size: 12px;
   text-transform: capitalize;
+  min-height: 0;
+  margin: 0 0 4px;
 }
 
 .empty {

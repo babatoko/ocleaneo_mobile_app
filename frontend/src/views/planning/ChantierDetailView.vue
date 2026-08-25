@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage } from '@ionic/vue';
+import { IonButton, IonCard, IonCardContent, IonContent, IonIcon, IonItem, IonLabel, IonPage } from '@ionic/vue';
 import { alertCircleOutline, chevronForwardOutline, clipboardOutline, cubeOutline, locationOutline, mapOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { useChantiersStore } from '../../stores/chantiers';
@@ -112,42 +112,44 @@ onMounted(async () => {
     <AppHeader title="Détail du chantier" />
     <ion-content>
       <template v-if="shift">
-        <div class="detail-hero">
-          <p class="dtime">{{ timeRange(shift) }}</p>
-          <p class="dclient">{{ shift.chantier_name }}</p>
-          <p class="daddr"><ion-icon :icon="locationOutline"></ion-icon> {{ shift.chantier_address || shift.chantier_name }}</p>
-        </div>
+        <ion-card class="detail-hero">
+          <ion-card-content>
+            <p class="dtime">{{ timeRange(shift) }}</p>
+            <p class="dclient">{{ shift.chantier_name }}</p>
+            <p class="daddr"><ion-icon :icon="locationOutline"></ion-icon> {{ shift.chantier_address || shift.chantier_name }}</p>
+          </ion-card-content>
+        </ion-card>
 
         <div class="detail-actions">
-          <a class="dbtn" :href="itineraryHref(shift)" target="_blank" rel="noopener">
-            <ion-icon :icon="mapOutline"></ion-icon> Itinéraire
-          </a>
-          <button type="button" class="dbtn" @click="goToStock">
-            <ion-icon :icon="cubeOutline"></ion-icon> Stock
-          </button>
-          <button type="button" class="dbtn" @click="goToInventaire">
-            <ion-icon :icon="clipboardOutline"></ion-icon> Inventaire
-          </button>
+          <ion-button class="dbtn" fill="clear" :href="itineraryHref(shift)" target="_blank" rel="noopener">
+            <div><ion-icon :icon="mapOutline"></ion-icon><span>Itinéraire</span></div>
+          </ion-button>
+          <ion-button class="dbtn" fill="clear" @click="goToStock">
+            <div><ion-icon :icon="cubeOutline"></ion-icon><span>Stock</span></div>
+          </ion-button>
+          <ion-button class="dbtn" fill="clear" @click="goToInventaire">
+            <div><ion-icon :icon="clipboardOutline"></ion-icon><span>Inventaire</span></div>
+          </ion-button>
         </div>
 
-        <div v-if="shift.note" class="detail-block">
-          <div class="note-box">
-            <ion-icon :icon="alertCircleOutline"></ion-icon>
-            <span>{{ shift.note }}</span>
-          </div>
-        </div>
+        <ion-item v-if="shift.note" class="note-box" color="warning" lines="none">
+          <ion-icon slot="start" :icon="alertCircleOutline"></ion-icon>
+          <ion-label class="ion-text-wrap">{{ shift.note }}</ion-label>
+        </ion-item>
 
         <div v-if="stockPreview.length" class="detail-block">
           <div class="block-head">
             <p class="section-title" style="padding: 0; margin: 14px 0 6px">Stock du site</p>
-            <button type="button" class="see-all" @click="goToStock">Tout voir <ion-icon :icon="chevronForwardOutline"></ion-icon></button>
+            <ion-button fill="clear" size="small" @click="goToStock">
+              Tout voir <ion-icon slot="end" :icon="chevronForwardOutline"></ion-icon>
+            </ion-button>
           </div>
           <div class="stock-mini-row">
-            <div class="stock-mini" v-for="p in stockPreview" :key="p.name">
+            <ion-card class="stock-mini" v-for="p in stockPreview" :key="p.name">
               <ion-icon :icon="p.icon"></ion-icon>
               <p class="sname">{{ p.name }}</p>
               <p class="slevel" :class="p.status">{{ statusLabel(p.status) }}</p>
-            </div>
+            </ion-card>
           </div>
         </div>
       </template>
@@ -156,3 +158,123 @@ onMounted(async () => {
     </ion-content>
   </ion-page>
 </template>
+
+<style scoped>
+.detail-hero {
+  margin: 10px 18px;
+  --background: var(--surface-1);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.dtime {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0 0 2px;
+}
+
+.dclient {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 10px;
+}
+
+.daddr {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  margin: 0 18px 6px;
+}
+
+.dbtn {
+  flex: 1;
+  --background: var(--surface-1);
+  --background-hover: var(--surface-1);
+  --border-radius: 12px;
+  --box-shadow: none;
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+  height: auto;
+  margin: 0;
+}
+
+.dbtn div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: none;
+}
+
+.dbtn ion-icon {
+  font-size: 19px;
+  color: var(--text-primary);
+}
+
+.note-box {
+  margin: 6px 18px;
+  border-radius: 10px;
+  font-size: 12px;
+  --padding-start: 12px;
+  --inner-padding-end: 12px;
+}
+
+.note-box ion-icon {
+  font-size: 15px;
+}
+
+.stock-mini-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.stock-mini {
+  flex-shrink: 0;
+  min-width: 76px;
+  --background: var(--surface-1);
+  border-radius: 10px;
+  padding: 8px;
+  text-align: center;
+  margin: 0;
+  box-shadow: none;
+}
+
+.stock-mini ion-icon {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.stock-mini .sname {
+  font-size: 10px;
+  margin: 4px 0 2px;
+}
+
+.stock-mini .slevel {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.slevel.ok {
+  color: var(--success-text);
+}
+
+.slevel.low {
+  color: var(--warn-text);
+}
+
+.slevel.out {
+  color: var(--danger);
+}
+</style>

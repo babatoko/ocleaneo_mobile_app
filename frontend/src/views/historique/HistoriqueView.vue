@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { IonContent, IonPage } from '@ionic/vue';
+import { useRouter } from 'vue-router';
+import { IonContent, IonItem, IonLabel, IonList, IonNote, IonPage } from '@ionic/vue';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
 import AppHeader from '../../components/AppHeader.vue';
 import DataState from '../../components/DataState.vue';
 import type { Order } from '../../types/models';
+
+const router = useRouter();
 
 const orders = ref<Order[]>([]);
 const loading = ref(true);
@@ -34,17 +37,21 @@ onMounted(load);
     <ion-content>
       <DataState :loading="loading" :error="error" :empty="!orders.length" @retry="load">
         <template #empty>Aucune commande pour le moment.</template>
-        <div class="list">
-          <RouterLink
+        <ion-list class="list" lines="none">
+          <ion-item
             v-for="o in orders"
             :key="o.id"
-            :to="`/commande/${o.id}/recap`"
             class="order"
+            button
+            detail
+            @click="router.push(`/commande/${o.id}/recap`)"
           >
-            <strong>Commande n°{{ o.id }} — {{ o.chantier_name }}</strong>
-            <span>{{ new Date(o.created_at).toLocaleDateString('fr-FR') }} · {{ o.status }}</span>
-          </RouterLink>
-        </div>
+            <ion-label class="ion-text-wrap">
+              <strong>Commande n°{{ o.id }} — {{ o.chantier_name }}</strong>
+              <ion-note>{{ new Date(o.created_at).toLocaleDateString('fr-FR') }} · {{ o.status }}</ion-note>
+            </ion-label>
+          </ion-item>
+        </ion-list>
       </DataState>
     </ion-content>
   </ion-page>
@@ -53,24 +60,26 @@ onMounted(load);
 <style scoped>
 .list {
   padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  background: transparent;
 }
 
 .order {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  background: var(--surface);
+  --background: var(--surface);
+  --color: var(--text);
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  text-decoration: none;
-  color: var(--text);
+  margin-bottom: 10px;
+  overflow: hidden;
 }
 
-.order span {
+.order strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.order ion-note {
   font-size: 12px;
   color: var(--text-muted);
 }

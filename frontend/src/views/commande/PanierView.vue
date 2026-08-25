@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonButton, IonContent, IonPage, IonSpinner } from '@ionic/vue';
+import { IonButton, IonContent, IonItem, IonLabel, IonList, IonNote, IonPage, IonSpinner } from '@ionic/vue';
 import { provider } from '../../providers';
 import { useCartStore } from '../../stores/cart';
 import { useChantiersStore } from '../../stores/chantiers';
@@ -45,17 +45,21 @@ async function submit() {
     <AppHeader title="Panier" />
     <ion-content>
       <div class="cart">
-        <div v-for="item in cart.items" :key="item.productId + '-' + item.packagingId" class="row">
-          <div>
-            <strong>{{ item.productEmoji }} {{ item.productName }}</strong>
-            <span>{{ item.packagingLabel }}</span>
-          </div>
-          <QuantityStepper
-            :model-value="item.quantity"
-            :min="1"
-            @update:model-value="(q) => cart.updateQuantity(item.productId, item.packagingId, q)"
-          />
-        </div>
+        <ion-list v-if="cart.items.length" lines="none">
+          <ion-item v-for="item in cart.items" :key="item.productId + '-' + item.packagingId" class="row">
+            <ion-label>
+              <strong>{{ item.productEmoji }} {{ item.productName }}</strong>
+              <ion-note>{{ item.packagingLabel }}</ion-note>
+            </ion-label>
+            <QuantityStepper
+              slot="end"
+              :model-value="item.quantity"
+              :min="1"
+              :label="item.productName"
+              @update:model-value="(q) => cart.updateQuantity(item.productId, item.packagingId, q)"
+            />
+          </ion-item>
+        </ion-list>
         <p v-if="!cart.items.length" class="empty">Votre panier est vide.</p>
 
         <ion-button v-if="cart.items.length" class="submit" expand="block" :disabled="submitting" @click="submit">
@@ -77,22 +81,17 @@ async function submit() {
 }
 
 .row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--surface);
+  --background: var(--surface);
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px 16px;
+  margin-bottom: 10px;
+  overflow: hidden;
 }
 
-.row div {
-  display: flex;
-  flex-direction: column;
-}
-
-.row span {
-  color: var(--text-muted);
+.row ion-note {
+  display: block;
   font-size: 12px;
 }
 

@@ -1,7 +1,24 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage, IonSegment, IonSegmentButton, IonLabel } from '@ionic/vue';
+import {
+  IonBadge,
+  IonButton,
+  IonCard,
+  IonCardContent,
+  IonCardHeader,
+  IonCardSubtitle,
+  IonCardTitle,
+  IonChip,
+  IonContent,
+  IonIcon,
+  IonItem,
+  IonLabel,
+  IonList,
+  IonPage,
+  IonSegment,
+  IonSegmentButton,
+} from '@ionic/vue';
 import type { SegmentChangeEventDetail } from '@ionic/core';
 import {
   alertCircleOutline,
@@ -185,6 +202,13 @@ function onViewChange(e: CustomEvent<SegmentChangeEventDetail>) {
 function pickDay(date: Date) {
   selectedDate.value = toIso(date);
   view.value = 'jour';
+}
+
+function badgeColor(status: string): string {
+  if (status === 'confirmed') return 'success';
+  if (status === 'modified' || status === 'pending') return 'warning';
+  if (status === 'cancelled') return 'danger';
+  return 'medium';
 }
 
 function timeRange(shift: Shift): string {
@@ -461,35 +485,34 @@ onUnmounted(destroyMap);
     >
       <template #empty>Aucune vacation ce jour-là.</template>
 
-      <div class="shift" v-for="s in planning.dayShifts" :key="s.id">
-        <div class="bar" :class="s.status"></div>
-        <div class="card">
-          <button
-            type="button"
-            class="card-main"
-            :aria-label="`Détail de la vacation ${timeRange(s)} à ${s.chantier_name}`"
-            @click="openDetail(s)"
-          >
+      <ion-card class="shift-card" :class="s.status" v-for="s in planning.dayShifts" :key="s.id">
+        <button
+          type="button"
+          class="card-main"
+          :aria-label="`Détail de la vacation ${timeRange(s)} à ${s.chantier_name}`"
+          @click="openDetail(s)"
+        >
+          <ion-card-header>
             <div class="top">
               <span class="time">{{ timeRange(s) }}</span>
-              <span class="badge" :class="s.status">{{
+              <ion-badge :color="badgeColor(s.status)">{{
                 s.status === 'confirmed' ? 'confirmé' : s.status === 'modified' ? 'modifié' : s.status
-              }}</span>
+              }}</ion-badge>
             </div>
-            <p class="client">{{ s.chantier_name }}</p>
-            <p class="place"><ion-icon :icon="locationOutline"></ion-icon> {{ s.chantier_address || s.chantier_name }}</p>
-            <p v-if="s.note" class="meta">{{ s.note }}</p>
-          </button>
-          <div class="card-actions">
-            <a :href="itineraryHref(s)" target="_blank" rel="noopener">
-              <ion-icon :icon="mapOutline"></ion-icon> Itinéraire
-            </a>
-            <button type="button" @click="exportToCalendar([s], `vacation-${s.id}.ics`)">
-              <ion-icon :icon="calendarOutline"></ion-icon> Calendrier
-            </button>
-          </div>
+            <ion-card-title>{{ s.chantier_name }}</ion-card-title>
+            <ion-card-subtitle><ion-icon :icon="locationOutline"></ion-icon> {{ s.chantier_address || s.chantier_name }}</ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content v-if="s.note">{{ s.note }}</ion-card-content>
+        </button>
+        <div class="card-actions">
+          <ion-button fill="clear" size="small" :href="itineraryHref(s)" target="_blank" rel="noopener">
+            <ion-icon slot="start" :icon="mapOutline"></ion-icon> Itinéraire
+          </ion-button>
+          <ion-button fill="clear" size="small" @click="exportToCalendar([s], `vacation-${s.id}.ics`)">
+            <ion-icon slot="start" :icon="calendarOutline"></ion-icon> Calendrier
+          </ion-button>
         </div>
-      </div>
+      </ion-card>
     </DataState>
   </div>
 
@@ -500,36 +523,41 @@ onUnmounted(destroyMap);
       :empty="false"
       @retry="loadWeek"
     >
-      <button
+      <ion-button
         v-if="Object.values(planning.weekShiftsByDay).flat().length"
-        type="button"
         class="export-week-btn"
+        expand="block"
+        fill="outline"
         @click="exportToCalendar(Object.values(planning.weekShiftsByDay).flat(), 'planning-semaine.ics')"
       >
-        <ion-icon :icon="calendarOutline"></ion-icon> Exporter la semaine
-      </button>
+        <ion-icon slot="start" :icon="calendarOutline"></ion-icon> Exporter la semaine
+      </ion-button>
 
-      <div v-for="d in weekDays" :key="toIso(d)" class="week-day">
-        <button type="button" class="week-day-head" @click="pickDay(d)">
-          <strong>{{ d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) }}</strong>
-          <span class="count">{{ (planning.weekShiftsByDay[toIso(d)] || []).length }}</span>
-        </button>
-        <div v-for="s in planning.weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift">
+      <ion-list v-for="d in weekDays" :key="toIso(d)" class="week-day">
+        <ion-item class="week-day-item" lines="none">
+          <button type="button" class="week-day-head" @click="pickDay(d)">
+            {{ d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }) }}
+          </button>
+          <ion-badge slot="end" color="medium">{{ (planning.weekShiftsByDay[toIso(d)] || []).length }}</ion-badge>
+        </ion-item>
+        <ion-item v-for="s in planning.weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift" lines="none">
           <button type="button" class="ws-info" @click="openDetail(s)">
             {{ timeRange(s) }} · {{ s.chantier_name }}
-            <span v-if="s.status === 'modified'" class="ws-badge">modifié</span>
+            <ion-badge v-if="s.status === 'modified'" color="warning" class="ws-badge">modifié</ion-badge>
           </button>
-          <a
-            class="ws-itin"
+          <ion-button
+            slot="end"
+            fill="clear"
+            size="small"
             :href="itineraryHref(s)"
             target="_blank"
             rel="noopener"
             :aria-label="`Itinéraire vers ${s.chantier_name}`"
           >
-            <ion-icon :icon="mapOutline"></ion-icon>
-          </a>
-        </div>
-      </div>
+            <ion-icon slot="icon-only" :icon="mapOutline"></ion-icon>
+          </ion-button>
+        </ion-item>
+      </ion-list>
     </DataState>
   </div>
 
@@ -575,30 +603,33 @@ onUnmounted(destroyMap);
       <div ref="mapEl" class="map-wrap"></div>
 
       <div class="map-summary-bar">
-        <div class="sitem"><ion-icon :icon="mapOutline"></ion-icon> {{ fmtKm(tripDistanceMeters) }}</div>
-        <div class="sitem"><ion-icon :icon="timeOutline"></ion-icon> {{ fmtDuration(tripDurationSeconds) }} trajet</div>
-        <div class="optimize-badge"><ion-icon :icon="sparklesOutline"></ion-icon> Optimisée</div>
+        <ion-chip class="sitem" outline><ion-icon :icon="mapOutline"></ion-icon> {{ fmtKm(tripDistanceMeters) }}</ion-chip>
+        <ion-chip class="sitem" outline><ion-icon :icon="timeOutline"></ion-icon> {{ fmtDuration(tripDurationSeconds) }} trajet</ion-chip>
+        <ion-chip class="optimize-badge" color="success"><ion-icon :icon="sparklesOutline"></ion-icon> Optimisée</ion-chip>
       </div>
 
-      <a
+      <ion-button
         class="start-nav-btn"
+        expand="block"
         :href="turnByTurnHref({ latitude: tripStops[0].latitude, longitude: tripStops[0].longitude, address: tripStops[0].address })"
         target="_blank"
         rel="noopener"
       >
-        <ion-icon :icon="navigateOutline"></ion-icon> Démarrer la navigation vers {{ tripStops[0].name }}
-      </a>
+        <ion-icon slot="start" :icon="navigateOutline"></ion-icon> Démarrer la navigation vers {{ tripStops[0].name }}
+      </ion-button>
 
-      <div v-for="(s, i) in tripStops" :key="s.id" class="stop-row">
-        <div class="stop-num">{{ i + 1 }}</div>
-        <div class="stop-card">
-          <div class="stop-top">
-            <p class="sname">{{ s.name }}</p>
-            <p class="seta">{{ fmtTime(s.arrival) }} - {{ fmtTime(s.departure) }}</p>
-          </div>
-          <p v-if="s.address" class="saddr">{{ s.address }}</p>
-        </div>
-      </div>
+      <ion-list class="stop-list">
+        <ion-item v-for="(s, i) in tripStops" :key="s.id" class="stop-row" lines="full">
+          <ion-badge slot="start" class="stop-num">{{ i + 1 }}</ion-badge>
+          <ion-label>
+            <div class="stop-top">
+              <p class="sname">{{ s.name }}</p>
+              <p class="seta">{{ fmtTime(s.arrival) }} - {{ fmtTime(s.departure) }}</p>
+            </div>
+            <p v-if="s.address" class="saddr">{{ s.address }}</p>
+          </ion-label>
+        </ion-item>
+      </ion-list>
     </template>
 
     <p v-else-if="tripLoading" class="trip-empty">Calcul de l'itinéraire optimisé…</p>
@@ -628,60 +659,130 @@ onUnmounted(destroyMap);
   color: var(--danger);
 }
 
+/* Carte de vacation (vue Jour) : le résumé est un vrai <button> (focusable,
+   annoncé par les lecteurs d'écran), les actions Itinéraire/Calendrier
+   restent en dehors pour ne pas imbriquer d'interactif dans de l'interactif
+   — même principe que l'ancienne .card-main / .card-actions, hébergé
+   maintenant dans un ion-card plutôt qu'une div maison. */
+.shift-card {
+  margin: 0 18px 10px;
+  border-inline-start: 3px solid var(--border-strong);
+  --background: var(--surface-1);
+  box-shadow: none;
+}
+
+.shift-card.confirmed {
+  border-inline-start-color: var(--accent);
+}
+
+.shift-card .card-main {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.shift-card ion-card-header {
+  /* Ionic (mode iOS) inverse l'ordre visuel du header (column-reverse) pour
+     mettre le sous-titre au-dessus du titre — on revient à l'ordre du DOM
+     (heure/statut, puis nom, puis adresse) qui reflète l'ordre de lecture voulu. */
+  flex-direction: column;
+  padding-bottom: 6px;
+}
+
+.shift-card .top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.shift-card .time {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.shift-card ion-card-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.shift-card ion-card-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: none;
+}
+
+.shift-card ion-card-content {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding-top: 0;
+}
+
+.shift-card .card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 8px 8px 8px;
+  border-top: 0.5px solid var(--border);
+}
+
+.shift-card .card-actions ion-button {
+  --color: var(--accent-text);
+  font-size: 12px;
+  text-transform: none;
+  margin: 0;
+}
+
 .week {
   padding: 0 18px 18px;
 }
 
 .export-week-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
+  --border-radius: 10px;
+  --color: var(--accent-text);
+  --border-color: var(--accent-bg);
+  --background: var(--accent-bg);
+  --box-shadow: none;
   font-size: 13px;
   font-weight: 500;
-  color: var(--accent-text);
-  background: var(--accent-bg);
-  border: none;
-  border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 12px;
+  text-transform: none;
+  margin: 0 0 12px;
 }
 
 .week-day {
   background: var(--surface-1);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 4px 0;
   margin-bottom: 10px;
 }
 
+.week-day ion-item,
+.week-day-item,
+.week-shift {
+  --background: transparent;
+  --padding-start: 14px;
+  --inner-padding-end: 10px;
+}
+
 .week-day-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   width: 100%;
   font-size: 13px;
+  font-weight: 600;
   text-transform: capitalize;
   background: none;
   border: none;
-  padding: 0;
+  padding: 12px 0;
   color: inherit;
   font-family: inherit;
   text-align: left;
-}
-
-.count {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.week-shift {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 6px;
 }
 
 .week-shift .ws-info {
@@ -689,26 +790,16 @@ onUnmounted(destroyMap);
   min-width: 0;
   background: none;
   border: none;
-  padding: 0;
+  padding: 8px 0;
   text-align: left;
   font: inherit;
-  color: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .ws-badge {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--warn-text);
-  background: var(--warn-bg);
-  padding: 1px 6px;
-  border-radius: 6px;
+  font-size: 9px;
   margin-left: 6px;
-}
-
-.ws-itin {
-  color: var(--accent-text);
-  flex-shrink: 0;
-  font-size: 14px;
 }
 
 .empty {
@@ -806,17 +897,72 @@ onUnmounted(destroyMap);
 /* Tournée */
 
 .start-nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
   margin: 0 18px 14px;
-  background: var(--text-primary);
-  color: var(--on-solid);
-  border-radius: 12px;
-  padding: 12px;
+  --background: var(--text-primary);
+  --color: var(--on-solid);
+  --border-radius: 12px;
+  --box-shadow: none;
   font-size: 13px;
   font-weight: 500;
-  text-decoration: none;
+  text-transform: none;
+}
+
+.map-summary-bar {
+  margin: 0 18px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-summary-bar ion-chip {
+  font-size: 12px;
+  color: var(--text-secondary);
+  --background: var(--surface-1);
+}
+
+.map-summary-bar ion-chip ion-icon {
+  font-size: 15px;
+}
+
+.stop-list {
+  background: transparent;
+}
+
+.stop-row {
+  --background: transparent;
+  --padding-start: 18px;
+  --inner-padding-end: 18px;
+}
+
+.stop-num {
+  margin-inline-end: 10px;
+  --background: var(--text-primary);
+  color: var(--on-solid);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.stop-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sname {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.seta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.saddr {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
 }
 </style>
