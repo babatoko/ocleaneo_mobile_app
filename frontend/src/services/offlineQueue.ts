@@ -1,7 +1,6 @@
 import { Preferences } from '@capacitor/preferences';
 import { Network } from '@capacitor/network';
 import { App } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
 import { provider } from '../providers';
 import { ProviderNetworkError } from '../providers/DataProvider';
 import type { CreateTimeEntryPayload } from '../types/models';
@@ -12,14 +11,17 @@ interface QueuedEntry extends CreateTimeEntryPayload {
   localId: string;
 }
 
+// Pas de garde sur la plateforme : @capacitor/preferences retombe sur
+// localStorage dans le navigateur — même raisonnement que le cache du planning
+// (stores/planning.ts) et celui des chantiers. Avec une garde native, `enqueue`
+// ne persistait rien en PWA alors que l'écran affichait « pointage enregistré,
+// synchronisation dès que possible » : le pointage était perdu en silence.
 async function readQueue(): Promise<QueuedEntry[]> {
-  if (!Capacitor.isNativePlatform()) return [];
   const { value } = await Preferences.get({ key: QUEUE_KEY });
   return value ? JSON.parse(value) : [];
 }
 
 async function writeQueue(queue: QueuedEntry[]): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
   await Preferences.set({ key: QUEUE_KEY, value: JSON.stringify(queue) });
 }
 
@@ -69,9 +71,14 @@ export async function flushQueue(): Promise<{ flushed: number; remaining: number
 
 let watching = false;
 
-/** Relance flushQueue() dès que le réseau revient ou que l'app repasse au premier plan. */
+/**
+ * Relance flushQueue() dès que le réseau revient ou que l'app repasse au
+ * premier plan. Actif aussi en PWA : les deux plugins ont une implémentation
+ * web (`online`/`offline` pour Network, `visibilitychange` pour App.resume),
+ * sans quoi la file se remplirait dans le navigateur sans jamais se vider.
+ */
 export function watchConnectivity(onReconnect: () => void): void {
-  if (watching || !Capacitor.isNativePlatform()) return;
+  if (watching) return;
   watching = true;
   Network.addListener('networkStatusChange', (status) => {
     if (status.connected) onReconnect();

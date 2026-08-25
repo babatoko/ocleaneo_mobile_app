@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
 import type { RouteLocationNormalized } from 'vue-router';
+import { ProviderNetworkError } from '../providers/DataProvider';
 import { useAuthStore } from '../stores/auth';
 
 declare module 'vue-router' {
@@ -34,15 +35,35 @@ const router = createRouter({
   routes,
 });
 
+/** "/" n'est pas un lien profond à préserver : après connexion, on atterrit
+ *  directement sur le planning plutôt que sur l'accueil. */
+function toLogin(to: RouteLocationNormalized) {
+  return { name: 'login', query: to.path === '/' ? {} : { redirect: to.fullPath } };
+}
+
 router.beforeEach(async (to: RouteLocationNormalized) => {
   const auth = useAuthStore();
   if (!to.meta.public && !auth.isAuthenticated) {
-    // "/" n'est pas un lien profond à préserver : après connexion, on atterrit
-    // directement sur le planning plutôt que sur l'accueil.
-    return { name: 'login', query: to.path === '/' ? {} : { redirect: to.fullPath } };
+    return toLogin(to);
   }
-  if (auth.isAuthenticated && !auth.employee) {
-    await auth.fetchMe();
+  // Jamais sur une route publique : l'écran de connexion doit rester
+  // atteignable quoi qu'il arrive à cet appel, y compris avec un jeton
+  // invalide encore en mémoire.
+  if (!to.meta.public && auth.isAuthenticated && !auth.employee) {
+    try {
+      await auth.fetchMe();
+    } catch (e) {
+      // Hors ligne : on laisse entrer. Le jeton n'est pas invalide pour
+      // autant, et les écrans ont leur propre repli sur le cache local —
+      // déconnecter ici priverait le salarié de son planning hors réseau.
+      if (e instanceof ProviderNetworkError) return true;
+      // Jeton expiré ou révoqué. Sans ce rattrapage, la garde rejetait : la
+      // navigation était annulée sur un écran vide, et comme le jeton restait
+      // en mémoire (`isAuthenticated` toujours vrai) plus aucune route, pas
+      // même /login, n'était atteignable — l'app était bonne à réinstaller.
+      auth.logout();
+      return toLogin(to);
+    }
   }
   return true;
 });
