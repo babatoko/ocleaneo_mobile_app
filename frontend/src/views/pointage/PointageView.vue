@@ -66,15 +66,25 @@ let initialLoadDone = false;
 onMounted(async () => {
   nfcSupported.value = await isNfcSupported();
   pointage.initGlobalListener(router);
-  await chantiers.fetchMine();
-  await pointage.loadSafe();
-  await pointage.loadWeekSummary().catch(() => {});
-  await pointage.refreshQueueCount();
-  initialLoadDone = true;
-  clockInterval = setInterval(() => {
-    now.value = new Date();
-    pointage.updateTick(); // fait avancer le total d'heures de la semaine
-  }, 1000);
+  try {
+    // chantiers.fetchMine() et loadSafe() ne couvrent que la coupure réseau
+    // (repli sur le cache) ; une panne serveur (500, etc.) reste possible et
+    // ne doit pas empêcher l'écran de rester utilisable.
+    await chantiers.fetchMine();
+    await pointage.loadSafe();
+    await pointage.loadWeekSummary().catch(() => {});
+    await pointage.refreshQueueCount();
+  } catch {
+    // Rien de plus à faire ici : DataState/le contenu affiché restent dans
+    // leur dernier état connu. Ce qui compte, c'est de ne pas sauter la
+    // suite — sans elle, l'horloge de l'écran restait figée sans message.
+  } finally {
+    initialLoadDone = true;
+    clockInterval = setInterval(() => {
+      now.value = new Date();
+      pointage.updateTick(); // fait avancer le total d'heures de la semaine
+    }, 1000);
+  }
 });
 
 onUnmounted(() => {

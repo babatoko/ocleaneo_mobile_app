@@ -26,6 +26,16 @@ describe('checkGeofence', () => {
     expect(checkGeofence(cegetel, {})).toBeNull();
   });
 
+  it('vérifie bien un chantier sur l\'équateur ou le méridien (latitude/longitude à 0)', () => {
+    // 0 est une coordonnée réelle, pas une valeur "manquante" — `!chantier.latitude`
+    // la traitait par erreur comme telle et désactivait silencieusement la
+    // vérification pour tout chantier sur l'équateur ou le méridien de Greenwich.
+    const surLEquateur = { latitude: 0, longitude: 4.8286 };
+    const res = checkGeofence(surLEquateur, surLEquateur);
+    expect(res).not.toBeNull();
+    expect(res!.withinRange).toBe(true);
+  });
+
   it('accepte une position sur le site', () => {
     const res = checkGeofence(cegetel, { ...cegetel });
     expect(res!.withinRange).toBe(true);

@@ -40,7 +40,7 @@ L'app était initialement en CSS custom + police d'icônes ([Tabler Icons](https
 - **Palette** — `style.css` mappe les tokens existants (`--accent`, `--bg-page`, `--text-primary`…) vers les variables de thème Ionic (`--ion-color-primary`, `--ion-background-color`…, avec leurs triplets `-rgb` requis pour les ombres/ripples). Les composants Ionic suivent donc la palette Ocleaneo, dans les deux thèmes, sans configuration supplémentaire par composant.
 - **`mode: 'ios'` forcé** — un seul rendu, cohérent entre Android et iOS ; sans ça, Ionic bascule certains composants en style Material sous Android, ce qui aurait introduit une divergence visuelle non voulue avec l'identité Ocleaneo.
 - **Icônes** — chaque `<i class="ti ti-*">` est devenu `<ion-icon :icon="...">` avec une constante importée de `ionicons/icons` ; `utils/productIcons.ts` et les fonctions `entryIcon()`/`statusIcon()` renvoient directement ces constantes plutôt qu'un nom de classe.
-- **Coût connu** : le bundle JS grossit sensiblement (Ionic embarque son propre runtime de composants) — accepté comme le prix normal de ces garanties, pas creusé plus loin ici (code-splitting éventuel à revoir si la taille devient un problème réel sur réseau mobile).
+- **Coût connu** : le bundle JS grossit sensiblement (Ionic embarque son propre runtime de composants — environ 1,2 Mo, ~280 Ko gzippés, isolés dans leur propre chunk `ionic-*.js` via `build.rollupOptions.output.manualChunks` dans `vite.config.ts` pour un nommage clair et un cache navigateur stable d'un déploiement à l'autre) — accepté comme le prix normal de ces garanties. Aucun code-splitting supplémentaire de ce runtime lui-même : `IonicVue` doit être enregistré avant le montage, donc chargé au démarrage quoi qu'il arrive ; le réduire demanderait de revenir sur le choix d'Ionic, pas d'optimiser le build.
 
 ## Structure
 
@@ -127,7 +127,7 @@ Après chaque changement du code Vue, relancer `npm run cap:sync` pour propager 
 Identifiant + mot de passe, stockés sur la fiche employé (côté Odoo). L'empreinte n'est proposée que si l'appareil dispose d'un lecteur :
 
 1. Premier login : formulaire identifiant/mot de passe (`POST /api/auth/login { username, password }`).
-2. Si l'appareil a un capteur biométrique disponible (`NativeBiometric.isAvailable()`, via `@capgo/capacitor-native-biometric`), les identifiants sont enregistrés dans le stockage sécurisé natif (Keychain iOS / Keystore Android, `accessControl: BIOMETRY_ANY`) juste après une connexion réussie.
+2. Si l'appareil a un capteur biométrique disponible (`NativeBiometric.isAvailable()`, via `@capgo/capacitor-native-biometric`), l'app propose (une alerte, pas un enregistrement silencieux) d'activer la connexion par empreinte juste après une connexion réussie ; en cas d'accord, les identifiants sont enregistrés dans le stockage sécurisé natif (Keychain iOS / Keystore Android, `accessControl: BIOMETRY_ANY`). Un refus n'est plus redemandé aux connexions suivantes (`ocleaneo_biometric_declined` en `localStorage`).
 3. Aux connexions suivantes sur cet appareil, l'écran affiche directement le cercle d'empreinte (`getSecureCredentials`, qui déclenche le prompt biométrique du système) au lieu du formulaire ; un lien « Utiliser le mot de passe » reste disponible en repli.
 4. Sur le web (PWA, pas de plateforme native), `isAvailable()` retourne `false` et l'app retombe simplement sur le formulaire — aucun crash, aucune dépendance à un lecteur.
 

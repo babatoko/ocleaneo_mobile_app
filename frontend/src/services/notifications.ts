@@ -37,7 +37,12 @@ const REMINDER_DELAY_MIN = 20;
 const CHANNEL_ID = 'pointage';
 
 const PLANNING_CHANNEL_ID = 'planning';
-const SHIFT_REMINDER_BASE_ID = 3000; // + shift.id, plage dédiée pour ne pas collisionner avec le pointage
+// + shift.id : plage dédiée, assez loin des autres ids (1001/1002 pour le
+// pointage, 5000-5999 pour les notifications de changement ci-dessous) pour
+// qu'aucun id de vacation réaliste (identifiants Odoo) ne vienne recouvrir
+// l'une d'elles — avec l'ancienne base à 3000, tout id de vacation entre 2000
+// et 2999 écrasait silencieusement une notification "planning modifié".
+const SHIFT_REMINDER_BASE_ID = 200000;
 const SHIFT_REMINDER_BEFORE_MIN = 30;
 let planChangeSeq = 0;
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonButton, IonContent, IonIcon, IonInput, IonPage, IonSpinner } from '@ionic/vue';
+import { IonButton, IonContent, IonIcon, IonInput, IonPage, IonSpinner, alertController } from '@ionic/vue';
 import { fingerPrintOutline, lockClosedOutline, sparklesOutline } from 'ionicons/icons';
 import { useAuthStore } from '../stores/auth';
 import { usePointageStore } from '../stores/pointage';
@@ -15,6 +15,7 @@ import {
 } from '../services/biometric';
 
 const LAST_USERNAME_KEY = 'ocleaneo_last_username';
+const BIOMETRIC_DECLINED_KEY = 'ocleaneo_biometric_declined';
 
 const mode = ref('password'); // 'password' | 'biometric'
 const username = ref('');
@@ -90,14 +91,43 @@ async function forgetBiometric() {
   usePassword();
 }
 
+/**
+ * Propose l'activation de la biométrie plutôt que de sauvegarder le mot de
+ * passe sans le dire : sans ce consentement explicite, chaque connexion au
+ * mot de passe enregistrait silencieusement les identifiants dans le
+ * trousseau natif. On ne le redemande pas si le salarié a déjà refusé une
+ * fois (`BIOMETRIC_DECLINED_KEY`) ni s'il a déjà des identifiants enregistrés.
+ */
+async function maybeOfferBiometric(loggedInUsername: string, loggedInPassword: string) {
+  if (!biometricAvailable.value) return;
+  if (localStorage.getItem(BIOMETRIC_DECLINED_KEY) === '1') return;
+  if (await hasSavedCredentials()) return;
+
+  const alert = await alertController.create({
+    header: 'Connexion par empreinte ?',
+    message: 'Activez-la pour vous reconnecter plus vite la prochaine fois, sans retaper votre mot de passe.',
+    buttons: [
+      {
+        text: 'Non merci',
+        role: 'cancel',
+        handler: () => localStorage.setItem(BIOMETRIC_DECLINED_KEY, '1'),
+      },
+      {
+        text: 'Activer',
+        handler: () => saveCredentials(loggedInUsername, loggedInPassword),
+      },
+    ],
+  });
+  await alert.present();
+  await alert.onDidDismiss();
+}
+
 async function submit() {
   error.value = '';
   loading.value = true;
   try {
     await auth.login(username.value, password.value);
-    if (biometricAvailable.value) {
-      await saveCredentials(username.value, password.value);
-    }
+    await maybeOfferBiometric(username.value, password.value);
     await afterLogin(username.value);
   } catch (e) {
     error.value = loginErrorMessage(e);
@@ -160,7 +190,7 @@ async function submit() {
           </form>
 
           <p v-if="biometricAvailable" class="login-alt">
-            <ion-icon :icon="fingerPrintOutline"></ion-icon> L'empreinte sera proposée à la prochaine connexion
+            <ion-icon :icon="fingerPrintOutline"></ion-icon> On vous proposera d'activer la connexion par empreinte après la connexion
           </p>
         </template>
 

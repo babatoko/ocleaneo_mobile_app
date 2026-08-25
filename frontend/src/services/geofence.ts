@@ -35,7 +35,10 @@ export function checkGeofence(
   position: Position | null | undefined,
   chantier: Pick<Chantier, 'latitude' | 'longitude'> | null | undefined
 ): GeofenceResult | null {
-  if (!position || !chantier?.latitude || !chantier?.longitude) return null;
+  // `chantier.latitude == null` (pas `!chantier.latitude`) : un chantier situé
+  // exactement sur l'équateur ou le méridien de Greenwich a une coordonnée à
+  // 0, une valeur réelle et vérifiable — pas une coordonnée « inconnue ».
+  if (!position || chantier?.latitude == null || chantier?.longitude == null) return null;
   const d = distanceMeters(position, { latitude: chantier.latitude, longitude: chantier.longitude });
   return { withinRange: d <= GEOFENCE_TOLERANCE_M, distanceMeters: Math.round(d) };
 }
