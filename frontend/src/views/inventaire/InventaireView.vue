@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { IonButton, IonContent, IonIcon, IonInput, IonPage, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
+import { alertCircleOutline, businessOutline, checkmarkCircleOutline, chevronDownOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
 import { useChantiersStore } from '../../stores/chantiers';
@@ -110,56 +112,61 @@ const filledCount = () =>
 </script>
 
 <template>
-  <AppHeader title="Inventaire" />
-
-  <div v-if="done" class="inv-done">
-    <i class="ti ti-circle-check"></i>
-    <p class="d-title">Inventaire enregistré</p>
-    <p class="d-sub">Les niveaux de stock du site sont à jour.</p>
-    <button type="button" class="d-again" @click="restart">Modifier la saisie</button>
-  </div>
-
-  <template v-else>
-    <DataState :loading="loading" :error="loadError" :empty="!products.length" @retry="load">
-      <template #empty>Aucun produit au catalogue.</template>
-
-      <div class="site-select">
-        <i class="ti ti-building-warehouse"></i>
-        <select v-model="chantiers.selectedId" aria-label="Chantier concerné">
-          <option v-for="c in chantiers.list" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
-        <i class="ti ti-chevron-down chev"></i>
+  <ion-page>
+    <AppHeader title="Inventaire" />
+    <ion-content>
+      <div v-if="done" class="inv-done">
+        <ion-icon :icon="checkmarkCircleOutline"></ion-icon>
+        <p class="d-title">Inventaire enregistré</p>
+        <p class="d-sub">Les niveaux de stock du site sont à jour.</p>
+        <button type="button" class="d-again" @click="restart">Modifier la saisie</button>
       </div>
 
-      <p class="inv-hint">Indiquez ce qu'il reste sur place. Les valeurs du dernier inventaire sont préremplies.</p>
+      <template v-else>
+        <DataState :loading="loading" :error="loadError" :empty="!products.length" @retry="load">
+          <template #empty>Aucun produit au catalogue.</template>
 
-      <div class="inv-list">
-        <div v-for="p in products" :key="p.id" class="inv-product">
-          <div class="ip-head">
-            <i class="ti" :class="iconForProduct(p)"></i>
-            <span class="ip-name">{{ p.name }}</span>
+          <div class="site-select">
+            <ion-icon :icon="businessOutline"></ion-icon>
+            <ion-select v-model="chantiers.selectedId" interface="popover" aria-label="Chantier concerné">
+              <ion-select-option v-for="c in chantiers.list" :key="c.id" :value="c.id">{{ c.name }}</ion-select-option>
+            </ion-select>
+            <ion-icon :icon="chevronDownOutline" class="chev"></ion-icon>
           </div>
-          <div v-for="pk in p.packagings" :key="pk.id" class="ip-row">
-            <label :for="`pk-${pk.id}`">{{ pk.label }}</label>
-            <input
-              :id="`pk-${pk.id}`"
-              v-model="quantities[pk.id]"
-              type="number"
-              min="0"
-              inputmode="numeric"
-              placeholder="—"
-            />
+
+          <p class="inv-hint">Indiquez ce qu'il reste sur place. Les valeurs du dernier inventaire sont préremplies.</p>
+
+          <div class="inv-list">
+            <div v-for="p in products" :key="p.id" class="inv-product">
+              <div class="ip-head">
+                <ion-icon :icon="iconForProduct(p)"></ion-icon>
+                <span class="ip-name">{{ p.name }}</span>
+              </div>
+              <div v-for="pk in p.packagings" :key="pk.id" class="ip-row">
+                <label :for="`pk-${pk.id}`">{{ pk.label }}</label>
+                <ion-input
+                  :id="`pk-${pk.id}`"
+                  v-model="quantities[pk.id]"
+                  type="number"
+                  min="0"
+                  inputmode="numeric"
+                  fill="outline"
+                  placeholder="—"
+                ></ion-input>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <p v-if="submitError" class="inv-error"><i class="ti ti-alert-circle"></i> {{ submitError }}</p>
+          <p v-if="submitError" class="inv-error"><ion-icon :icon="alertCircleOutline"></ion-icon> {{ submitError }}</p>
 
-      <button type="button" class="inv-submit" :disabled="submitting" @click="submit">
-        {{ submitting ? 'Envoi…' : `Valider l'inventaire (${filledCount()})` }}
-      </button>
-    </DataState>
-  </template>
+          <ion-button class="inv-submit" expand="block" :disabled="submitting" @click="submit">
+            <ion-spinner v-if="submitting" name="crescent"></ion-spinner>
+            <template v-else>Valider l'inventaire ({{ filledCount() }})</template>
+          </ion-button>
+        </DataState>
+      </template>
+    </ion-content>
+  </ion-page>
 </template>
 
 <style scoped>
@@ -189,7 +196,7 @@ const filledCount = () =>
   margin-bottom: 6px;
 }
 
-.ip-head i {
+.ip-head ion-icon {
   font-size: 17px;
   color: var(--text-secondary);
 }
@@ -212,14 +219,15 @@ const filledCount = () =>
   color: var(--text-secondary);
 }
 
-.ip-row input {
+.ip-row ion-input {
   width: 74px;
-  padding: 7px 9px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  --padding-start: 9px;
+  --padding-end: 9px;
+  --border-radius: 8px;
+  --border-color: var(--border);
+  --background: var(--surface-2);
+  --color: var(--text-primary);
   text-align: right;
-  background: var(--surface-2);
-  color: var(--text-primary);
 }
 
 .inv-error {
@@ -233,17 +241,13 @@ const filledCount = () =>
 
 .inv-submit {
   margin: 14px 18px 8px;
-  padding: 13px;
-  border: none;
-  border-radius: 12px;
-  background: var(--accent);
-  color: var(--on-accent);
+  --border-radius: 12px;
+  --background: var(--accent);
+  --color: var(--on-accent);
+  --box-shadow: none;
   font-size: 14px;
   font-weight: 500;
-}
-
-.inv-submit:disabled {
-  opacity: 0.6;
+  text-transform: none;
 }
 
 .inv-done {
@@ -255,7 +259,7 @@ const filledCount = () =>
   gap: 6px;
 }
 
-.inv-done i {
+.inv-done ion-icon {
   font-size: 42px;
   color: var(--accent);
 }

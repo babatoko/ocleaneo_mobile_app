@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { IonContent, IonPage } from '@ionic/vue';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
 import AppHeader from '../../components/AppHeader.vue';
@@ -28,21 +29,25 @@ onMounted(load);
 </script>
 
 <template>
-  <AppHeader title="Historique des commandes" />
-  <DataState :loading="loading" :error="error" :empty="!orders.length" @retry="load">
-    <template #empty>Aucune commande pour le moment.</template>
-    <div class="list">
-      <RouterLink
-        v-for="o in orders"
-        :key="o.id"
-        :to="`/commande/${o.id}/recap`"
-        class="order"
-      >
-        <strong>Commande n°{{ o.id }} — {{ o.chantier_name }}</strong>
-        <span>{{ new Date(o.created_at).toLocaleDateString('fr-FR') }} · {{ o.status }}</span>
-      </RouterLink>
-    </div>
-  </DataState>
+  <ion-page>
+    <AppHeader title="Historique des commandes" />
+    <ion-content>
+      <DataState :loading="loading" :error="error" :empty="!orders.length" @retry="load">
+        <template #empty>Aucune commande pour le moment.</template>
+        <div class="list">
+          <RouterLink
+            v-for="o in orders"
+            :key="o.id"
+            :to="`/commande/${o.id}/recap`"
+            class="order"
+          >
+            <strong>Commande n°{{ o.id }} — {{ o.chantier_name }}</strong>
+            <span>{{ new Date(o.created_at).toLocaleDateString('fr-FR') }} · {{ o.status }}</span>
+          </RouterLink>
+        </div>
+      </DataState>
+    </ion-content>
+  </ion-page>
 </template>
 
 <style scoped>

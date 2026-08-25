@@ -2,6 +2,22 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Capacitor } from '@capacitor/core';
+import { IonContent, IonIcon, IonPage, IonSpinner } from '@ionic/vue';
+import {
+  alarmOutline,
+  alertCircleOutline,
+  checkmarkOutline,
+  chevronForwardOutline,
+  cloudOfflineOutline,
+  cloudUploadOutline,
+  logInOutline,
+  logOutOutline,
+  pauseOutline,
+  playOutline,
+  radioOutline,
+  stopOutline,
+  warningOutline,
+} from 'ionicons/icons';
 import { usePointageStore } from '../../stores/pointage';
 import { useChantiersStore } from '../../stores/chantiers';
 import { isNfcSupported, startIosNfcSession, cancelIosNfcSession } from '../../services/nfc';
@@ -102,11 +118,7 @@ const statusText = computed(() =>
 );
 
 const statusIcon = computed(() =>
-  pointage.status === 'in'
-    ? 'ti-player-play'
-    : pointage.status === 'paused'
-      ? 'ti-player-pause'
-      : 'ti-player-stop'
+  pointage.status === 'in' ? playOutline : pointage.status === 'paused' ? pauseOutline : stopOutline
 );
 
 function fmtOverdue(min: number): string {
@@ -149,10 +161,10 @@ async function onCircleClick() {
 }
 
 function entryIcon(type: TimeEntryType): string {
-  if (type === 'in') return 'ti-login-2';
-  if (type === 'pause_start') return 'ti-player-pause';
-  if (type === 'pause_end') return 'ti-player-play';
-  return 'ti-logout-2';
+  if (type === 'in') return logInOutline;
+  if (type === 'pause_start') return pauseOutline;
+  if (type === 'pause_end') return playOutline;
+  return logOutOutline;
 }
 
 function entryLabel(type: TimeEntryType): string {
@@ -169,29 +181,31 @@ function fmtTime(iso: string | Date | null | undefined): string {
 </script>
 
 <template>
+  <ion-page>
+    <ion-content>
   <div class="header">
     <div>
       <p class="hello">Pointage</p>
       <p class="name sub-name">{{ now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
     </div>
     <div class="status-pill" :class="pointage.status">
-      <i class="ti" :class="statusIcon"></i>
+      <ion-icon :icon="statusIcon"></ion-icon>
       <span>{{ statusText }}</span>
     </div>
   </div>
 
   <div v-if="pointage.offlineQueueCount > 0" class="offline-banner">
-    <i class="ti ti-cloud-off"></i>
+    <ion-icon :icon="cloudOfflineOutline"></ion-icon>
     <span>{{ pointage.offlineQueueCount }} pointage{{ pointage.offlineQueueCount > 1 ? 's' : '' }} en attente de synchronisation</span>
   </div>
 
   <div v-if="pointage.lastMessage" class="soft-banner" :class="pointage.lastMessage.type">
-    <i class="ti" :class="pointage.lastMessage.type === 'warn' ? 'ti-map-pin-off' : 'ti-cloud-upload'"></i>
+    <ion-icon :icon="pointage.lastMessage.type === 'warn' ? warningOutline : cloudUploadOutline"></ion-icon>
     <span>{{ pointage.lastMessage.text }}</span>
   </div>
 
   <div v-if="overdueMinutes" class="soft-banner warn">
-    <i class="ti ti-clock-exclamation"></i>
+    <ion-icon :icon="alarmOutline"></ion-icon>
     <span>Vacation dépassée de {{ fmtOverdue(overdueMinutes) }} — n'oubliez pas de badger votre départ.</span>
   </div>
 
@@ -202,26 +216,27 @@ function fmtTime(iso: string | Date | null | undefined): string {
       :disabled="pointage.scanning || !nfcSupported"
       @click="onCircleClick"
     >
-      <i v-if="justSucceeded" class="ti ti-check checkmark"></i>
-      <i v-else class="ti" :class="pointage.scanning ? 'ti-loader-2 spin' : 'ti-nfc'"></i>
+      <ion-icon v-if="justSucceeded" :icon="checkmarkOutline" class="checkmark"></ion-icon>
+      <ion-spinner v-else-if="pointage.scanning" name="crescent"></ion-spinner>
+      <ion-icon v-else :icon="radioOutline"></ion-icon>
       <p v-if="nfcSupported === false">NFC non disponible sur cet appareil</p>
       <p v-else-if="pointage.scanning">Lecture en cours…</p>
       <p v-else>Approchez le badge du chantier</p>
     </button>
     <p class="big-time">{{ now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</p>
-    <p v-if="pointage.scanError" class="scan-error"><i class="ti ti-alert-circle"></i> {{ pointage.scanError }}</p>
+    <p v-if="pointage.scanError" class="scan-error"><ion-icon :icon="alertCircleOutline"></ion-icon> {{ pointage.scanError }}</p>
     <p v-else-if="pointage.lastEntry" class="status-line">
       {{ statusText }} — {{ pointage.lastEntry.chantier_name }}
     </p>
 
     <div v-if="pointage.status === 'in'" class="pause-actions">
       <button type="button" class="pause-btn" @click="pointage.startPause()">
-        <i class="ti ti-player-pause"></i> Pause
+        <ion-icon :icon="pauseOutline"></ion-icon> Pause
       </button>
     </div>
     <div v-else-if="pointage.status === 'paused'" class="pause-actions">
       <button type="button" class="pause-btn resume" @click="pointage.endPause()">
-        <i class="ti ti-player-play"></i> Reprendre
+        <ion-icon :icon="playOutline"></ion-icon> Reprendre
       </button>
     </div>
   </div>
@@ -238,11 +253,11 @@ function fmtTime(iso: string | Date | null | undefined): string {
   <div class="history">
     <div class="history-head">
       <p class="history-title">Historique du jour</p>
-      <RouterLink to="/pointage/historique" class="see-all">Tout voir <i class="ti ti-chevron-right"></i></RouterLink>
+      <RouterLink to="/pointage/historique" class="see-all">Tout voir <ion-icon :icon="chevronForwardOutline"></ion-icon></RouterLink>
     </div>
     <div v-for="e in displayEntries" :key="e.id" class="hist-row">
       <div class="hist-icon" :class="e.type">
-        <i class="ti" :class="entryIcon(e.type)"></i>
+        <ion-icon :icon="entryIcon(e.type)"></ion-icon>
       </div>
       <div class="hist-text">
         <p class="lbl" :class="{ muted: e.planned }">{{ entryLabel(e.type) }}</p>
@@ -254,6 +269,8 @@ function fmtTime(iso: string | Date | null | undefined): string {
     </div>
     <p v-if="!pointage.entries.length" class="empty">Aucun pointage aujourd'hui.</p>
   </div>
+    </ion-content>
+  </ion-page>
 </template>
 
 <style scoped>
@@ -277,7 +294,7 @@ function fmtTime(iso: string | Date | null | undefined): string {
   color: var(--text-secondary);
 }
 
-.status-pill i {
+.status-pill ion-icon {
   font-size: 14px;
 }
 
@@ -304,8 +321,8 @@ function fmtTime(iso: string | Date | null | undefined): string {
   color: var(--text-secondary);
 }
 
-.offline-banner i,
-.soft-banner i {
+.offline-banner ion-icon,
+.soft-banner ion-icon {
   font-size: 15px;
   flex-shrink: 0;
 }
@@ -351,20 +368,9 @@ function fmtTime(iso: string | Date | null | undefined): string {
   }
 }
 
-.spin {
-  animation: spin 1s linear infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .spin,
   .checkmark {
     animation: none;
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 

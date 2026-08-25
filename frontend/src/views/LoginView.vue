@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { IonButton, IonContent, IonIcon, IonInput, IonPage, IonSpinner } from '@ionic/vue';
+import { fingerPrintOutline, lockClosedOutline, sparklesOutline } from 'ionicons/icons';
 import { useAuthStore } from '../stores/auth';
 import { usePointageStore } from '../stores/pointage';
 import { ProviderNetworkError, ProviderError } from '../providers/DataProvider';
@@ -106,42 +108,66 @@ async function submit() {
 </script>
 
 <template>
-  <div class="login-screen">
-    <div class="login-logo"><i class="ti ti-sparkles"></i></div>
+  <ion-page>
+    <ion-content class="ion-padding" :fullscreen="true">
+      <div class="login-screen">
+        <div class="login-logo"><ion-icon :icon="sparklesOutline"></ion-icon></div>
 
-    <template v-if="mode === 'biometric'">
-      <p class="login-title">Bonjour</p>
-      <p class="login-sub">Connectez-vous pour continuer</p>
+        <template v-if="mode === 'biometric'">
+          <p class="login-title">Bonjour</p>
+          <p class="login-sub">Connectez-vous pour continuer</p>
 
-      <button class="fingerprint-circle" :disabled="loading" @click="tryBiometric">
-        <i class="ti ti-fingerprint"></i>
-      </button>
-      <p class="login-hint">Posez votre doigt sur le capteur</p>
-      <p class="login-name">{{ rememberedUsername }}</p>
+          <button class="fingerprint-circle" type="button" :disabled="loading" @click="tryBiometric">
+            <ion-spinner v-if="loading" name="crescent"></ion-spinner>
+            <ion-icon v-else :icon="fingerPrintOutline"></ion-icon>
+          </button>
+          <p class="login-hint">Posez votre doigt sur le capteur</p>
+          <p class="login-name">{{ rememberedUsername }}</p>
 
-      <button class="login-alt" @click="usePassword">
-        <i class="ti ti-lock"></i> Utiliser le mot de passe
-      </button>
-      <button class="login-alt" @click="forgetBiometric">Ce n'est pas vous ?</button>
-    </template>
+          <button class="login-alt" type="button" @click="usePassword">
+            <ion-icon :icon="lockClosedOutline"></ion-icon> Utiliser le mot de passe
+          </button>
+          <button class="login-alt" type="button" @click="forgetBiometric">Ce n'est pas vous ?</button>
+        </template>
 
-    <template v-else>
-      <p class="login-title">Bonjour</p>
-      <p class="login-sub">Connectez-vous avec vos identifiants</p>
+        <template v-else>
+          <p class="login-title">Bonjour</p>
+          <p class="login-sub">Connectez-vous avec vos identifiants</p>
 
-      <form class="login-form" @submit.prevent="submit">
-        <input v-model="username" placeholder="Identifiant" autocapitalize="none" autocomplete="username" required />
-        <input v-model="password" type="password" placeholder="Mot de passe" autocomplete="current-password" required />
-        <button type="submit" :disabled="loading">{{ loading ? 'Connexion…' : 'Se connecter' }}</button>
-      </form>
+          <form class="login-form" @submit.prevent="submit">
+            <ion-input
+              v-model="username"
+              fill="outline"
+              label="Identifiant"
+              label-placement="floating"
+              autocapitalize="none"
+              autocomplete="username"
+              required
+            ></ion-input>
+            <ion-input
+              v-model="password"
+              type="password"
+              fill="outline"
+              label="Mot de passe"
+              label-placement="floating"
+              autocomplete="current-password"
+              required
+            ></ion-input>
+            <ion-button type="submit" expand="block" :disabled="loading">
+              <ion-spinner v-if="loading" name="crescent"></ion-spinner>
+              <template v-else>Se connecter</template>
+            </ion-button>
+          </form>
 
-      <p v-if="biometricAvailable" class="login-alt">
-        <i class="ti ti-fingerprint"></i> L'empreinte sera proposée à la prochaine connexion
-      </p>
-    </template>
+          <p v-if="biometricAvailable" class="login-alt">
+            <ion-icon :icon="fingerPrintOutline"></ion-icon> L'empreinte sera proposée à la prochaine connexion
+          </p>
+        </template>
 
-    <p v-if="error" class="error">{{ error }}</p>
-  </div>
+        <p v-if="error" class="error">{{ error }}</p>
+      </div>
+    </ion-content>
+  </ion-page>
 </template>
 
 <style scoped>
@@ -152,19 +178,23 @@ async function submit() {
   gap: 10px;
 }
 
-.login-form input {
-  padding: 13px 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+.login-form ion-input {
+  --background: var(--surface-2);
+  --border-color: var(--border);
+  --border-radius: 10px;
+  --color: var(--text-primary);
+  --padding-start: 14px;
+  --padding-end: 14px;
 }
 
-.login-form button {
-  padding: 13px;
-  border: none;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--on-accent);
+.login-form ion-button {
+  margin-top: 4px;
+  --background: var(--accent);
+  --color: var(--on-accent);
+  --border-radius: 10px;
+  --box-shadow: none;
   font-weight: 500;
+  text-transform: none;
 }
 
 .error {

@@ -49,6 +49,11 @@ export default [
       // Capacitor sans types, réponses de payload dynamiques) ; le contrat
       // de types utile est sur le domaine métier, pas sur ces bords-là.
       '@typescript-eslint/no-explicit-any': 'off',
+
+      // Faux positif avec Ionic : `slot="start"` est l'attribut natif de
+      // projection Shadow DOM des ion-* (ion-buttons, ion-icon...), pas la
+      // syntaxe de slot nommé dépréciée de Vue 2 que cette règle vise.
+      'vue/no-deprecated-slot-attribute': 'off',
     },
   },
 

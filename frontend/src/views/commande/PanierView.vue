@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { IonButton, IonContent, IonPage, IonSpinner } from '@ionic/vue';
 import { provider } from '../../providers';
 import { useCartStore } from '../../stores/cart';
 import { useChantiersStore } from '../../stores/chantiers';
@@ -40,26 +41,31 @@ async function submit() {
 </script>
 
 <template>
-  <AppHeader title="Panier" />
-  <div class="cart">
-    <div v-for="item in cart.items" :key="item.productId + '-' + item.packagingId" class="row">
-      <div>
-        <strong>{{ item.productEmoji }} {{ item.productName }}</strong>
-        <span>{{ item.packagingLabel }}</span>
-      </div>
-      <QuantityStepper
-        :model-value="item.quantity"
-        :min="1"
-        @update:model-value="(q) => cart.updateQuantity(item.productId, item.packagingId, q)"
-      />
-    </div>
-    <p v-if="!cart.items.length" class="empty">Votre panier est vide.</p>
+  <ion-page>
+    <AppHeader title="Panier" />
+    <ion-content>
+      <div class="cart">
+        <div v-for="item in cart.items" :key="item.productId + '-' + item.packagingId" class="row">
+          <div>
+            <strong>{{ item.productEmoji }} {{ item.productName }}</strong>
+            <span>{{ item.packagingLabel }}</span>
+          </div>
+          <QuantityStepper
+            :model-value="item.quantity"
+            :min="1"
+            @update:model-value="(q) => cart.updateQuantity(item.productId, item.packagingId, q)"
+          />
+        </div>
+        <p v-if="!cart.items.length" class="empty">Votre panier est vide.</p>
 
-    <button v-if="cart.items.length" class="submit" :disabled="submitting" @click="submit">
-      {{ submitting ? 'Envoi…' : 'Valider la commande' }}
-    </button>
-    <p v-if="error" class="error">{{ error }}</p>
-  </div>
+        <ion-button v-if="cart.items.length" class="submit" expand="block" :disabled="submitting" @click="submit">
+          <ion-spinner v-if="submitting" name="crescent"></ion-spinner>
+          <template v-else>Valider la commande</template>
+        </ion-button>
+        <p v-if="error" class="error">{{ error }}</p>
+      </div>
+    </ion-content>
+  </ion-page>
 </template>
 
 <style scoped>
@@ -97,12 +103,13 @@ async function submit() {
 }
 
 .submit {
-  padding: 14px;
-  border: none;
-  border-radius: 8px;
-  background: var(--primary);
-  color: var(--on-accent);
+  --border-radius: 8px;
+  --background: var(--primary);
+  --color: var(--on-accent);
+  --box-shadow: none;
   font-weight: 600;
+  text-transform: none;
+  margin: 0;
 }
 
 .error {

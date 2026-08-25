@@ -1,14 +1,23 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
+import { IonicVue } from '@ionic/vue';
 import App from './App.vue';
 import router from './router';
 import { usePointageStore } from './stores/pointage';
 import { ensureNotificationChannel } from './services/notifications';
 import { initProvider } from './providers';
-import '@tabler/icons-webfont/dist/tabler-icons.css';
+
+// Ionic apporte les mécanismes (transitions de page, geste de retour iOS,
+// clavier/scroll adaptatifs, safe-area) — le style visuel Ocleaneo reste
+// celui de style.css, chargé après pour garder la main sur les couleurs.
+import '@ionic/vue/css/core.css';
+import '@ionic/vue/css/normalize.css';
+import '@ionic/vue/css/structure.css';
+import '@ionic/vue/css/typography.css';
 import './style.css';
 
 const app = createApp(App);
+app.use(IonicVue, { mode: 'ios' }); // un seul look, cohérent sur les deux plateformes — pas de rendu Material/Cupertino qui diverge de l'identité Ocleaneo
 const pinia = createPinia();
 app.use(pinia);
 

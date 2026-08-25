@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { IonContent, IonIcon, IonPage } from '@ionic/vue';
+import { checkmarkCircleOutline, downloadOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
 import AppHeader from '../../components/AppHeader.vue';
@@ -35,20 +37,24 @@ function downloadPdf() {
 </script>
 
 <template>
-  <AppHeader title="Commande confirmée" />
-  <DataState :loading="loading" :error="error" :empty="!order" :skeleton-count="2" @retry="load">
-    <template #empty>Commande introuvable.</template>
-    <div class="recap">
-      <p class="success"><i class="ti ti-circle-check"></i> Commande n°{{ order!.id }} envoyée pour {{ order!.chantier_name }}</p>
-      <ul>
-        <li v-for="item in order!.items" :key="item.id">
-          {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
-        </li>
-      </ul>
-      <button v-if="pdfUrl" class="pdf" @click="downloadPdf"><i class="ti ti-file-download"></i> Télécharger le récapitulatif PDF</button>
-      <RouterLink to="/planning" class="home-link">Retour au planning</RouterLink>
-    </div>
-  </DataState>
+  <ion-page>
+    <AppHeader title="Commande confirmée" />
+    <ion-content>
+      <DataState :loading="loading" :error="error" :empty="!order" :skeleton-count="2" @retry="load">
+        <template #empty>Commande introuvable.</template>
+        <div class="recap">
+          <p class="success"><ion-icon :icon="checkmarkCircleOutline"></ion-icon> Commande n°{{ order!.id }} envoyée pour {{ order!.chantier_name }}</p>
+          <ul>
+            <li v-for="item in order!.items" :key="item.id">
+              {{ item.product_emoji }} {{ item.product_name }} — {{ item.packaging_label }} × {{ item.quantity }}
+            </li>
+          </ul>
+          <button v-if="pdfUrl" class="pdf" @click="downloadPdf"><ion-icon :icon="downloadOutline"></ion-icon> Télécharger le récapitulatif PDF</button>
+          <RouterLink to="/planning" class="home-link">Retour au planning</RouterLink>
+        </div>
+      </DataState>
+    </ion-content>
+  </ion-page>
 </template>
 
 <style scoped>
@@ -66,7 +72,7 @@ function downloadPdf() {
   gap: 6px;
 }
 
-.success i {
+.success ion-icon {
   color: var(--success-text);
 }
 

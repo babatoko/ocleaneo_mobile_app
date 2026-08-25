@@ -7,6 +7,7 @@ Application mobile **Android et iOS** (via Capacitor) Ocleaneo pour le terrain :
 ## Stack
 
 - **Frontend** : Vue 3 + Vite, **TypeScript** (`strict: true`), Vue Router, Pinia, Axios
+- **UI** : [Ionic Vue](https://ionicframework.com/docs/vue/overview) (mode `ios` unique, pas de bascule Material) + [Ionicons](https://ionic.io/ionicons) — voir § UI (Ionic Vue) ci-dessous
 - **Apps natives** : [Capacitor](https://capacitorjs.com) 8 — enveloppe le build web dans un shell natif Android (`frontend/android/`) et iOS (`frontend/ios/`), donne accès aux API natives (caméra, géolocalisation, NFC, notifications push) nécessaires aux écrans du mockup (pointage NFC, photos d'anomalie, PTI/SOS)
 - **PWA** : `vite-plugin-pwa` en plus, pour un accès web installable indépendant des stores
 - **Backend : Odoo 14 + modules OCA**, exposé via **`base_rest`** (instance existante, à connecter — voir [Intégration Odoo](#intégration-odoo) ci-dessous)
@@ -28,6 +29,18 @@ Aucun store ni aucune vue n'appelle un client HTTP ou ne connaît la forme d'une
 **Erreurs normalisées** : chaque provider doit lever `ProviderNetworkError` (exportée par `DataProvider.ts`, `instanceof ProviderNetworkError`) pour une coupure réseau — c'est ce que vérifient la file d'attente hors ligne du pointage et le cache du planning pour décider de mettre en attente plutôt que d'afficher un écran vide. Toute autre erreur métier normalisée est une `ProviderError` avec un `.message` déjà lisible et un `.status` optionnel (pas de `error.response.data.error` à décoder dans les vues).
 
 **Limite assumée** : la persistance de session (`token` + `localStorage`, dans `stores/auth.ts`) reste un concept générique partagé par tous les providers — un jeton opaque à renvoyer par `login()` et à présenter ensuite. Un futur provider basé sur des cookies de session devrait quand même renvoyer un jeton logique pour ce mécanisme, ou `stores/auth.ts` devra évoluer en conséquence ; ce n'est pas poussé plus loin ici pour ne pas sur-abstraire un besoin hypothétique.
+
+## UI (Ionic Vue)
+
+L'app était initialement en CSS custom + police d'icônes ([Tabler Icons](https://tabler.io/icons)) — entièrement fonctionnel, mais chaque mécanique native (geste de retour iOS, safe-area, focus clavier, comportement des champs/select) avait dû être recodée à la main. Le passage à [**Ionic Vue**](https://ionicframework.com/docs/vue/overview) + **Ionicons** remplace cette plomberie par des composants éprouvés sur des milliers d'apps en prod, sans jeter l'identité visuelle Ocleaneo (tokens de couleur, mise en page, composants métier) qui avait déjà passé plusieurs tours d'audit :
+
+- **Coquille applicative** — `App.vue` : `<ion-app><ion-router-outlet /></ion-app>` remplace `<router-view>`. Chaque route reste définie normalement dans `router/index.ts`, mais avec [`@ionic/vue-router`](https://www.npmjs.com/package/@ionic/vue-router) à la place de `vue-router` pour `createRouter`/`createWebHistory` — c'est ce wrapper qui fournit le contexte de navigation dont `IonRouterOutlet` a besoin (transitions de page, geste de retour iOS par balayage, pile de navigation pour `ion-back-button`). Chaque vue est encapsulée dans `<ion-page><ion-content>…</ion-content></ion-page>`.
+- **Composants natifs, pas de réinvention** — les éléments réellement interactifs sont de vrais composants Ionic : `ion-input`/`ion-select`/`ion-toggle` (comportement clavier/plateforme correct), `ion-button` (cible tactile, état disabled, ripple), `ion-spinner` (au lieu d'un spin CSS maison), `ion-back-button` (savait déjà quand s'afficher, sans lire `$router.options.history.state.back` à la main), `ion-segment` pour le sélecteur Jour/Semaine/Mois/Tournée, `ion-skeleton-text` pour les écrans de chargement.
+- **Mise en page métier conservée** — les cartes de vacation, la grille de stock, la timeline de tournée, etc. restent des `<div>`/CSS custom : les reconstruire en `ion-item`/`ion-card` n'aurait rien apporté en solidité et aurait fait courir un vrai risque de régression visuelle sur une UI déjà réglée.
+- **Palette** — `style.css` mappe les tokens existants (`--accent`, `--bg-page`, `--text-primary`…) vers les variables de thème Ionic (`--ion-color-primary`, `--ion-background-color`…, avec leurs triplets `-rgb` requis pour les ombres/ripples). Les composants Ionic suivent donc la palette Ocleaneo, dans les deux thèmes, sans configuration supplémentaire par composant.
+- **`mode: 'ios'` forcé** — un seul rendu, cohérent entre Android et iOS ; sans ça, Ionic bascule certains composants en style Material sous Android, ce qui aurait introduit une divergence visuelle non voulue avec l'identité Ocleaneo.
+- **Icônes** — chaque `<i class="ti ti-*">` est devenu `<ion-icon :icon="...">` avec une constante importée de `ionicons/icons` ; `utils/productIcons.ts` et les fonctions `entryIcon()`/`statusIcon()` renvoient directement ces constantes plutôt qu'un nom de classe.
+- **Coût connu** : le bundle JS grossit sensiblement (Ionic embarque son propre runtime de composants) — accepté comme le prix normal de ces garanties, pas creusé plus loin ici (code-splitting éventuel à revoir si la taille devient un problème réel sur réseau mobile).
 
 ## Structure
 
@@ -89,7 +102,7 @@ Les tests ciblent la logique où une erreur coûte cher plutôt que la couvertur
 
 Le thème est entièrement piloté par les tokens CSS de `style.css` : `prefers-color-scheme: dark` n'y redéfinit que les variables, aucun composant ne déclare de couleur en dur. Deux tokens méritent une mention — `--on-solid` et `--on-accent`, la couleur du texte posé sur un aplat plein : sans eux, un `#fff` codé en dur devient illisible en sombre, où ces fonds s'éclaircissent.
 
-Côté accessibilité : `:focus-visible` global, cartes et lignes cliquables en vrais `<button>` (focusables et annoncés), libellés sur les commandes à icône seule, cibles tactiles de 44 px, et `prefers-reduced-motion` respecté. `viewport-fit=cover` étant actif, les en-têtes compensent `env(safe-area-inset-top)` et la zone de contenu `env(safe-area-inset-bottom)`, faute de quoi l'interface passe sous l'encoche et sous la barre gestuelle.
+Côté accessibilité : `:focus-visible` global, cartes et lignes cliquables en vrais `<button>` (focusables et annoncés), libellés sur les commandes à icône seule, cibles tactiles de 44 px, et `prefers-reduced-motion` respecté. `viewport-fit=cover` étant actif, la safe-area (encoche, îlot dynamique, barre gestuelle) doit être compensée : `ion-header`/`ion-content` le font nativement pour les écrans qui les utilisent (voir § UI (Ionic Vue)), et `env(safe-area-inset-bottom)` reste géré à la main pour la barre de navigation custom (`BottomNav.vue`, en position fixed, hors du flux Ionic).
 
 ## Apps natives (Capacitor)
 

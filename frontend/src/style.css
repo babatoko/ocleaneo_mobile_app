@@ -36,6 +36,44 @@
   color-scheme: light;
   color: var(--text-primary);
   background: var(--bg-page);
+
+  /* Mapping vers les variables de thème Ionic : les composants ion-* (bouton,
+     toolbar, tab-bar, spinner...) suivent ainsi la palette Ocleaneo au lieu du
+     bleu par défaut, dans les deux thèmes. Les `-rgb` sont dupliquées en
+     triplet (pas de conversion CSS native depuis le hex) : Ionic les combine
+     en `rgba(var(--ion-color-primary-rgb), alpha)` pour les ombres/ripples. */
+  --ion-background-color: var(--bg-page);
+  --ion-background-color-rgb: 244, 243, 239;
+  --ion-text-color: var(--text-primary);
+  --ion-text-color-rgb: 38, 37, 31;
+  --ion-border-color: var(--border);
+  --ion-toolbar-background: var(--surface-2);
+  --ion-item-background: var(--surface-2);
+  --ion-tab-bar-background: var(--surface-2);
+  --ion-tab-bar-color: var(--text-muted);
+  --ion-tab-bar-color-selected: var(--accent);
+
+  --ion-color-primary: var(--accent);
+  --ion-color-primary-rgb: 15, 110, 86;
+  --ion-color-primary-contrast: var(--on-accent);
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: var(--accent-text);
+  --ion-color-primary-tint: var(--accent);
+
+  --ion-color-success: var(--success-text);
+  --ion-color-success-rgb: 59, 109, 17;
+  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-contrast-rgb: 255, 255, 255;
+
+  --ion-color-warning: var(--warn-text);
+  --ion-color-warning-rgb: 133, 79, 11;
+  --ion-color-warning-contrast: #ffffff;
+  --ion-color-warning-contrast-rgb: 255, 255, 255;
+
+  --ion-color-danger: var(--danger);
+  --ion-color-danger-rgb: 192, 57, 43;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
 }
 
 /* Mode sombre. Les agents badgent avant l'aube et en soirée, souvent dans des
@@ -66,6 +104,14 @@
     --on-solid: #16150f;
     --on-accent: #06231c;
 
+    --ion-background-color-rgb: 22, 21, 15;
+    --ion-text-color-rgb: 240, 238, 230;
+    --ion-color-primary-rgb: 58, 171, 139;
+    --ion-color-primary-contrast-rgb: 6, 35, 28;
+    --ion-color-success-rgb: 169, 207, 110;
+    --ion-color-warning-rgb: 227, 180, 101;
+    --ion-color-danger-rgb: 240, 138, 124;
+
     color-scheme: dark;
   }
 }
@@ -89,6 +135,16 @@
   --danger: #f08a7c;
   --danger-bg: #3d211e;
   --skeleton-sheen: #2a2721;
+  --on-solid: #16150f;
+  --on-accent: #06231c;
+
+  --ion-background-color-rgb: 22, 21, 15;
+  --ion-text-color-rgb: 240, 238, 230;
+  --ion-color-primary-rgb: 58, 171, 139;
+  --ion-color-primary-contrast-rgb: 6, 35, 28;
+  --ion-color-success-rgb: 169, 207, 110;
+  --ion-color-warning-rgb: 227, 180, 101;
+  --ion-color-danger-rgb: 240, 138, 124;
 
   color-scheme: dark;
 }
@@ -108,6 +164,22 @@ body {
   background: var(--bg-page);
   display: flex;
   flex-direction: column;
+}
+
+ion-app {
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg-page);
+}
+
+/* La barre du bas (BottomNav) est en position fixed, par-dessus le contenu :
+   chaque page réserve cet espace pour que son dernier élément ne passe pas
+   dessous. Sans nav (écran de connexion), le padding est simplement inutile,
+   pas gênant. */
+ion-content {
+  --background: var(--bg-page);
+  --color: var(--text-primary);
+  --padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
 button {
@@ -143,10 +215,8 @@ input[type='number'] {
 .nav-item,
 .see-all,
 .login-alt,
-.toggle,
 .day,
 .month-cell,
-.view-toggle .opt,
 .stepper button,
 .card-actions a,
 .card-actions button,
@@ -222,29 +292,29 @@ input[type='number'] {
   flex-shrink: 0;
 }
 
+/* ion-segment remplace l'ancien toggle maison : même look (pilule grise,
+   option active sur fond clair), mais le focus clavier, les indicateurs
+   ARIA (role="tablist"/"tab") et l'animation du curseur viennent d'Ionic. */
 .view-toggle {
-  display: flex;
   margin: 0 18px 8px;
-  background: var(--surface-1);
+  --background: var(--surface-1);
   border-radius: 10px;
-  padding: 3px;
 }
 
-.view-toggle .opt {
-  flex: 1;
-  text-align: center;
+.view-toggle ion-segment-button {
+  --color: var(--text-secondary);
+  --color-checked: var(--text-primary);
+  --background-checked: var(--surface-2);
+  --indicator-color: transparent;
+  min-height: 30px;
   font-size: 12px;
-  padding: 7px 0;
-  border-radius: 8px;
-  color: var(--text-secondary);
-  border: none;
-  background: transparent;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
-.view-toggle .opt.active {
-  background: var(--surface-2);
-  color: var(--text-primary);
-  font-weight: 500;
+.view-toggle ion-segment-button::part(indicator-background) {
+  border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
@@ -454,12 +524,18 @@ input[type='number'] {
   border-color: var(--danger);
 }
 
-.nfc-circle i {
+.nfc-circle ion-icon {
   font-size: 28px;
   color: var(--accent);
 }
 
-.nfc-circle.active i {
+.nfc-circle ion-spinner {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+
+.nfc-circle.active ion-icon {
   color: var(--danger);
 }
 
@@ -571,7 +647,7 @@ input[type='number'] {
   text-decoration: none;
 }
 
-.nav-item i {
+.nav-item ion-icon {
   font-size: 21px;
 }
 
@@ -611,7 +687,7 @@ input[type='number'] {
   margin-bottom: 20px;
 }
 
-.login-logo i {
+.login-logo ion-icon {
   font-size: 26px;
   color: var(--on-solid);
 }
@@ -640,7 +716,7 @@ input[type='number'] {
   margin-bottom: 18px;
 }
 
-.fingerprint-circle i {
+.fingerprint-circle ion-icon {
   font-size: 40px;
   color: var(--accent);
 }
@@ -715,7 +791,7 @@ input[type='number'] {
   color: var(--text-primary);
 }
 
-.menu-item i:first-child {
+.menu-item ion-icon:first-child {
   font-size: 18px;
   color: var(--text-secondary);
   width: 20px;
@@ -747,19 +823,24 @@ input[type='number'] {
   width: calc(100% - 36px);
 }
 
-.site-select i {
+.site-select ion-icon {
   font-size: 16px;
   color: var(--text-secondary);
 }
 
-.site-select select {
-  border: none;
-  background: none;
+.site-select ion-select {
+  --padding-start: 0;
+  --padding-end: 0;
   font-size: 13px;
   font-weight: 500;
   flex: 1;
   color: var(--text-primary);
-  appearance: none;
+  max-width: 100%;
+}
+
+/* Chevron rendu par nous (`.chev`), pas besoin de celui d'Ionic en plus. */
+.site-select ion-select::part(icon) {
+  display: none;
 }
 
 .site-select .chev {
@@ -792,7 +873,7 @@ input[type='number'] {
   justify-content: center;
 }
 
-.stock-item .icon-wrap i {
+.stock-item .icon-wrap ion-icon {
   font-size: 18px;
   color: var(--text-secondary);
 }
@@ -927,7 +1008,7 @@ input[type='number'] {
   text-decoration: none;
 }
 
-.detail-actions .dbtn i {
+.detail-actions .dbtn ion-icon {
   font-size: 19px;
   color: var(--text-primary);
 }
@@ -947,7 +1028,7 @@ input[type='number'] {
   align-items: flex-start;
 }
 
-.note-box i {
+.note-box ion-icon {
   font-size: 15px;
   margin-top: 1px;
 }
@@ -1034,55 +1115,22 @@ input[type='number'] {
   color: var(--text-secondary);
 }
 
-.toggle {
-  width: 38px;
-  height: 22px;
-  border-radius: 11px;
-  background: var(--accent);
-  position: relative;
+/* ion-toggle : le comportement (piste, poignée, animation, disabled,
+   `prefers-reduced-motion`) vient d'Ionic — seule la couleur suit la palette
+   Ocleaneo au lieu du bleu par défaut. */
+.app-toggle {
+  --track-background: var(--border-strong);
+  --track-background-checked: var(--accent);
+  --handle-background: var(--surface-2);
+  --handle-background-checked: var(--surface-2);
   flex-shrink: 0;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.toggle::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  transition: right 0.15s ease, left 0.15s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toggle::after {
-    transition: none;
-  }
-}
-
-.toggle.off {
-  background: var(--border-strong);
-}
-
-.toggle.off::after {
-  right: auto;
-  left: 2px;
-}
-
-.toggle:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .menu-item.danger {
   color: var(--danger);
 }
 
-.menu-item.danger i:first-child {
+.menu-item.danger ion-icon:first-child {
   color: var(--danger);
 }
 
@@ -1108,13 +1156,14 @@ button.menu-item:last-child {
   padding: 12px 0;
 }
 
-.server-url-field input {
-  width: 100%;
-  padding: 11px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+.server-url-field ion-input {
+  --background: var(--surface-1);
+  --border-color: var(--border);
+  --border-radius: 10px;
+  --color: var(--text-primary);
+  --padding-start: 12px;
+  --padding-end: 12px;
   font-size: 13px;
-  background: var(--surface-1);
 }
 
 .server-url-field .srow-sub {
@@ -1135,26 +1184,21 @@ button.menu-item:last-child {
 }
 
 .server-url-save {
-  padding: 11px;
-  border: none;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--on-accent);
+  --border-radius: 10px;
+  --background: var(--accent);
+  --color: var(--on-accent);
+  --box-shadow: none;
   font-weight: 500;
   font-size: 13px;
-}
-
-.server-url-save:disabled {
-  opacity: 0.5;
+  text-transform: none;
+  margin: 0;
 }
 
 .server-url-reset {
-  padding: 8px;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
+  --color: var(--text-secondary);
   font-size: 12px;
   text-decoration: underline;
+  margin: 0;
 }
 
 .stock-mini-row {
@@ -1173,7 +1217,7 @@ button.menu-item:last-child {
   text-align: center;
 }
 
-.stock-mini i {
+.stock-mini ion-icon {
   font-size: 16px;
   color: var(--text-secondary);
 }
@@ -1229,7 +1273,7 @@ button.menu-item:last-child {
   color: var(--text-secondary);
 }
 
-.map-summary-bar .sitem i {
+.map-summary-bar .sitem ion-icon {
   font-size: 15px;
 }
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { IonContent, IonIcon, IonPage } from '@ionic/vue';
+import { alertCircleOutline, chevronForwardOutline, clipboardOutline, cubeOutline, locationOutline, mapOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { useChantiersStore } from '../../stores/chantiers';
 import { usePlanningStore } from '../../stores/planning';
@@ -106,48 +108,51 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppHeader title="Détail du chantier" />
-
-  <template v-if="shift">
-    <div class="detail-hero">
-      <p class="dtime">{{ timeRange(shift) }}</p>
-      <p class="dclient">{{ shift.chantier_name }}</p>
-      <p class="daddr"><i class="ti ti-map-pin"></i> {{ shift.chantier_address || shift.chantier_name }}</p>
-    </div>
-
-    <div class="detail-actions">
-      <a class="dbtn" :href="itineraryHref(shift)" target="_blank" rel="noopener">
-        <i class="ti ti-map-2"></i> Itinéraire
-      </a>
-      <button type="button" class="dbtn" @click="goToStock">
-        <i class="ti ti-box"></i> Stock
-      </button>
-      <button type="button" class="dbtn" @click="goToInventaire">
-        <i class="ti ti-clipboard-list"></i> Inventaire
-      </button>
-    </div>
-
-    <div v-if="shift.note" class="detail-block">
-      <div class="note-box">
-        <i class="ti ti-alert-circle"></i>
-        <span>{{ shift.note }}</span>
-      </div>
-    </div>
-
-    <div v-if="stockPreview.length" class="detail-block">
-      <div class="block-head">
-        <p class="section-title" style="padding: 0; margin: 14px 0 6px">Stock du site</p>
-        <button type="button" class="see-all" @click="goToStock">Tout voir <i class="ti ti-chevron-right"></i></button>
-      </div>
-      <div class="stock-mini-row">
-        <div class="stock-mini" v-for="p in stockPreview" :key="p.name">
-          <i class="ti" :class="p.icon"></i>
-          <p class="sname">{{ p.name }}</p>
-          <p class="slevel" :class="p.status">{{ statusLabel(p.status) }}</p>
+  <ion-page>
+    <AppHeader title="Détail du chantier" />
+    <ion-content>
+      <template v-if="shift">
+        <div class="detail-hero">
+          <p class="dtime">{{ timeRange(shift) }}</p>
+          <p class="dclient">{{ shift.chantier_name }}</p>
+          <p class="daddr"><ion-icon :icon="locationOutline"></ion-icon> {{ shift.chantier_address || shift.chantier_name }}</p>
         </div>
-      </div>
-    </div>
-  </template>
 
-  <p v-else-if="!loading" class="trip-empty">Vacation introuvable.</p>
+        <div class="detail-actions">
+          <a class="dbtn" :href="itineraryHref(shift)" target="_blank" rel="noopener">
+            <ion-icon :icon="mapOutline"></ion-icon> Itinéraire
+          </a>
+          <button type="button" class="dbtn" @click="goToStock">
+            <ion-icon :icon="cubeOutline"></ion-icon> Stock
+          </button>
+          <button type="button" class="dbtn" @click="goToInventaire">
+            <ion-icon :icon="clipboardOutline"></ion-icon> Inventaire
+          </button>
+        </div>
+
+        <div v-if="shift.note" class="detail-block">
+          <div class="note-box">
+            <ion-icon :icon="alertCircleOutline"></ion-icon>
+            <span>{{ shift.note }}</span>
+          </div>
+        </div>
+
+        <div v-if="stockPreview.length" class="detail-block">
+          <div class="block-head">
+            <p class="section-title" style="padding: 0; margin: 14px 0 6px">Stock du site</p>
+            <button type="button" class="see-all" @click="goToStock">Tout voir <ion-icon :icon="chevronForwardOutline"></ion-icon></button>
+          </div>
+          <div class="stock-mini-row">
+            <div class="stock-mini" v-for="p in stockPreview" :key="p.name">
+              <ion-icon :icon="p.icon"></ion-icon>
+              <p class="sname">{{ p.name }}</p>
+              <p class="slevel" :class="p.status">{{ statusLabel(p.status) }}</p>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <p v-else-if="!loading" class="trip-empty">Vacation introuvable.</p>
+    </ion-content>
+  </ion-page>
 </template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { IonButton } from '@ionic/vue';
+
 const props = defineProps({
   modelValue: { type: Number, default: 0 },
   min: { type: Number, default: 0 },
@@ -13,9 +15,9 @@ function step(delta: number) {
 
 <template>
   <div class="stepper">
-    <button type="button" @click="step(-1)">−</button>
+    <ion-button class="step-btn" fill="outline" shape="round" @click="step(-1)">−</ion-button>
     <span>{{ modelValue }}</span>
-    <button type="button" @click="step(1)">+</button>
+    <ion-button class="step-btn" fill="outline" shape="round" @click="step(1)">+</ion-button>
   </div>
 </template>
 
@@ -26,14 +28,18 @@ function step(delta: number) {
   gap: 10px;
 }
 
-button {
+.step-btn {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --border-color: var(--border);
+  --color: var(--text-primary);
+  --box-shadow: none;
   font-size: 18px;
-  line-height: 1;
+  margin: 0;
 }
 
 span {

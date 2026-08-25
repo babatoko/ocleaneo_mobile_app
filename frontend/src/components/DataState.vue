@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { IonButton, IonIcon, IonSkeletonText } from '@ionic/vue';
+import { cloudOfflineOutline, refreshOutline } from 'ionicons/icons';
+
 /**
  * États d'un écran alimenté par des données distantes : chargement, erreur,
  * vide, contenu. Existe pour qu'aucun écran ne puisse plus afficher « vide »
@@ -20,15 +23,16 @@ defineEmits(['retry']);
 <template>
   <div v-if="loading" class="ds-skeletons" aria-busy="true" aria-live="polite">
     <span class="sr-only">Chargement en cours…</span>
-    <div v-for="i in skeletonCount" :key="i" class="ds-skeleton"></div>
+    <ion-skeleton-text v-for="i in skeletonCount" :key="i" class="ds-skeleton" animated></ion-skeleton-text>
   </div>
 
   <div v-else-if="error" class="ds-error" role="alert">
-    <i class="ti ti-cloud-off"></i>
+    <ion-icon :icon="cloudOfflineOutline" aria-hidden="true"></ion-icon>
     <p class="ds-msg">{{ error }}</p>
-    <button type="button" class="ds-retry" @click="$emit('retry')">
-      <i class="ti ti-refresh"></i> Réessayer
-    </button>
+    <ion-button class="ds-retry" fill="solid" size="small" @click="$emit('retry')">
+      <ion-icon slot="start" :icon="refreshOutline"></ion-icon>
+      Réessayer
+    </ion-button>
   </div>
 
   <p v-else-if="empty" class="ds-empty">
@@ -49,29 +53,8 @@ defineEmits(['retry']);
 .ds-skeleton {
   height: 76px;
   border-radius: 12px;
-  background: linear-gradient(
-    100deg,
-    var(--surface-1) 30%,
-    var(--skeleton-sheen) 50%,
-    var(--surface-1) 70%
-  );
-  background-size: 300% 100%;
-  animation: ds-sheen 1.3s ease-in-out infinite;
-}
-
-@keyframes ds-sheen {
-  from {
-    background-position: 150% 0;
-  }
-  to {
-    background-position: -50% 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ds-skeleton {
-    animation: none;
-  }
+  --background: var(--surface-1);
+  --background-rgb: 0, 0, 0;
 }
 
 .ds-error {
@@ -83,7 +66,7 @@ defineEmits(['retry']);
   text-align: center;
 }
 
-.ds-error i {
+.ds-error ion-icon {
   font-size: 30px;
   color: var(--text-muted);
 }
@@ -95,17 +78,14 @@ defineEmits(['retry']);
 }
 
 .ds-retry {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   margin-top: 14px;
-  padding: 9px 18px;
-  border: none;
-  border-radius: 10px;
-  background: var(--accent-bg);
-  color: var(--accent-text);
+  --background: var(--accent-bg);
+  --color: var(--accent-text);
+  --border-radius: 10px;
+  --box-shadow: none;
   font-size: 13px;
   font-weight: 500;
+  text-transform: none;
 }
 
 .ds-empty {

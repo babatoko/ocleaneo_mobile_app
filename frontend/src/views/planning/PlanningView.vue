@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { IonContent, IonIcon, IonPage, IonSegment, IonSegmentButton, IonLabel } from '@ionic/vue';
+import type { SegmentChangeEventDetail } from '@ionic/core';
+import {
+  alertCircleOutline,
+  calendarOutline,
+  chevronBackOutline,
+  chevronForwardOutline,
+  locationOutline,
+  mapOutline,
+  navigateOutline,
+  sparklesOutline,
+  timeOutline,
+} from 'ionicons/icons';
 import { useAuthStore } from '../../stores/auth';
 import { useChantiersStore } from '../../stores/chantiers';
 import { usePlanningStore } from '../../stores/planning';
@@ -162,6 +175,11 @@ function refresh() {
   else if (view.value === 'semaine') loadWeek();
   else if (view.value === 'mois') loadMonth();
   else loadTournee();
+}
+
+function onViewChange(e: CustomEvent<SegmentChangeEventDetail>) {
+  const next = e.detail.value as PlanningTab | undefined;
+  if (next) view.value = next;
 }
 
 function pickDay(date: Date) {
@@ -341,10 +359,14 @@ async function renderMap(
 
   const points: [number, number][] = [];
   if (current) {
+    // Marqueur Leaflet : du HTML brut injecté hors du rendu Vue, donc pas
+    // d'<ion-icon> (chargerait son SVG à distance sans registre local) — la
+    // même constante ionicons est réutilisable directement comme <img>, elle
+    // est déjà une data URI SVG.
     L.marker([current.latitude, current.longitude], {
       icon: L.divIcon({
         className: '',
-        html: '<div class="trip-marker start"><i class="ti ti-navigation"></i></div>',
+        html: `<div class="trip-marker start"><img src="${navigateOutline}" alt="" width="14" height="14" /></div>`,
         iconSize: [24, 24],
       }),
     }).addTo(map);
@@ -393,6 +415,8 @@ onUnmounted(destroyMap);
 </script>
 
 <template>
+  <ion-page>
+    <ion-content>
   <div class="header">
     <div>
       <p class="hello">Bonjour</p>
@@ -401,14 +425,14 @@ onUnmounted(destroyMap);
     <div class="avatar">{{ initials }}</div>
   </div>
 
-  <div class="view-toggle four">
-    <button class="opt" :class="{ active: view === 'jour' }" @click="view = 'jour'">Jour</button>
-    <button class="opt" :class="{ active: view === 'semaine' }" @click="view = 'semaine'">Semaine</button>
-    <button class="opt" :class="{ active: view === 'mois' }" @click="view = 'mois'">Mois</button>
-    <button class="opt" :class="{ active: view === 'tournee' }" @click="view = 'tournee'">Tournée</button>
-  </div>
+  <ion-segment class="view-toggle four" :value="view" @ion-change="onViewChange">
+    <ion-segment-button value="jour"><ion-label>Jour</ion-label></ion-segment-button>
+    <ion-segment-button value="semaine"><ion-label>Semaine</ion-label></ion-segment-button>
+    <ion-segment-button value="mois"><ion-label>Mois</ion-label></ion-segment-button>
+    <ion-segment-button value="tournee"><ion-label>Tournée</ion-label></ion-segment-button>
+  </ion-segment>
 
-  <p v-if="exportError" class="export-error"><i class="ti ti-alert-circle"></i> {{ exportError }}</p>
+  <p v-if="exportError" class="export-error"><ion-icon :icon="alertCircleOutline"></ion-icon> {{ exportError }}</p>
 
   <div v-if="view === 'jour'">
     <div class="days">
@@ -453,15 +477,15 @@ onUnmounted(destroyMap);
               }}</span>
             </div>
             <p class="client">{{ s.chantier_name }}</p>
-            <p class="place"><i class="ti ti-map-pin"></i> {{ s.chantier_address || s.chantier_name }}</p>
+            <p class="place"><ion-icon :icon="locationOutline"></ion-icon> {{ s.chantier_address || s.chantier_name }}</p>
             <p v-if="s.note" class="meta">{{ s.note }}</p>
           </button>
           <div class="card-actions">
             <a :href="itineraryHref(s)" target="_blank" rel="noopener">
-              <i class="ti ti-map-2"></i> Itinéraire
+              <ion-icon :icon="mapOutline"></ion-icon> Itinéraire
             </a>
             <button type="button" @click="exportToCalendar([s], `vacation-${s.id}.ics`)">
-              <i class="ti ti-calendar-plus"></i> Calendrier
+              <ion-icon :icon="calendarOutline"></ion-icon> Calendrier
             </button>
           </div>
         </div>
@@ -482,7 +506,7 @@ onUnmounted(destroyMap);
         class="export-week-btn"
         @click="exportToCalendar(Object.values(planning.weekShiftsByDay).flat(), 'planning-semaine.ics')"
       >
-        <i class="ti ti-calendar-plus"></i> Exporter la semaine
+        <ion-icon :icon="calendarOutline"></ion-icon> Exporter la semaine
       </button>
 
       <div v-for="d in weekDays" :key="toIso(d)" class="week-day">
@@ -502,7 +526,7 @@ onUnmounted(destroyMap);
             rel="noopener"
             :aria-label="`Itinéraire vers ${s.chantier_name}`"
           >
-            <i class="ti ti-map-2"></i>
+            <ion-icon :icon="mapOutline"></ion-icon>
           </a>
         </div>
       </div>
@@ -511,9 +535,9 @@ onUnmounted(destroyMap);
 
   <div v-else-if="view === 'mois'" class="month">
     <div class="month-nav">
-      <button type="button" aria-label="Mois précédent" @click="shiftMonth(-1)"><i class="ti ti-chevron-left"></i></button>
+      <button type="button" aria-label="Mois précédent" @click="shiftMonth(-1)"><ion-icon :icon="chevronBackOutline"></ion-icon></button>
       <strong>{{ monthLabel }}</strong>
-      <button type="button" aria-label="Mois suivant" @click="shiftMonth(1)"><i class="ti ti-chevron-right"></i></button>
+      <button type="button" aria-label="Mois suivant" @click="shiftMonth(1)"><ion-icon :icon="chevronForwardOutline"></ion-icon></button>
     </div>
     <div class="month-weekdays" aria-hidden="true">
       <span v-for="(wd, i) in ['L', 'M', 'M', 'J', 'V', 'S', 'D']" :key="i">{{ wd }}</span>
@@ -551,9 +575,9 @@ onUnmounted(destroyMap);
       <div ref="mapEl" class="map-wrap"></div>
 
       <div class="map-summary-bar">
-        <div class="sitem"><i class="ti ti-route"></i> {{ fmtKm(tripDistanceMeters) }}</div>
-        <div class="sitem"><i class="ti ti-clock"></i> {{ fmtDuration(tripDurationSeconds) }} trajet</div>
-        <div class="optimize-badge"><i class="ti ti-sparkles"></i> Optimisée</div>
+        <div class="sitem"><ion-icon :icon="mapOutline"></ion-icon> {{ fmtKm(tripDistanceMeters) }}</div>
+        <div class="sitem"><ion-icon :icon="timeOutline"></ion-icon> {{ fmtDuration(tripDurationSeconds) }} trajet</div>
+        <div class="optimize-badge"><ion-icon :icon="sparklesOutline"></ion-icon> Optimisée</div>
       </div>
 
       <a
@@ -562,7 +586,7 @@ onUnmounted(destroyMap);
         target="_blank"
         rel="noopener"
       >
-        <i class="ti ti-navigation"></i> Démarrer la navigation vers {{ tripStops[0].name }}
+        <ion-icon :icon="navigateOutline"></ion-icon> Démarrer la navigation vers {{ tripStops[0].name }}
       </a>
 
       <div v-for="(s, i) in tripStops" :key="s.id" class="stop-row">
@@ -585,6 +609,8 @@ onUnmounted(destroyMap);
     </p>
     <p v-else class="trip-empty">Pas assez de sites planifiés ce jour-là pour une tournée.</p>
   </div>
+    </ion-content>
+  </ion-page>
 </template>
 
 <style scoped>

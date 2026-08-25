@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { IonContent, IonIcon, IonPage } from '@ionic/vue';
+import { logInOutline, logOutOutline, pauseOutline, playOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
 import { todayIso, addDaysIso } from '../../utils/date';
@@ -45,10 +47,10 @@ const byDay = computed(() => {
 });
 
 function entryIcon(type: TimeEntryType): string {
-  if (type === 'in') return 'ti-login-2';
-  if (type === 'pause_start') return 'ti-player-pause';
-  if (type === 'pause_end') return 'ti-player-play';
-  return 'ti-logout-2';
+  if (type === 'in') return logInOutline;
+  if (type === 'pause_start') return pauseOutline;
+  if (type === 'pause_end') return playOutline;
+  return logOutOutline;
 }
 
 function entryLabel(type: TimeEntryType): string {
@@ -64,25 +66,28 @@ function fmtTime(iso: string): string {
 </script>
 
 <template>
-  <AppHeader title="Historique des pointages" />
+  <ion-page>
+    <AppHeader title="Historique des pointages" />
+    <ion-content>
+      <DataState :loading="loading" :error="error" :empty="!byDay.length" @retry="load">
+        <template #empty>Aucun pointage sur les 14 derniers jours.</template>
 
-  <DataState :loading="loading" :error="error" :empty="!byDay.length" @retry="load">
-    <template #empty>Aucun pointage sur les 14 derniers jours.</template>
-
-    <div v-for="d in byDay" :key="d.day" class="history">
-      <p class="history-title day-title">{{ d.label }}</p>
-      <div v-for="e in d.entries" :key="e.id" class="hist-row">
-        <div class="hist-icon" :class="e.type" aria-hidden="true">
-          <i class="ti" :class="entryIcon(e.type)"></i>
+        <div v-for="d in byDay" :key="d.day" class="history">
+          <p class="history-title day-title">{{ d.label }}</p>
+          <div v-for="e in d.entries" :key="e.id" class="hist-row">
+            <div class="hist-icon" :class="e.type" aria-hidden="true">
+              <ion-icon :icon="entryIcon(e.type)"></ion-icon>
+            </div>
+            <div class="hist-text">
+              <p class="lbl">{{ entryLabel(e.type) }}</p>
+              <p class="sub">{{ e.chantier_name }}</p>
+            </div>
+            <span class="hist-time">{{ fmtTime(e.recorded_at) }}</span>
+          </div>
         </div>
-        <div class="hist-text">
-          <p class="lbl">{{ entryLabel(e.type) }}</p>
-          <p class="sub">{{ e.chantier_name }}</p>
-        </div>
-        <span class="hist-time">{{ fmtTime(e.recorded_at) }}</span>
-      </div>
-    </div>
-  </DataState>
+      </DataState>
+    </ion-content>
+  </ion-page>
 </template>
 
 <style scoped>

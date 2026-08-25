@@ -1,4 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory } from '@ionic/vue-router';
+import type { RouteLocationNormalized } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 
 declare module 'vue-router' {
@@ -33,7 +34,7 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to: RouteLocationNormalized) => {
   const auth = useAuthStore();
   if (!to.meta.public && !auth.isAuthenticated) {
     // "/" n'est pas un lien profond à préserver : après connexion, on atterrit
