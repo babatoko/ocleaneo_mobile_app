@@ -1,5 +1,6 @@
 import { DataProvider } from './DataProvider';
-import { todayIso } from '../utils/date';
+import { addDaysIso, todayIso } from '../utils/date';
+import { startOfWeekIso } from '../utils/week';
 import type {
   Chantier,
   CreateOrderPayload,
@@ -32,11 +33,29 @@ const chantiers: Chantier[] = [
   {
     id: 2,
     name: 'Résidence Les Tilleuls',
-    address: 'Tournus',
+    address: '8 rue des Tilleuls, Tournus',
     is_active: 1,
     nfc_tag_id: '04D4E5F6',
     latitude: 46.568,
     longitude: 4.906,
+  },
+  {
+    id: 3,
+    name: 'Clinique du Val de Saône',
+    address: '22 quai Bouchacourt, Mâcon',
+    is_active: 1,
+    nfc_tag_id: '04B7C8D9',
+    latitude: 46.3057,
+    longitude: 4.8319,
+  },
+  {
+    id: 4,
+    name: 'Collège Lamartine',
+    address: '5 rue Lamartine, Mâcon',
+    is_active: 1,
+    nfc_tag_id: '04E1F2A3',
+    latitude: 46.3082,
+    longitude: 4.8301,
   },
 ];
 
@@ -45,10 +64,25 @@ const products: Product[] = [
   { id: 2, name: 'Dégraissant sol', emoji: '🧹', category: 'Sol', is_active: 1, packagings: [{ id: 2, label: '5L', is_default: true }] },
   { id: 3, name: 'Spray vitres', emoji: '🪟', category: 'Vitres', is_active: 1, packagings: [{ id: 3, label: '750ml', is_default: true }] },
   { id: 4, name: 'Papier toilette', emoji: '🧻', category: 'Consommables', is_active: 1, packagings: [{ id: 4, label: 'Carton 96 rouleaux', is_default: true }] },
+  { id: 5, name: 'Essuie-mains', emoji: '🧻', category: 'Consommables', is_active: 1, packagings: [{ id: 5, label: 'Carton 6 rouleaux', is_default: true }] },
+  { id: 6, name: 'Savon mains', emoji: '🧼', category: 'Sanitaires', is_active: 1, packagings: [{ id: 6, label: '500ml', is_default: true }] },
+  { id: 7, name: 'Désinfectant sanitaires', emoji: '🧽', category: 'Sanitaires', is_active: 1, packagings: [{ id: 7, label: '1L', is_default: true }] },
+  { id: 8, name: 'Sacs poubelle 50L', emoji: '🗑️', category: 'Consommables', is_active: 1, packagings: [{ id: 8, label: 'Rouleau de 20', is_default: true }] },
 ];
 
+/**
+ * Vacations réparties sur toute la semaine calendaire en cours (lundi-dimanche
+ * de `today`) pour que Semaine/Mois affichent plusieurs jours renseignés, pas
+ * seulement aujourd'hui — plus les deux vacations du jour même de la fixture
+ * d'origine, ancrées sur `today` plutôt que sur un jour fixe de la semaine
+ * pour que l'onglet Jour et la Tournée aient toujours des données quel que
+ * soit le jour d'exécution.
+ */
 function shiftsFixture(): Shift[] {
   const today = todayIso();
+  const monday = startOfWeekIso(today);
+  const weekday = (n: number) => addDaysIso(monday, n);
+
   return [
     {
       id: 1,
@@ -70,6 +104,87 @@ function shiftsFixture(): Shift[] {
       start_at: `${today}T14:00:00`,
       end_at: `${today}T16:30:00`,
       status: 'confirmed',
+      note: 'Digicode 4471B — sonner à l\'accueil si besoin.',
+    },
+    {
+      id: 3,
+      employee_id: 1,
+      chantier_id: 4,
+      chantier_name: chantiers[3].name,
+      chantier_address: chantiers[3].address,
+      start_at: `${today}T12:00:00`,
+      end_at: `${today}T13:00:00`,
+      status: 'confirmed',
+      note: null,
+    },
+    // Lundi
+    {
+      id: 4,
+      employee_id: 1,
+      chantier_id: 1,
+      chantier_name: chantiers[0].name,
+      chantier_address: chantiers[0].address,
+      start_at: `${weekday(0)}T08:00:00`,
+      end_at: `${weekday(0)}T11:00:00`,
+      status: 'confirmed',
+      note: null,
+    },
+    // Mercredi
+    {
+      id: 5,
+      employee_id: 1,
+      chantier_id: 3,
+      chantier_name: chantiers[2].name,
+      chantier_address: chantiers[2].address,
+      start_at: `${weekday(2)}T07:30:00`,
+      end_at: `${weekday(2)}T10:00:00`,
+      status: 'confirmed',
+      note: 'Client absent — prévenir la réception avant d\'entrer.',
+    },
+    // Jeudi
+    {
+      id: 6,
+      employee_id: 1,
+      chantier_id: 1,
+      chantier_name: chantiers[0].name,
+      chantier_address: chantiers[0].address,
+      start_at: `${weekday(3)}T08:00:00`,
+      end_at: `${weekday(3)}T11:00:00`,
+      status: 'modified',
+      note: null,
+    },
+    {
+      id: 7,
+      employee_id: 1,
+      chantier_id: 4,
+      chantier_name: chantiers[3].name,
+      chantier_address: chantiers[3].address,
+      start_at: `${weekday(3)}T13:00:00`,
+      end_at: `${weekday(3)}T15:00:00`,
+      status: 'confirmed',
+      note: null,
+    },
+    // Vendredi
+    {
+      id: 8,
+      employee_id: 1,
+      chantier_id: 2,
+      chantier_name: chantiers[1].name,
+      chantier_address: chantiers[1].address,
+      start_at: `${weekday(4)}T09:00:00`,
+      end_at: `${weekday(4)}T12:00:00`,
+      status: 'confirmed',
+      note: null,
+    },
+    {
+      id: 9,
+      employee_id: 1,
+      chantier_id: 3,
+      chantier_name: chantiers[2].name,
+      chantier_address: chantiers[2].address,
+      start_at: `${weekday(4)}T15:00:00`,
+      end_at: `${weekday(4)}T17:00:00`,
+      status: 'confirmed',
       note: null,
     },
   ];
@@ -79,11 +194,79 @@ function delay(ms = 150): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const timeEntries: TimeEntry[] = [];
-const orders: Order[] = [];
-const inventoryByChantier: Record<number, InventoryLatest> = {};
-let nextEntryId = 1;
-let nextOrderId = 1;
+/**
+ * Historique de pointage sur les deux jours précédents (arrivée/pause/reprise/
+ * départ) pour que Pointage/Historique ne parte pas d'un écran vide — les
+ * pointages du jour même restent, eux, à saisir en direct dans la démo.
+ */
+function timeEntriesFixture(): TimeEntry[] {
+  const yesterday = addDaysIso(todayIso(), -1);
+  const beforeYesterday = addDaysIso(todayIso(), -2);
+  return [
+    { id: 1, type: 'in', chantier_id: 1, chantier_name: chantiers[0].name, recorded_at: `${beforeYesterday}T08:02:00` },
+    { id: 2, type: 'out', chantier_id: 1, chantier_name: chantiers[0].name, recorded_at: `${beforeYesterday}T11:05:00` },
+    { id: 3, type: 'in', chantier_id: 2, chantier_name: chantiers[1].name, recorded_at: `${beforeYesterday}T14:00:00` },
+    { id: 4, type: 'out', chantier_id: 2, chantier_name: chantiers[1].name, recorded_at: `${beforeYesterday}T16:28:00` },
+    { id: 5, type: 'in', chantier_id: 1, chantier_name: chantiers[0].name, recorded_at: `${yesterday}T07:58:00` },
+    { id: 6, type: 'pause_start', chantier_id: 1, chantier_name: chantiers[0].name, recorded_at: `${yesterday}T09:30:00` },
+    { id: 7, type: 'pause_end', chantier_id: 1, chantier_name: chantiers[0].name, recorded_at: `${yesterday}T09:45:00` },
+    { id: 8, type: 'out', chantier_id: 1, chantier_name: chantiers[0].name, recorded_at: `${yesterday}T11:10:00` },
+  ];
+}
+
+/** Deux commandes passées les jours précédents, pour que l'historique et le
+ *  récapitulatif aient un vrai contenu à afficher. */
+function ordersFixture(): Order[] {
+  const yesterday = addDaysIso(todayIso(), -1);
+  const beforeYesterday = addDaysIso(todayIso(), -3);
+  return [
+    {
+      id: 2,
+      chantier_name: chantiers[0].name,
+      status: 'confirmed',
+      created_at: `${yesterday}T11:20:00`,
+      items: [
+        { id: 1, product_emoji: '🧴', product_name: 'Javel', packaging_label: '5L', quantity: 2 },
+        { id: 6, product_emoji: '🧼', product_name: 'Savon mains', packaging_label: '500ml', quantity: 3 },
+      ],
+    },
+    {
+      id: 1,
+      chantier_name: chantiers[1].name,
+      status: 'confirmed',
+      created_at: `${beforeYesterday}T16:40:00`,
+      items: [
+        { id: 4, product_emoji: '🧻', product_name: 'Papier toilette', packaging_label: 'Carton 96 rouleaux', quantity: 1 },
+        { id: 3, product_emoji: '🪟', product_name: 'Spray vitres', packaging_label: '750ml', quantity: 2 },
+      ],
+    },
+  ];
+}
+
+/** Niveaux de stock initiaux pour Cegetel Mâcon — de quoi voir les trois
+ *  statuts (OK/faible/rupture) sur l'écran Catalogue dès l'ouverture. */
+function inventoryFixture(): Record<number, InventoryLatest> {
+  return {
+    1: {
+      items: [
+        { product_id: 1, packaging_id: 1, quantity_remaining: 4 },
+        { product_id: 2, packaging_id: 2, quantity_remaining: 1 },
+        { product_id: 3, packaging_id: 3, quantity_remaining: 0 },
+        { product_id: 4, packaging_id: 4, quantity_remaining: 6 },
+        { product_id: 5, packaging_id: 5, quantity_remaining: 2 },
+        { product_id: 6, packaging_id: 6, quantity_remaining: 5 },
+        { product_id: 7, packaging_id: 7, quantity_remaining: 1 },
+        { product_id: 8, packaging_id: 8, quantity_remaining: 3 },
+      ],
+    },
+  };
+}
+
+const timeEntries: TimeEntry[] = timeEntriesFixture();
+const orders: Order[] = ordersFixture();
+const inventoryByChantier: Record<number, InventoryLatest> = inventoryFixture();
+let nextEntryId = timeEntries.length + 1;
+let nextOrderId = orders.length + 1;
 
 /**
  * Provider 100 % en mémoire, aucun appel réseau : pour développer ou faire
