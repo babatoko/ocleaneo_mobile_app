@@ -5,33 +5,20 @@ import logging
 from odoo import http, _
 from odoo.http import request
 
-_logger = logging.getLogger(__name__)
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
+    MOBILE_CORS_ORIGIN,
+    authenticate_mobile_request,
+)
 
-MOBILE_CORS_ORIGIN = "http://127.0.0.1:5173"
+_logger = logging.getLogger(__name__)
 
 
 class MobileMeController(http.Controller):
 
-    def _authenticate_mobile(self):
-        auth_header = request.httprequest.headers.get("Authorization", "")
-        token = ""
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:].strip()
-        if not token:
-            token = request.httprequest.headers.get("X-Mobile-Token", "")
-        if not token:
-            return None
-        env = request.env
-        users = env["res.users"].sudo().search([("mobile_api_token", "!=", False)])
-        for user in users:
-            if user.verify_mobile_api_token(token):
-                return user
-        return None
-
     @http.route("/api/mobile/me", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def me(self, **kwargs):
         """Return current user/employee profile with open attendance and current FSM order."""
-        user = self._authenticate_mobile()
+        user = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 

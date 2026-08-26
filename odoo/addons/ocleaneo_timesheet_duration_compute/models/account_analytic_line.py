@@ -32,7 +32,26 @@ class AccountAnalyticLine(models.Model):
         return super(AccountAnalyticLine, self).create(vals_list)
 
     def write(self, vals):
-        vals = self._compute_duration(vals)
+        """Recompute unit_amount from date_time/date_time_end.
+
+        The mobile clocking flow (ocleaneo_mobile_pointage) creates a line
+        with only date_time set, then later writes only date_time_end on
+        that same record (`open_line.date_time_end = now`) once the worker
+        clocks out. _compute_duration(vals) alone only ever sees whichever
+        single field is in vals for that call, so it never fired on the
+        write that actually closes the line — every mobile-created
+        timesheet stayed at unit_amount=0. Falling back to each record's
+        own current value for the field not present in vals fixes that
+        while still supporting direct two-field writes/create() calls.
+        """
+        if ('date_time' in vals or 'date_time_end' in vals) and 'unit_amount' not in vals:
+            for line in self:
+                merged = dict(vals)
+                merged.setdefault('date_time', line.date_time)
+                merged.setdefault('date_time_end', line.date_time_end)
+                merged = self._compute_duration(merged)
+                super(AccountAnalyticLine, line).write(merged)
+            return True
         return super(AccountAnalyticLine, self).write(vals)
 
     def _compute_duration(self, vals):

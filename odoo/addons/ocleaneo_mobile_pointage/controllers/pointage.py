@@ -5,55 +5,26 @@ from odoo import http, fields
 from odoo.http import request
 from odoo.exceptions import ValidationError, AccessError
 import logging
-import dateutil.parser
-import pytz
+
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
+    MOBILE_CORS_ORIGIN,
+    authenticate_mobile_request,
+)
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import local_to_utc
 
 _logger = logging.getLogger(__name__)
-
-MOBILE_CORS_ORIGIN = "http://127.0.0.1:5173"
 
 
 class MobilePointageController(http.Controller):
 
-    def _authenticate_mobile(self):
-        auth_header = request.httprequest.headers.get("Authorization", "")
-        token = ""
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:].strip()
-        if not token:
-            token = request.httprequest.headers.get("X-Mobile-Token", "")
-        if not token:
-            return None
-        env = request.env
-        users = env["res.users"].sudo().search([("mobile_api_token", "!=", False)])
-        for user in users:
-            if user.verify_mobile_api_token(token):
-                return user
-        return None
-
-    def _local_to_utc(self, datetime_iso, fallback_tz=None):
-        """Convert an ISO8601 local datetime string (with or without offset) to UTC Datetime.
-
-        If no timezone is provided, the user's own timezone is assumed.
-        Returns the current UTC time if parsing fails.
-        """
-        if not datetime_iso:
-            return fields.Datetime.now()
-        try:
-            dt = dateutil.parser.isoparse(datetime_iso)
-            if dt.tzinfo is None:
-                tz = fallback_tz or request.env.user.tz or "Europe/Paris"
-                local_tz = pytz.timezone(tz)
-                dt = local_tz.localize(dt)
-            return dt.astimezone(pytz.utc).replace(tzinfo=None)
-        except Exception as e:
-            _logger.warning("Failed to parse datetime '%s': %s", datetime_iso, e)
-            return fields.Datetime.now()
+    def _get_fsm_person(self, env, user):
+        """Resolve the fsm.person linked to the authenticated user's partner."""
+        return env["fsm.person"].sudo().search([("partner_id", "=", user.partner_id.id)], limit=1)
 
     @http.route("/api/mobile/chantiers/aujourdhui", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def chantiers_aujourdhui(self, **kwargs):
         """Return today's FSM orders for the connected employee."""
-        user = self._authenticate_mobile()
+        user = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
@@ -63,8 +34,7 @@ class MobilePointageController(http.Controller):
             return {"error": "no employee linked to user", "code": 400}
 
         today = fields.Date.today()
-        # Find fsm.person linked to the user's partner
-        person = env["fsm.person"].sudo().search([("partner_id", "=", user.partner_id.id)], limit=1)
+        person = self._get_fsm_person(env, user)
         if not person:
             return {"count": 0, "orders": []}
 
@@ -102,7 +72,7 @@ class MobilePointageController(http.Controller):
         datetime: ISO8601 local time sent by the mobile app.
         description: free text entered by the worker (used as timesheet line name).
         """
-        user = self._authenticate_mobile()
+        user = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
@@ -115,7 +85,7 @@ class MobilePointageController(http.Controller):
         if pointage_type not in ("arrivee", "depart", "pause_debut", "pause_fin"):
             return {"error": "invalid type", "code": 400}
 
-        now = self._local_to_utc(datetime)
+        now = local_to_utc(datetime)
         company_id = employee.company_id.id or user.company_id.id
 
         vals = {
@@ -133,10 +103,22 @@ class MobilePointageController(http.Controller):
         }
         order = env["fsm.order"].browse(False)
         if fsm_order_id:
-            order = env["fsm.order"].sudo().browse(int(fsm_order_id))
-            if order.exists():
-                vals["fsm_order_id"] = order.id
-                vals["fsm_location_id"] = order.location_id.id
+            try:
+                fsm_order_id = int(fsm_order_id)
+            except (TypeError, ValueError):
+                return {"error": "invalid fsm_order_id", "code": 400}
+            order = env["fsm.order"].sudo().browse(fsm_order_id)
+            if not order.exists():
+                return {"error": "fsm_order not found", "code": 404}
+            # Ownership check: a worker may only clock on FSM orders assigned
+            # to their own fsm.person — without this, any authenticated user
+            # could pass an arbitrary fsm_order_id and clock (and, on
+            # "depart", close) another employee's job.
+            person = self._get_fsm_person(env, user)
+            if not person or order.person_id.id != person.id:
+                return {"error": "forbidden: fsm_order does not belong to this worker", "code": 403}
+            vals["fsm_order_id"] = order.id
+            vals["fsm_location_id"] = order.location_id.id
 
         pointage = env["ocleaneo.mobile.pointage"].sudo().create(vals)
 
@@ -172,8 +154,29 @@ class MobilePointageController(http.Controller):
         }
 
     def _get_project_pointage_chantiers(self, env, company_id):
-        """Return the generic 'Pointage chantiers' project for the given company."""
+        """Return the generic 'Pointage chantiers' project for the given company.
+
+        Prefers an explicit ir.config_parameter (set once, e.g. from the
+        Odoo shell: `env['ir.config_parameter'].set_param(
+        'ocleaneo_mobile_pointage.project_id', str(project.id))`) so
+        renaming the project from the UI — a completely normal action — no
+        longer silently breaks timesheet creation for every worker. Falls
+        back to the name search only when no id has been configured.
+        """
         Project = env["project.project"].sudo()
+        project_id = env["ir.config_parameter"].sudo().get_param("ocleaneo_mobile_pointage.project_id")
+        if project_id:
+            try:
+                project = Project.browse(int(project_id))
+            except (TypeError, ValueError):
+                project = Project.browse()
+            if project.exists():
+                return project
+            _logger.warning(
+                "ocleaneo_mobile_pointage.project_id=%s does not exist; falling back to name search",
+                project_id,
+            )
+
         project = Project.search([
             ("name", "ilike", "pointage chantiers"),
             ("company_id", "=", company_id),

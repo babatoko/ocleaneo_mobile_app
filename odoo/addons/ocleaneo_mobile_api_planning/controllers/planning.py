@@ -6,28 +6,16 @@ from odoo.http import request
 import logging
 import dateutil.parser
 
-_logger = logging.getLogger(__name__)
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
+    MOBILE_CORS_ORIGIN,
+    authenticate_mobile_request,
+)
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import local_day_bounds_utc
 
-MOBILE_CORS_ORIGIN = "http://127.0.0.1:5173"
+_logger = logging.getLogger(__name__)
 
 
 class MobilePlanningController(http.Controller):
-
-    def _authenticate_mobile(self):
-        auth_header = request.httprequest.headers.get("Authorization", "")
-        token = ""
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:].strip()
-        if not token:
-            token = request.httprequest.headers.get("X-Mobile-Token", "")
-        if not token:
-            return None
-        env = request.env
-        users = env["res.users"].sudo().search([("mobile_api_token", "!=", False)])
-        for user in users:
-            if user.verify_mobile_api_token(token):
-                return user
-        return None
 
     def _parse_date(self, date_str):
         if not date_str:
@@ -49,7 +37,7 @@ class MobilePlanningController(http.Controller):
         - date: YYYY-MM-DD (defaults to today)
         - view: 'day' | 'week' | 'route' (informational, defaults to config)
         """
-        user = self._authenticate_mobile()
+        user = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
@@ -59,8 +47,11 @@ class MobilePlanningController(http.Controller):
             return {"error": "no employee linked to user", "code": 400}
 
         target_date = self._parse_date(kwargs.get("date", date))
-        date_start = fields.Datetime.from_string(target_date.isoformat() + " 00:00:00")
-        date_end = fields.Datetime.from_string(target_date.isoformat() + " 23:59:59")
+        # Day boundaries in the worker's local timezone, converted to UTC —
+        # not a naive "00:00-23:59 in UTC" window, which would drop or
+        # misplace shifts starting before dawn or ending late at night
+        # (see frontend/src/utils/date.ts for the equivalent frontend fix).
+        date_start, date_end = local_day_bounds_utc(target_date, user.tz)
 
         # Resolve worker via fsm.person
         person = env["fsm.person"].sudo().search([("partner_id", "=", user.partner_id.id)], limit=1)

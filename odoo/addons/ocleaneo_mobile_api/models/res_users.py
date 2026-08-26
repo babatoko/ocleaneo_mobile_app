@@ -3,8 +3,15 @@
 
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessDenied
+from datetime import timedelta
+import os
 import secrets
 import hashlib
+
+# Mobile API token lifetime. Configurable via environment variable, same
+# pattern as MOBILE_CORS_ORIGIN (see tools/mobile_auth.py) — no code change
+# needed to tighten/loosen it per environment.
+MOBILE_TOKEN_TTL_DAYS = int(os.environ.get("OCLEANEO_MOBILE_TOKEN_TTL_DAYS", "30"))
 
 
 class ResUsers(models.Model):
@@ -25,7 +32,7 @@ class ResUsers(models.Model):
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         self.mobile_api_token = token_hash
-        self.mobile_api_token_expire = False  # set expiry later if needed
+        self.mobile_api_token_expire = fields.Datetime.now() + timedelta(days=MOBILE_TOKEN_TTL_DAYS)
         return token
 
     def verify_mobile_api_token(self, token):
