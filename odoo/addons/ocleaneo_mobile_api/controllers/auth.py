@@ -58,6 +58,48 @@ class MobileAuthController(http.Controller):
 
         user = env["res.users"].sudo().browse(uid)
         employee = user.get_employee_for_mobile()
+        return self._issue_mobile_token(env, user, employee)
+
+    @http.route("/api/mobile/auth/login_badge", type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    def login_badge(self, barcode=None, **kwargs):
+        """Authenticate by badge/NFC identifier alone and return a mobile API token.
+
+        The phone itself acts as the badge here (NFC/RFID), identified by
+        hr.employee.barcode — the same field Odoo uses for physical badge
+        scans elsewhere (Attendance, PoS). This is possession-based, not a
+        second factor: unlike login()'s login+password pair, a single
+        barcode value is the entire credential. That's an intentional
+        product choice for field workers (see odoo/README.md), not an
+        oversight — but it does mean whoever holds/knows a valid barcode
+        can obtain a full mobile API token for that employee, so treat
+        barcode values with the same care as a password, and note that no
+        rate-limiting is applied here any more than on login() (see
+        odoo/README.md § Comparaison avec res.users.apikeys).
+        """
+        barcode = kwargs.get("barcode", barcode)
+        if not barcode:
+            return {"error": "barcode required", "code": 400}
+
+        env = request.env
+        Employee = env["hr.employee"].sudo()
+        matches = Employee.search([("barcode", "=", barcode)], limit=2)
+        if not matches:
+            return {"error": "Invalid badge", "code": 401}
+        if len(matches) > 1:
+            # barcode is expected to be unique per employee; if it isn't
+            # (data entry error, or two employees sharing a code), refuse
+            # rather than silently authenticate as whichever one the
+            # search happened to return first.
+            _logger.error("Mobile badge login: barcode %r matches more than one hr.employee", barcode)
+            return {"error": "badge is not uniquely assigned; contact an administrator", "code": 409}
+        employee = matches
+        user = employee.user_id
+        return self._issue_mobile_token(env, user, employee)
+
+    def _issue_mobile_token(self, env, user, employee):
+        """Shared by login() and login_badge(): validate the employee/user
+        link and issue a mobile API token, or return the matching error.
+        """
         if not employee:
             return {"error": "no employee linked to user", "code": 400}
         # The mobile API token lives on hr.employee (see models/hr_employee.py),
@@ -66,9 +108,9 @@ class MobileAuthController(http.Controller):
         # direct one, not one of get_employee_for_mobile()'s fallback paths
         # (fsm.person / address_home_id), which don't guarantee employee.user_id
         # points back at this same user.
-        if not employee.user_id or employee.user_id.id != user.id:
+        if not employee.user_id or not user or employee.user_id.id != user.id:
             return {
-                "error": "employee is not directly linked to this user (hr.employee.user_id); "
+                "error": "employee is not directly linked to a user account (hr.employee.user_id); "
                          "required to issue a mobile API token",
                 "code": 400,
             }
@@ -84,8 +126,8 @@ class MobileAuthController(http.Controller):
             "user_name": user.name,
             "company_id": company.id,
             "company_name": company.name,
-            "employee_id": employee.id if employee else False,
-            "employee_name": employee.name if employee else False,
+            "employee_id": employee.id,
+            "employee_name": employee.name,
             "modules": [c.to_mobile_dict() for c in configs],
         }
 

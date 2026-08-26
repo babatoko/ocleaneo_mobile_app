@@ -85,9 +85,23 @@ Odoo dispose depuis la 14 d'un mécanisme natif de clés API (`res.users.apikeys
 
 Le point le plus concret que ce commit reprend : la recherche du token entrant n'est plus un scan de tous les employés ayant un jour eu un token (`env["hr.employee"].search([("mobile_api_token", "!=", False)])` puis vérification en boucle), mais une recherche indexée sur `mobile_api_token_index`, qui ne renvoie en pratique qu'une seule ligne candidate.
 
-Deux différences restent des décisions produit ouvertes, pas encore tranchées :
-- **Une seule session par employé** : contrairement au modèle natif (plusieurs clés par utilisateur), reconnecter l'app sur un nouveau téléphone invalide l'ancien. Si un salarié doit pouvoir être connecté sur plusieurs appareils (ou changer de téléphone sans couper l'app de l'ancien avant confirmation), il faudrait passer `mobile_api_token`/`_index`/`_expire` d'un champ unique sur `hr.employee` à un modèle séparé un-vers-plusieurs (comme `res.users.apikeys` l'est vis-à-vis de `res.users`).
-- **Rate limiting sur la vérification de token** : chaque requête `/api/mobile/*` vérifie le token sans limite de tentatives, contrairement à `_assert_can_auth()` côté natif.
+Décisions produit tranchées sur ces deux points :
+- **Une seule session par employé** (confirmé) : cohérent avec « le téléphone est le badge » — un salarié = un appareil = un badge. Pas de modèle un-vers-plusieurs comme `res.users.apikeys`.
+- **Rate limiting sur la vérification de token** : toujours un point ouvert, non traité dans ce module (chaque requête `/api/mobile/*` vérifie le token sans limite de tentatives, contrairement à `_assert_can_auth()` côté natif).
+
+### Connexion par badge (`POST /api/mobile/auth/login_badge`)
+
+Le téléphone lui-même fait office de badge NFC/RFID, identifié par un numéro unique par salarié (potentiellement synchronisé avec l'ID du logiciel de paie, ex. Silae). Réutilise `hr.employee.barcode` — le même champ « Badge ID » qu'Odoo utilise nativement pour les scans physiques ailleurs (Attendance, PoS) — plutôt qu'un nouveau champ dédié.
+
+```
+POST /api/mobile/auth/login_badge
+{ "barcode": "<numéro unique du badge>" }
+→ { "token": "...", "user_id": ..., "employee_id": ..., ... }  (même forme que /auth/login)
+```
+
+Contrairement à `/api/mobile/auth/login` (login + mot de passe, deux facteurs), `login_badge` n'a qu'un seul facteur : la possession/connaissance du numéro de badge suffit à obtenir un token API mobile complet. C'est un choix produit assumé (pas un oubli d'implémentation) — mais ça veut dire que ce numéro doit être traité avec la même prudence qu'un mot de passe : pas de diffusion en clair non nécessaire, pas de valeur prévisible (l'unicité seule ne suffit pas — voir la synchronisation Silae ci-dessous, à ne pas faire à partir d'un identifiant séquentiel devinable). Si `barcode` correspond à plusieurs `hr.employee` (erreur de saisie), la connexion est refusée (409) plutôt que de choisir arbitrairement l'un des deux.
+
+La synchronisation avec l'ID Silae (ou tout autre identifiant du logiciel de paie) n'est pas implémentée ici — ce module se contente de lire `hr.employee.barcode` tel qu'il est renseigné ; l'import/synchronisation de cette valeur depuis Silae reste à faire séparément (import manuel, ou connecteur dédié).
 
 ## Notes
 
