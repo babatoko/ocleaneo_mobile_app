@@ -10,6 +10,9 @@ from odoo.exceptions import AccessDenied
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     MOBILE_CORS_ORIGIN,
     authenticate_mobile_request,
+    check_auth_rate_limit,
+    clear_auth_failures,
+    record_auth_failure,
 )
 
 _logger = logging.getLogger(__name__)
@@ -43,19 +46,27 @@ class MobileAuthController(http.Controller):
             return {"error": "login and password required", "code": 400}
 
         env = request.env
+        limited = check_auth_rate_limit(env, "login", login)
+        if limited:
+            return limited
+
         try:
             uid = env["res.users"].authenticate(
                 request.db, login, password, {"interactive": True}
             )
         except AccessDenied:
+            record_auth_failure(env, "login", login)
             return {"error": "Invalid credentials", "code": 401}
         except Exception as e:
             _logger.exception("Mobile login error: %s", e)
+            record_auth_failure(env, "login", login)
             return {"error": "Authentication failed", "code": 401}
 
         if not uid:
+            record_auth_failure(env, "login", login)
             return {"error": "Invalid credentials", "code": 401}
 
+        clear_auth_failures(env, "login", login)
         user = env["res.users"].sudo().browse(uid)
         employee = user.get_employee_for_mobile()
         return self._issue_mobile_token(env, user, employee)
@@ -72,15 +83,20 @@ class MobileAuthController(http.Controller):
         product choice for field workers (see odoo/README.md), not an
         oversight — but it does mean whoever holds/knows a valid barcode
         can obtain a full mobile API token for that employee, so treat
-        barcode values with the same care as a password, and note that no
-        rate-limiting is applied here any more than on login() (see
-        odoo/README.md § Comparaison avec res.users.apikeys).
+        barcode values with the same care as a password. Being
+        single-factor is exactly why this route is rate-limited: a badge
+        number is far lower entropy than a password, so an unthrottled
+        endpoint would be enumerable.
         """
         barcode = kwargs.get("barcode", barcode)
         if not barcode:
             return {"error": "barcode required", "code": 400}
 
         env = request.env
+        limited = check_auth_rate_limit(env, "badge", barcode)
+        if limited:
+            return limited
+
         # A single match is guaranteed by hr.employee's own SQL constraint
         # (`unique (barcode)`, verified in PostgreSQL) — two employees
         # cannot share a badge, so there is no ambiguity to arbitrate here.
@@ -88,7 +104,10 @@ class MobileAuthController(http.Controller):
         # archived employee's badge stops working, without a special case.
         employee = env["hr.employee"].sudo().search([("barcode", "=", barcode)], limit=1)
         if not employee:
+            record_auth_failure(env, "badge", barcode)
             return {"error": "Invalid badge", "code": 401}
+
+        clear_auth_failures(env, "badge", barcode)
         return self._issue_mobile_token(env, employee.user_id, employee)
 
     def _issue_mobile_token(self, env, user, employee):

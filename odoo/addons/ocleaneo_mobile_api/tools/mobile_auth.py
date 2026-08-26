@@ -9,16 +9,80 @@ hardcoded CORS origin. Centralizing them here means a fix (e.g. enforcing
 token expiry) only has to be made once.
 """
 
+import logging
 import os
 
+import odoo
 from odoo import fields
 from odoo.http import request
+
+_logger = logging.getLogger(__name__)
 
 # Origin allowed for CORS on the mobile API. Configurable via environment
 # variable so dev/staging/prod can each set their own value without a code
 # change — the same pattern the frontend uses for its own runtime
 # configuration (see frontend/.env.example and docker-compose.yml).
 MOBILE_CORS_ORIGIN = os.environ.get("OCLEANEO_MOBILE_CORS_ORIGIN", "http://127.0.0.1:5173")
+
+
+def request_ip():
+    """Source address of the current request, honouring a reverse proxy.
+
+    Odoo is normally deployed behind nginx, where remote_addr is the proxy
+    itself — every request would then share one rate-limit bucket. Trust
+    X-Forwarded-For only when Odoo is configured to run behind a proxy
+    (`--proxy-mode`), because a client can otherwise forge that header at
+    will and trivially escape the limit by rotating it.
+    """
+    httprequest = request.httprequest
+    if odoo.tools.config.get("proxy_mode"):
+        forwarded = httprequest.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return httprequest.remote_addr
+
+
+def check_auth_rate_limit(env, scope, key):
+    """Return an error payload when `key` (or this source address) has burnt
+    its budget of failed attempts, otherwise None.
+
+    Applied to the credential endpoints (login, login_badge) only. Token
+    verification is deliberately not throttled: a mobile API token carries
+    256 bits of entropy, so guessing one is not a realistic attack, while
+    writing a row per unauthenticated request would hand anyone an easy way
+    to flood the table.
+    """
+    Attempt = env["ocleaneo.mobile.auth.attempt"].sudo()
+    ip = request_ip()
+    for check_scope, check_key in ((scope, key), ("ip", ip)):
+        if Attempt.is_rate_limited(check_scope, check_key):
+            _logger.warning(
+                "Mobile auth rate limit hit on %s (ip=%s)", check_scope, ip
+            )
+            return {
+                "error": "too many attempts, try again later",
+                "code": 429,
+            }
+    return None
+
+
+def record_auth_failure(env, scope, key):
+    Attempt = env["ocleaneo.mobile.auth.attempt"].sudo()
+    ip = request_ip()
+    Attempt.record_failure(scope, key, ip=ip)
+    Attempt.record_failure("ip", ip, ip=ip)
+
+
+def clear_auth_failures(env, scope, key):
+    """Reset the credential's budget after it authenticated successfully.
+
+    Only the credential bucket is cleared, never the address one. An
+    attacker holding one valid account would otherwise reset the address
+    budget at will — log in as themselves whenever they approach the
+    limit — and enumerate other credentials from the same address
+    indefinitely. The address budget decays with time only.
+    """
+    env["ocleaneo.mobile.auth.attempt"].sudo().clear(scope, key)
 
 
 def authenticate_mobile_request():

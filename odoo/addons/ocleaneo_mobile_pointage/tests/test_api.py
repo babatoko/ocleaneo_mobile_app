@@ -11,6 +11,10 @@ client_ref idempotency.
 import json
 
 import odoo
+from odoo.addons.ocleaneo_mobile_api.models.mobile_auth_attempt import (
+    MAX_ATTEMPTS,
+    MAX_IP_ATTEMPTS,
+)
 from odoo.tests.common import HOST, HttpCase
 
 from .common import MobilePointageCommon
@@ -24,6 +28,11 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         super().setUp()
         self.user.password = PASSWORD
         self.employee.barcode = "BADGE-WORKER-1"
+        # authenticate() reads the password straight from the database on
+        # its own cursor, so the ORM write above has to be flushed first —
+        # otherwise it sits in cache and the login is refused.
+        self.user.flush()
+        self.employee.flush()
 
         # A second worker, to prove one cannot act on the other's job.
         self.other_user, self.other_employee, self.other_person = self._make_worker(
@@ -77,13 +86,6 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         self.assertTrue(result["token"])
         self.assertEqual(result["employee_id"], self.employee.id)
         self.assertEqual(result["user_id"], self.user.id)
-
-    def test_login_with_wrong_password_is_rejected(self):
-        result = self._result(
-            "/api/mobile/auth/login",
-            {"login": self.user.login, "password": "wrong"},
-        )
-        self.assertEqual(result["code"], 401)
 
     def test_token_is_stored_on_the_employee_not_the_user(self):
         """res.users keeps access control; hr.employee carries identity."""
@@ -334,3 +336,137 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.headers.get("Access-Control-Allow-Origin"))
+
+
+class TestMobileAuthFailures(MobilePointageCommon, HttpCase):
+    """Tests that deliberately fail authentication, kept in their own class.
+
+    Two Odoo behaviours make failed logins messy to test alongside
+    everything else, hence the separate class:
+
+    - res.users.authenticate() opens its own cursor and rolls it back when
+      credentials are refused. Under HttpCase that cursor is the test's
+      own, so a rejected login also discards the fixtures set up for the
+      test — the user record included.
+    - Odoo's native login cooldown (_assert_can_auth) counts failures in
+      *process memory*, keyed by source address. That state is not
+      transactional: it survives the rollback between tests and would make
+      a later test fail to log in for reasons unrelated to what it asserts.
+      setUp disables it so these tests measure this module's limiter rather
+      than Odoo's.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.user.password = PASSWORD
+        self.employee.barcode = "BADGE-WORKER-1"
+        # authenticate() reads the password straight from the database on
+        # its own cursor, so the ORM write above has to be flushed first —
+        # otherwise it sits in cache and the login is refused.
+        self.user.flush()
+        self.employee.flush()
+        # 0 disables Odoo's own in-memory cooldown (see class docstring).
+        self.env["ir.config_parameter"].sudo().set_param("base.login_cooldown_after", "0")
+        self.Attempt = self.env["ocleaneo.mobile.auth.attempt"]
+
+    def _rpc(self, path, params=None, token=None):
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = "Bearer %s" % token
+        response = self.url_open(
+            path,
+            data=json.dumps({
+                "jsonrpc": "2.0", "method": "call", "id": 1, "params": params or {},
+            }),
+            headers=headers,
+        )
+        return response.json()
+
+    def _result(self, path, params=None, token=None):
+        body = self._rpc(path, params, token)
+        self.assertNotIn("error", body, "unexpected server exception: %s" % body.get("error"))
+        return body["result"]
+
+    def _bad_login(self):
+        return self._result("/api/mobile/auth/login", {
+            "login": self.user.login, "password": "wrong",
+        })
+
+    def test_login_with_wrong_password_is_rejected(self):
+        self.assertEqual(self._bad_login()["code"], 401)
+
+    def test_repeated_bad_logins_are_eventually_throttled(self):
+        """Brute force must stop getting fresh 401s indefinitely."""
+        codes = [self._bad_login()["code"] for _ in range(MAX_ATTEMPTS + 1)]
+
+        self.assertEqual(codes[0], 401)
+        self.assertEqual(codes[-1], 429, "the last attempt should be throttled")
+
+    def test_throttling_survives_a_correct_password(self):
+        """Once throttled, the right password gets no free pass — otherwise
+        the limit would only slow down an attacker who never guesses right."""
+        for _ in range(MAX_ATTEMPTS):
+            self._bad_login()
+
+        result = self._result("/api/mobile/auth/login", {
+            "login": self.user.login, "password": PASSWORD,
+        })
+
+        self.assertEqual(result["code"], 429)
+
+    def test_badge_enumeration_is_stopped_by_the_address_budget(self):
+        """Guessing a different badge each time never fills the per-badge
+        bucket — only the shared per-address one stops the sweep."""
+        first = self._result("/api/mobile/auth/login_badge", {"barcode": "BADGE-GUESS-1"})
+        self.assertEqual(first["code"], 401)
+
+        # Fast-forward the sweep rather than issuing MAX_IP_ATTEMPTS requests.
+        for _ in range(MAX_IP_ATTEMPTS):
+            self.Attempt.record_failure("ip", "127.0.0.1", ip="127.0.0.1")
+
+        later = self._result("/api/mobile/auth/login_badge", {"barcode": "BADGE-GUESS-2"})
+        self.assertEqual(later["code"], 429)
+
+    def test_a_valid_login_cannot_reset_the_address_budget(self):
+        """Otherwise anyone holding one valid account could clear the address
+        limit at will and keep enumerating the others."""
+        for _ in range(MAX_IP_ATTEMPTS):
+            self.Attempt.record_failure("ip", "127.0.0.1", ip="127.0.0.1")
+
+        self.assertEqual(
+            self._result("/api/mobile/auth/login", {
+                "login": self.user.login, "password": PASSWORD,
+            })["code"],
+            429,
+        )
+        self.assertTrue(self.Attempt.is_rate_limited("ip", "127.0.0.1"))
+
+    def test_successful_login_clears_the_credential_budget(self):
+        """A worker who mistypes once must not carry that against them.
+
+        The earlier failures are seeded through the model rather than by
+        actually failing a login: authenticate()'s rollback would take the
+        whole fixture with it — the user record included — leaving nobody
+        to log in as afterwards. What this test is about, that the endpoint
+        clears the bucket on success, is still exercised for real.
+        """
+        for _ in range(MAX_ATTEMPTS - 1):
+            self.Attempt.record_failure("login", self.user.login, ip="127.0.0.1")
+        self.assertEqual(
+            self.Attempt.search_count([
+                ("scope", "=", "login"), ("key", "=", self.user.login),
+            ]),
+            MAX_ATTEMPTS - 1,
+        )
+
+        result = self._result("/api/mobile/auth/login", {
+            "login": self.user.login, "password": PASSWORD,
+        })
+
+        self.assertTrue(result.get("token"), "expected a successful login, got %s" % result)
+        self.assertEqual(
+            self.Attempt.search_count([
+                ("scope", "=", "login"), ("key", "=", self.user.login),
+            ]),
+            0,
+        )
