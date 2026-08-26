@@ -30,11 +30,15 @@ class MobilePlanningController(http.Controller):
                 return fields.Date.today()
 
     @http.route("/api/mobile/planning", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
-    def planning(self, date=None, view=None, **kwargs):
-        """Return the worker's FSM orders for a given date.
+    def planning(self, date=None, date_from=None, date_to=None, view=None, **kwargs):
+        """Return the worker's FSM orders for a date or a date range.
 
         Query parameters:
-        - date: YYYY-MM-DD (defaults to today)
+        - date: YYYY-MM-DD, single day (defaults to today). Ignored if
+          date_from/date_to are given.
+        - date_from, date_to: YYYY-MM-DD, inclusive range — for the
+          Semaine/Mois frontend views, so they don't have to make one
+          request per day.
         - view: 'day' | 'week' | 'route' (informational, defaults to config)
         """
         user, employee = authenticate_mobile_request()
@@ -42,17 +46,25 @@ class MobilePlanningController(http.Controller):
             return {"error": "unauthorized", "code": 401}
 
         env = request.env(user=user.id)
-        target_date = self._parse_date(kwargs.get("date", date))
+        date_from = kwargs.get("date_from", date_from)
+        date_to = kwargs.get("date_to", date_to)
+        if date_from or date_to:
+            range_start = self._parse_date(date_from) if date_from else fields.Date.today()
+            range_end = self._parse_date(date_to) if date_to else range_start
+        else:
+            range_start = range_end = self._parse_date(kwargs.get("date", date))
+
         # Day boundaries in the worker's local timezone, converted to UTC —
         # not a naive "00:00-23:59 in UTC" window, which would drop or
         # misplace shifts starting before dawn or ending late at night
         # (see frontend/src/utils/date.ts for the equivalent frontend fix).
-        date_start, date_end = local_day_bounds_utc(target_date, user.tz)
+        date_start, _ = local_day_bounds_utc(range_start, user.tz)
+        _, date_end = local_day_bounds_utc(range_end, user.tz)
 
         # Resolve worker via fsm.person
         person = env["fsm.person"].sudo().search([("partner_id", "=", user.partner_id.id)], limit=1)
         if not person:
-            return {"count": 0, "date": str(target_date), "orders": []}
+            return {"count": 0, "date_from": str(range_start), "date_to": str(range_end), "orders": []}
 
         # Load planning config for the user's company
         config = env["mobile.api.planning.config"].sudo().search([
@@ -118,7 +130,9 @@ class MobilePlanningController(http.Controller):
             })
 
         return {
-            "date": str(target_date),
+            "date": str(range_start),
+            "date_from": str(range_start),
+            "date_to": str(range_end),
             "view": view or default_view,
             "count": len(result),
             "orders": result,

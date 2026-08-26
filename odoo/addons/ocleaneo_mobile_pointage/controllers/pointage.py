@@ -51,6 +51,8 @@ class MobilePointageController(http.Controller):
                 "location_name": order.location_id.name,
                 "location_street": order.location_id.street,
                 "location_city": order.location_id.city,
+                "location_latitude": order.location_id.partner_latitude or False,
+                "location_longitude": order.location_id.partner_longitude or False,
                 "person_id": order.person_id.id,
                 "person_name": order.person_id.name,
                 "stage": order.stage_id.name,
@@ -62,11 +64,19 @@ class MobilePointageController(http.Controller):
     @http.route("/api/mobile/pointage", type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def pointage(self, type=None, fsm_order_id=None, gps_latitude=None, gps_longitude=None,
                  gps_accuracy=None, nfc_tag_id=None, photo=None, commentaire=None,
-                 datetime=None, description=None, **kwargs):
+                 datetime=None, description=None, client_ref=None, **kwargs):
         """Record a mobile clocking and update Odoo attendance/timesheet.
 
         datetime: ISO8601 local time sent by the mobile app.
         description: free text entered by the worker (used as timesheet line name).
+        client_ref: idempotency key generated once by the app for this
+            clocking (frontend CreateTimeEntryPayload.clientRef) and
+            resent unchanged on every retry — including after an offline
+            queue replay, or when the app only *thinks* the first attempt
+            failed because the response was lost after the server had
+            already processed it. Without honoring it, a retry creates a
+            second attendance/timesheet/pointage record for the same
+            physical clock-in.
         """
         user, employee = authenticate_mobile_request()
         if not user:
@@ -76,6 +86,14 @@ class MobilePointageController(http.Controller):
         pointage_type = type
         if pointage_type not in ("arrivee", "depart", "pause_debut", "pause_fin"):
             return {"error": "invalid type", "code": 400}
+
+        if client_ref:
+            existing = env["ocleaneo.mobile.pointage"].sudo().search([
+                ("user_id", "=", user.id),
+                ("client_ref", "=", client_ref),
+            ], limit=1)
+            if existing:
+                return self._pointage_response(existing)
 
         now = local_to_utc(datetime)
         company_id = employee.company_id.id or user.company_id.id
@@ -90,6 +108,7 @@ class MobilePointageController(http.Controller):
             "gps_accuracy": gps_accuracy,
             "nfc_tag_id": nfc_tag_id,
             "commentaire": commentaire,
+            "client_ref": client_ref,
             "source": "mobile",
             "company_id": company_id,
         }
@@ -136,6 +155,16 @@ class MobilePointageController(http.Controller):
                 except Exception as e:
                     _logger.warning("Could not set FSM order %s to Completed: %s", order.id, e)
 
+        return self._pointage_response(pointage, timesheet_ids)
+
+    def _pointage_response(self, pointage, timesheet_ids=None):
+        """Build the /api/mobile/pointage response payload for a pointage
+        record — shared by the normal create path and the client_ref
+        idempotent-replay path, so a retried request gets back exactly the
+        same shape as the original.
+        """
+        if timesheet_ids is None:
+            timesheet_ids = pointage.timesheet_line_ids.ids
         return {
             "id": pointage.id,
             "type": pointage.type,

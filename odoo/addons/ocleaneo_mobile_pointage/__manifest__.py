@@ -3,7 +3,7 @@
 {
     "name": "Ocleaneo Mobile Pointage",
     "summary": "Mobile clocking for field-service orders and daily attendance.",
-    "version": "14.0.1.0.3",
+    "version": "14.0.1.0.4",
     "license": "AGPL-3",
     "author": "Ocleaneo",
     "category": "Human Resources",
