@@ -23,8 +23,16 @@ MOBILE_CORS_ORIGIN = os.environ.get("OCLEANEO_MOBILE_CORS_ORIGIN", "http://127.0
 
 def authenticate_mobile_request():
     """Verify the Authorization: Bearer *** header (or legacy
-    X-Mobile-Token) against stored mobile API tokens and return the
-    matching, non-expired res.users record — or None.
+    X-Mobile-Token) against stored mobile API tokens.
+
+    The token is stored on hr.employee (see models/hr_employee.py), not
+    res.users — res.users only carries login/password/rights. Returns
+    (user, employee) for the matching, non-expired employee, resolved back
+    to its linked res.users via employee.user_id (required: an employee
+    without a direct user_id link cannot authenticate here — see
+    controllers/auth.py's login() for why that link is enforced at token
+    issuance time). Returns (None, None) if authentication fails for any
+    reason.
     """
     auth_header = request.httprequest.headers.get("Authorization", "")
     token = ""
@@ -34,15 +42,17 @@ def authenticate_mobile_request():
     if not token:
         token = request.httprequest.headers.get("X-Mobile-Token", "")
     if not token:
-        return None
+        return None, None
 
     env = request.env
     now = fields.Datetime.now()
-    users = env["res.users"].sudo().search([("mobile_api_token", "!=", False)])
-    for user in users:
-        if not user.verify_mobile_api_token(token):
+    employees = env["hr.employee"].sudo().search([("mobile_api_token", "!=", False)])
+    for employee in employees:
+        if not employee.verify_mobile_api_token(token):
             continue
-        if user.mobile_api_token_expire and user.mobile_api_token_expire < now:
+        if employee.mobile_api_token_expire and employee.mobile_api_token_expire < now:
             continue
-        return user
-    return None
+        if not employee.user_id:
+            return None, None
+        return employee.user_id, employee
+    return None, None

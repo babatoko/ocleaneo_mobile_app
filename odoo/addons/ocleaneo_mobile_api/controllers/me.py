@@ -18,12 +18,11 @@ class MobileMeController(http.Controller):
     @http.route("/api/mobile/me", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def me(self, **kwargs):
         """Return current user/employee profile with open attendance and current FSM order."""
-        user = authenticate_mobile_request()
+        user, employee = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
         env = request.env(user=user.id)
-        employee = user.get_employee_for_mobile()
         company = user.company_id
 
         attendances = False

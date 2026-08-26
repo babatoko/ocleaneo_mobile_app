@@ -3,49 +3,15 @@
 
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessDenied
-from datetime import timedelta
-import os
-import secrets
-import hashlib
-
-# Mobile API token lifetime. Configurable via environment variable, same
-# pattern as MOBILE_CORS_ORIGIN (see tools/mobile_auth.py) — no code change
-# needed to tighten/loosen it per environment.
-MOBILE_TOKEN_TTL_DAYS = int(os.environ.get("OCLEANEO_MOBILE_TOKEN_TTL_DAYS", "30"))
 
 
 class ResUsers(models.Model):
     _inherit = "res.users"
 
-    mobile_api_token = fields.Char(
-        string="Mobile API Token",
-        copy=False,
-        help="Token used by the mobile app to authenticate API calls.",
-    )
-    mobile_api_token_expire = fields.Datetime(
-        string="Mobile API Token Expiry",
-        copy=False,
-    )
-
-    def generate_mobile_api_token(self):
-        """Generate a new token and invalidate the old one."""
-        token = secrets.token_urlsafe(32)
-        token_hash = hashlib.sha256(token.encode()).hexdigest()
-        self.mobile_api_token = token_hash
-        self.mobile_api_token_expire = fields.Datetime.now() + timedelta(days=MOBILE_TOKEN_TTL_DAYS)
-        return token
-
-    def verify_mobile_api_token(self, token):
-        """Verify a raw token against the stored hash."""
-        if not self.mobile_api_token:
-            return False
-        token_hash = hashlib.sha256(token.encode()).hexdigest()
-        return secrets.compare_digest(self.mobile_api_token, token_hash)
-
-    def invalidate_mobile_api_token(self):
-        """Revoke the current token."""
-        self.mobile_api_token = False
-        self.mobile_api_token_expire = False
+    # res.users stays scoped to access control: login, password, groups
+    # and rights. Mobile-app credentials (API token, and — like the
+    # standard pin/barcode fields — any other worker-identification value)
+    # live on hr.employee instead; see models/hr_employee.py.
 
     def get_employee_for_mobile(self):
         """Resolve hr.employee from the user, using partner/worker chain fallback."""

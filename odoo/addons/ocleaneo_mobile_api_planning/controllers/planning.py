@@ -37,15 +37,11 @@ class MobilePlanningController(http.Controller):
         - date: YYYY-MM-DD (defaults to today)
         - view: 'day' | 'week' | 'route' (informational, defaults to config)
         """
-        user = authenticate_mobile_request()
+        user, employee = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
         env = request.env(user=user.id)
-        employee = user.get_employee_for_mobile()
-        if not employee:
-            return {"error": "no employee linked to user", "code": 400}
-
         target_date = self._parse_date(kwargs.get("date", date))
         # Day boundaries in the worker's local timezone, converted to UTC —
         # not a naive "00:00-23:59 in UTC" window, which would drop or

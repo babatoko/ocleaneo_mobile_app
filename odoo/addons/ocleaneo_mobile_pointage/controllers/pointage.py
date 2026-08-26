@@ -24,15 +24,11 @@ class MobilePointageController(http.Controller):
     @http.route("/api/mobile/chantiers/aujourdhui", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def chantiers_aujourdhui(self, **kwargs):
         """Return today's FSM orders for the connected employee."""
-        user = authenticate_mobile_request()
+        user, employee = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
         env = request.env(user=user.id)
-        employee = user.get_employee_for_mobile()
-        if not employee:
-            return {"error": "no employee linked to user", "code": 400}
-
         today = fields.Date.today()
         person = self._get_fsm_person(env, user)
         if not person:
@@ -72,15 +68,11 @@ class MobilePointageController(http.Controller):
         datetime: ISO8601 local time sent by the mobile app.
         description: free text entered by the worker (used as timesheet line name).
         """
-        user = authenticate_mobile_request()
+        user, employee = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
         env = request.env(user=user.id)
-        employee = user.get_employee_for_mobile()
-        if not employee:
-            return {"error": "no employee linked to user", "code": 400}
-
         pointage_type = type
         if pointage_type not in ("arrivee", "depart", "pause_debut", "pause_fin"):
             return {"error": "invalid type", "code": 400}

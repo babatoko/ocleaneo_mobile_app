@@ -4,7 +4,7 @@
 {
     "name": "Ocleaneo Mobile API Planning",
     "summary": "REST/JSON planning endpoints for the employee mobile app.",
-    "version": "14.0.1.0.1",
+    "version": "14.0.1.0.2",
     "license": "AGPL-3",
     "author": "Ocleaneo",
     "category": "API",

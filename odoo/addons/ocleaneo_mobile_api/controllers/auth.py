@@ -20,7 +20,7 @@ class MobileAuthController(http.Controller):
     @http.route("/api/mobile/config", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def config(self, **kwargs):
         """Return active mobile modules and app-level configuration for the current user."""
-        user = authenticate_mobile_request()
+        user, employee = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
@@ -57,10 +57,24 @@ class MobileAuthController(http.Controller):
             return {"error": "Invalid credentials", "code": 401}
 
         user = env["res.users"].sudo().browse(uid)
-        token = user.generate_mobile_api_token()
+        employee = user.get_employee_for_mobile()
+        if not employee:
+            return {"error": "no employee linked to user", "code": 400}
+        # The mobile API token lives on hr.employee (see models/hr_employee.py),
+        # resolved back to a res.users context via employee.user_id on every
+        # later request (tools/mobile_auth.py) — so that link must be the
+        # direct one, not one of get_employee_for_mobile()'s fallback paths
+        # (fsm.person / address_home_id), which don't guarantee employee.user_id
+        # points back at this same user.
+        if not employee.user_id or employee.user_id.id != user.id:
+            return {
+                "error": "employee is not directly linked to this user (hr.employee.user_id); "
+                         "required to issue a mobile API token",
+                "code": 400,
+            }
+        token = employee.generate_mobile_api_token()
 
         company = user.company_id
-        employee = user.get_employee_for_mobile()
         configs = env["mobile.module.config"].sudo().get_modules_for_user(user)
 
         return {
@@ -85,21 +99,20 @@ class MobileAuthController(http.Controller):
         a web session, only a Bearer token, so auth="user" here made
         logout unreachable from the app.
         """
-        user = authenticate_mobile_request()
+        user, employee = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
-        user.invalidate_mobile_api_token()
+        employee.invalidate_mobile_api_token()
         return {"status": "ok"}
 
     @http.route("/api/mobile/auth/me", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def auth_me(self, **kwargs):
         """Return current user/employee profile (used by mobile app on cold start)."""
-        user = authenticate_mobile_request()
+        user, employee = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
         env = request.env(user=user.id)
-        employee = user.get_employee_for_mobile()
         company = user.company_id
 
         return {
