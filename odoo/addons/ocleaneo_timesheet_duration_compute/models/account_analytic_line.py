@@ -11,10 +11,30 @@ class AccountAnalyticLine(models.Model):
     # Replace the computed date_time_end from project_timesheet_time_control
     # with a stored, user-controlled datetime. This prevents Odoo from
     # overwriting the user's input when they edit the end time.
+    #
+    # compute=False, inverse=False ARE REQUIRED here, not cosmetic: Odoo's
+    # field merging across an _inherit chain only overrides attributes a
+    # child class explicitly passes (see odoo/fields.py Field._get_attrs,
+    # `attrs.update(field.args)` then `attrs.update(self.args)` — a key
+    # simply absent from the child's args is left untouched, it is not
+    # reset to a default). Without compute=False/inverse=False, this
+    # redeclaration does NOT drop project_timesheet_time_control's
+    # compute="_compute_date_time_end" / inverse="_inverse_date_time_end":
+    # store=True just makes it a *stored* computed+inverse field, and every
+    # write() to date_time_end still runs through that inherited inverse
+    # (which derives unit_amount from a UoM-hours check that our mobile
+    # flow never satisfies, since the lines it creates don't set
+    # product_uom_id) instead of behaving like the plain field this module
+    # was written to assume. Confirmed against the real OCA source
+    # (OCA/project, 14.0 branch) and Odoo 14's own field-merging code —
+    # verified precedent for this exact pattern: OCA/stock-logistics-
+    # orderpoint uses `compute=False, store=False` to the same end.
     date_time_end = fields.Datetime(
         string="End Time",
         store=True,
         copy=False,
+        compute=False,
+        inverse=False,
     )
 
     @api.onchange("date_time", "date_time_end")
