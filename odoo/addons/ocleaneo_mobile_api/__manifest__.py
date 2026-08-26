@@ -3,7 +3,7 @@
 {
     "name": "Ocleaneo Mobile API",
     "summary": "REST/JSON API for the employee mobile app: auth, pointage, planning.",
-    "version": "14.0.1.0.5",
+    "version": "14.0.1.0.6",
     "license": "AGPL-3",
     "author": "Ocleaneo",
     "category": "API",
