@@ -46,7 +46,13 @@ def authenticate_mobile_request():
 
     env = request.env
     now = fields.Datetime.now()
-    employees = env["hr.employee"].sudo().search([("mobile_api_token", "!=", False)])
+    # Narrow via the indexed token prefix (see hr_employee.py) instead of
+    # scanning + hashing every employee that has ever had a token — turns
+    # an O(n) scan into an indexed lookup that returns essentially one row.
+    employees = env["hr.employee"].sudo().search([
+        ("mobile_api_token_index", "=", token[:8]),
+        ("mobile_api_token", "!=", False),
+    ])
     for employee in employees:
         if not employee.verify_mobile_api_token(token):
             continue

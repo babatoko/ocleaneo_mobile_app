@@ -26,7 +26,21 @@ class HrEmployee(models.Model):
     mobile_api_token = fields.Char(
         string="Mobile API Token",
         copy=False,
-        help="Token used by the mobile app to authenticate API calls for this employee.",
+        help="Salted hash of the token used by the mobile app to authenticate API calls for this employee.",
+    )
+    # First 8 characters of the *raw* token, stored in the clear and
+    # indexed, so authenticate_mobile_request() can narrow its search to a
+    # handful of candidate rows instead of scanning + hashing every
+    # employee that has ever had a token — same pattern core Odoo uses for
+    # res.users.apikeys (its `index` column on the first 8 hex chars of the
+    # raw key). A collision here only means a couple of extra hash
+    # comparisons, never a security weakening: the actual credential check
+    # is still the full token against the stored hash.
+    mobile_api_token_index = fields.Char(
+        string="Mobile API Token Index",
+        size=8,
+        copy=False,
+        index=True,
     )
     mobile_api_token_expire = fields.Datetime(
         string="Mobile API Token Expiry",
@@ -38,6 +52,7 @@ class HrEmployee(models.Model):
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         self.mobile_api_token = token_hash
+        self.mobile_api_token_index = token[:8]
         self.mobile_api_token_expire = fields.Datetime.now() + timedelta(days=MOBILE_TOKEN_TTL_DAYS)
         return token
 
@@ -51,4 +66,5 @@ class HrEmployee(models.Model):
     def invalidate_mobile_api_token(self):
         """Revoke the current token."""
         self.mobile_api_token = False
+        self.mobile_api_token_index = False
         self.mobile_api_token_expire = False
