@@ -103,7 +103,29 @@ Contrairement à `/api/mobile/auth/login` (login + mot de passe, deux facteurs),
 
 La synchronisation avec l'ID Silae (ou tout autre identifiant du logiciel de paie) n'est pas implémentée ici — ce module se contente de lire `hr.employee.barcode` tel qu'il est renseigné ; l'import/synchronisation de cette valeur depuis Silae reste à faire séparément (import manuel, ou connecteur dédié).
 
+## Dépendances OCA
+
+Non versionnées ici (voir § Notes) : à monter via volume dans `docker-compose.yml` (`/opt/oca_addons_v14`) ou à cloner localement pour du dev/test hors Docker.
+
+| Dépôt | Branche | Modules requis |
+|-------|---------|-----------------|
+| [OCA/field-service](https://github.com/OCA/field-service) | 14.0 | `fieldservice`, `base_territory` (dépendance directe) |
+| [OCA/project](https://github.com/OCA/project) | 14.0 | `project_timesheet_time_control` |
+| [OCA/timesheet](https://github.com/OCA/timesheet) | 14.0 | `hr_timesheet_task_domain`, `hr_timesheet_task_stage` (dépendances de `project_timesheet_time_control`, absentes d'`OCA/project` lui-même) |
+| [OCA/web](https://github.com/OCA/web) | 14.0 | `web_ir_actions_act_multi`, `web_ir_actions_act_view_reload` (idem) |
+
+Cette liste complète (`OCA/project` seul ne suffit pas) n'est apparue qu'en installant réellement les modules sur un Odoo 14 — voir § Vérification.
+
+## Vérification
+
+Les correctifs successifs sur ce module ont d'abord été validés par lecture de code, `py_compile` et des tests isolés sur objets factices (pas de runtime Odoo disponible dans l'environnement d'audit initial). Une installation Odoo 14 réelle (Python 3.10, PostgreSQL 16, les 4 dépôts OCA ci-dessus, hors Docker faute de démon disponible) a ensuite permis une vérification bout en bout : installation propre des 5 modules, puis appels HTTP réels sur `/api/mobile/*` (login, login_badge, pointage arrivée/départ, planning, chantiers du jour, logout) contre une vraie base Postgres. Deux bugs invisibles à l'analyse statique en sont ressortis et ont été corrigés :
+
+- `fsm.location` n'a pas de champ `customer_id` (seulement `owner_id`) — provoquait un crash 500 sur tout pointage avec un chantier assigné, et un `customer` toujours vide côté planning.
+- `_manage_timesheet()` cherchait la ligne de timesheet à clôturer par `date = fields.Date.today()`, alors que `project_timesheet_time_control` réécrit silencieusement `date` à partir de `date_time` — un pointage traversant minuit (équipe de nuit) ou rejoué plus tard via la file hors-ligne du frontend ne retrouvait jamais sa ligne ouverte.
+
+Cette installation de test n'est pas conservée dans le repo (faite dans un environnement jetable) ; à refaire pour toute modification future touchant à l'interaction avec les modules OCA.
+
 ## Notes
 
-- Les modules OCA (Field Service, etc.) ne sont pas versionnés ici : ils doivent être montés via volume dans `docker-compose.yml` (`/opt/oca_addons_v14`).
+- Les modules OCA (Field Service, etc. — voir § Dépendances OCA) ne sont pas versionnés ici : ils doivent être montés via volume dans `docker-compose.yml` (`/opt/oca_addons_v14`).
 - Les mots de passe et tokens de dev ne doivent jamais être commités.

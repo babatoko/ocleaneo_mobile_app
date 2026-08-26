@@ -39,7 +39,11 @@ services:
       - ./odoo14-dev.conf:/etc/odoo/odoo.conf:ro
       # Mount OCA/custom addons. Adjust host paths to your local checkout.
       - ../../odoo/addons:/opt/custom_addons_v14:ro
-      # If OCA addons live elsewhere, update or add another volume below.
+      # odoo14-dev.conf's addons_path requires /opt/oca_addons_v14 — Odoo
+      # will not start without it. Clone these four 14.0 branches into one
+      # local directory and mount it here (see odoo/README.md § Dépendances
+      # OCA for exactly which modules from each are required):
+      #   OCA/field-service, OCA/project, OCA/timesheet, OCA/web
       # - /path/to/oca_addons_v14:/opt/oca_addons_v14:ro
       - odoo14-dev-logs:/var/log/odoo:rw
     command:
