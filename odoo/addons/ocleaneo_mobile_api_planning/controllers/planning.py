@@ -75,8 +75,14 @@ class MobilePlanningController(http.Controller):
         result = []
         for order in orders:
             loc = order.location_id
-            customer = loc.customer_id if loc and hasattr(loc, "customer_id") and loc.customer_id else False
-            partner_contact = customer or (loc.owner_id if loc else False)
+            # fsm.location (OCA fieldservice) has no customer_id field —
+            # confirmed against the real module source and a live Odoo 14
+            # instance. hasattr() here was always False (Odoo model
+            # instances don't dynamically gain attributes for undeclared
+            # fields), so `customer` was always empty even when the order
+            # did have a billed owner. owner_id is the actual field.
+            customer = loc.owner_id if loc and loc.owner_id else False
+            partner_contact = customer
             result.append({
                 "id": order.id,
                 "name": order.name,

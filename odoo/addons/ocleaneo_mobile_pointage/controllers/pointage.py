@@ -246,18 +246,18 @@ class MobilePointageController(http.Controller):
         The project is the generic 'Pointage chantiers' project for the worker's company.
         """
         Timesheet = env["account.analytic.line"].sudo()
-        today = fields.Date.today()
         fsm_order = pointage.fsm_order_id
         if not fsm_order:
             return []
 
-        # Resolve billed customer
+        # Resolve billed customer. fsm.location (OCA fieldservice) has no
+        # customer_id field — confirmed against the real module source and
+        # by reproducing this exact call against a live Odoo 14 instance,
+        # where it raised AttributeError on every pointage carrying an
+        # fsm_order_id (i.e. on every normal clocking). owner_id is the
+        # actual "Related Owner"/billed-customer field on fsm.location.
         location = fsm_order.location_id
-        partner_id = False
-        if location and location.customer_id:
-            partner_id = location.customer_id.id
-        elif location and location.owner_id:
-            partner_id = location.owner_id.id
+        partner_id = location.owner_id.id if location and location.owner_id else False
 
         # Project: generic 'Pointage chantiers' for the company
         company_id = fsm_order.company_id.id or employee.company_id.id or env.company.id
@@ -266,11 +266,26 @@ class MobilePointageController(http.Controller):
             _logger.warning("No 'Pointage chantiers' project found for company %s; cannot create timesheet line", company_id)
             return []
 
-        # Find open timesheet for this order/employee today with unit_amount=0 (running)
+        # Find the open timesheet (unit_amount=0, still running) for this
+        # order/employee. No date filter here — confirmed against a live
+        # Odoo 14 instance that project_timesheet_time_control's create()/
+        # write() override (_eval_date) silently replaces whatever `date`
+        # we pass with the date derived from `date_time` itself, in the
+        # request's timezone. A same-day filter compares against
+        # fields.Date.today() (server wall-clock date), which does not
+        # equal that stored date for the exact shifts this app targets:
+        # a night shift starting before midnight and ending after it, or
+        # any offline-queued pointage replayed on a later calendar day
+        # (see frontend's offline queue + retry). Either one would make
+        # "depart" silently fail to find the line "arrivee" opened, and
+        # unit_amount would stay 0 forever — the same end symptom as the
+        # date_time_end field-merging bug fixed earlier on this branch,
+        # but from a completely different cause. _manage_hr_attendance
+        # already gets this right (no date filter on its own open-record
+        # search); this brings the timesheet lookup in line with it.
         open_line = Timesheet.search([
             ("employee_id", "=", employee.id),
             ("fsm_order_id", "=", fsm_order.id),
-            ("date", "=", today),
             ("unit_amount", "=", 0),
         ], limit=1, order="date_time desc")
 
@@ -286,7 +301,7 @@ class MobilePointageController(http.Controller):
                 "fsm_order_id": fsm_order.id,
                 "employee_id": employee.id,
                 "partner_id": partner_id,
-                "date": today,
+                "date": now.date(),
                 "date_time": now,
                 "unit_amount": 0,
                 "company_id": company_id,
