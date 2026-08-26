@@ -30,20 +30,38 @@ odoo/
 
 ## Démarrage en dev
 
-Prérequis : Docker + image `odoo-14-custom:latest` disponible localement (construite à partir de l'image de prod de Martial).
+Prérequis : Docker. Les modules OCA ne sont pas versionnés ici (voir § Dépendances OCA) — il faut donc les cloner une fois avant le premier démarrage :
 
 ```bash
 cd odoo/dev
+mkdir -p oca-addons && cd oca-addons
+for r in field-service project timesheet web; do
+  git clone --depth 1 -b 14.0 "https://github.com/OCA/$r.git"
+done
+cd ..
 docker compose up -d
 ```
 
 Odoo est accessible sur `http://127.0.0.1:8074`.
 
-La base de données cible est `odoo14_dev` (restaurée depuis Barman sur la machine de Martial).
+Le compose utilise l'image officielle `odoo:14` par défaut, pour démarrer chez n'importe qui. L'image de prod (construite à partir de celle de Martial) reste utilisable en posant `ODOO_IMAGE=odoo-14-custom:latest` dans `odoo/dev/.env` — elle n'est nécessaire que pour reproduire des paquets Python spécifiques à la prod.
+
+La base de données cible est `odoo14_dev`. La restaurer depuis Barman (machine de Martial) donne les données réelles ; à défaut, une base vierge suffit pour installer les modules et faire tourner les tests.
+
+## Tests
+
+```bash
+odoo-bin -d <base> --addons-path=<...>,odoo/addons \
+  -i ocleaneo_mobile_api,ocleaneo_mobile_pointage \
+  --test-enable --test-tags '/ocleaneo_mobile_api,/ocleaneo_mobile_pointage' \
+  --stop-after-init
+```
+
+Le job `odoo` de `.github/workflows/ci.yml` exécute exactement cette procédure à chaque push (clonage d'Odoo 14 et des quatre dépôts OCA, Postgres en service, lint `pyflakes` puis tests). `odoo-bin` propage l'échec dans son code retour, le job échoue donc si un test casse.
 
 ## Intégration avec le frontend
 
-Voir `docs/backend-integration-plan.md` et `docs/backend-integration.md` à la racine du repo.
+Voir `docs/backend-integration-plan.md` à la racine du repo, et `frontend/src/providers/OdooProvider.ts` pour l'adaptateur qui consomme ces routes.
 
 ## Configuration
 
@@ -53,6 +71,12 @@ Comme le frontend (`frontend/.env.example`), la configuration se fait par variab
 |----------|--------|------|
 | `OCLEANEO_MOBILE_CORS_ORIGIN` | `http://127.0.0.1:5173` | Origine autorisée en CORS sur les routes `/api/mobile/*`. À restreindre à l'origine réelle de l'app en production. |
 | `OCLEANEO_MOBILE_TOKEN_TTL_DAYS` | `30` | Durée de validité d'un token API mobile généré par `/api/mobile/auth/login`. |
+| `OCLEANEO_MOBILE_AUTH_MAX_ATTEMPTS` | `10` | Échecs d'authentification tolérés par identifiant (login ou badge) sur la fenêtre, avant refus. |
+| `OCLEANEO_MOBILE_AUTH_MAX_IP_ATTEMPTS` | `50` | Idem par adresse source. Volontairement plus large : une équipe entière partage souvent une seule connexion (wifi de site, NAT 4G). |
+| `OCLEANEO_MOBILE_AUTH_WINDOW_MINUTES` | `15` | Fenêtre glissante des deux compteurs ci-dessus. |
+| `OCLEANEO_MOBILE_AUTH_RETENTION_HOURS` | `24` | Durée de conservation des tentatives échouées avant purge (`@api.autovacuum`), pour rester consultables après coup. |
+
+Le rate limiting ne remplace pas le cooldown natif d'Odoo (`base.login_cooldown_after`) mais le complète : le natif ne couvre que `res.users.authenticate()` — donc pas `login_badge` — ne compte que par adresse, et garde son compteur en mémoire de chaque worker. Détail du raisonnement dans la docstring de `models/mobile_auth_attempt.py`.
 
 En complément, le paramètre système Odoo `ocleaneo_mobile_pointage.project_id` (`ir.config_parameter`) permet de figer l'ID du projet « Pointage chantiers » utilisé par le pointage mobile, pour ne plus dépendre d'une recherche par nom qui casse si le projet est renommé depuis l'UI :
 

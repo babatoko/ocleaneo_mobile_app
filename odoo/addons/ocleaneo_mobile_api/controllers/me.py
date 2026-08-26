@@ -2,7 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 import logging
-from odoo import http, _
+from odoo import http
 from odoo.http import request
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (

@@ -3,7 +3,7 @@
 
 from odoo import http, fields
 from odoo.http import request
-from odoo.exceptions import ValidationError, AccessError
+from odoo.exceptions import ValidationError
 import logging
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
@@ -23,13 +23,21 @@ class MobilePointageController(http.Controller):
 
     @http.route("/api/mobile/chantiers/aujourdhui", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def chantiers_aujourdhui(self, **kwargs):
-        """Return today's FSM orders for the connected employee."""
+        """Return the connected worker's open FSM orders.
+
+        Despite the route name, this does NOT filter on today's date: it
+        returns every job assigned to the worker whose stage is not closed.
+        That is what the frontend asks of it (OdooProvider.fetchChantiers
+        feeds the site list and the geofence check, not a daily agenda) —
+        /api/mobile/planning is the date-scoped endpoint. The name is kept
+        for compatibility. A `today` local was computed here and never
+        used, which is what made the mismatch easy to miss.
+        """
         user, employee = authenticate_mobile_request()
         if not user:
             return {"error": "unauthorized", "code": 401}
 
         env = request.env(user=user.id)
-        today = fields.Date.today()
         person = self._get_fsm_person(env, user)
         if not person:
             return {"count": 0, "orders": []}
@@ -118,7 +126,7 @@ class MobilePointageController(http.Controller):
 
     @http.route("/api/mobile/pointage", type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def pointage(self, type=None, fsm_order_id=None, gps_latitude=None, gps_longitude=None,
-                 gps_accuracy=None, nfc_tag_id=None, photo=None, commentaire=None,
+                 gps_accuracy=None, nfc_tag_id=None, commentaire=None,
                  datetime=None, description=None, client_ref=None, **kwargs):
         """Record a mobile clocking and update Odoo attendance/timesheet.
 

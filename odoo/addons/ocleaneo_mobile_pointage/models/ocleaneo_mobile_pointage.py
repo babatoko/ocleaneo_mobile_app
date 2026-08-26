@@ -1,8 +1,7 @@
 # Copyright 2026 Ocleaneo
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo import api, fields, models
 
 
 class OcleaneoMobilePointage(models.Model):
@@ -38,6 +37,11 @@ class OcleaneoMobilePointage(models.Model):
              "network drop right after the server processed it — and "
              "return the original record instead of creating a duplicate.",
     )
+    # Attachable from the Odoo backoffice only. /api/mobile/pointage used to
+    # accept a `photo` parameter that was never stored anywhere — an endpoint
+    # silently discarding what a caller sends is worse than not accepting it,
+    # so the parameter is gone. Wire it back to this field if the app ever
+    # needs to upload one.
     photo_id = fields.Many2one("ir.attachment", string="Photo")
     commentaire = fields.Text(string="Commentaire")
     source = fields.Selection([

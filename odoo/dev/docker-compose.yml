@@ -22,7 +22,12 @@ services:
       retries: 10
 
   odoo-14-dev:
-    image: odoo-14-custom:latest
+    # Par défaut l'image officielle, pour que `docker compose up` démarre
+    # chez n'importe qui. L'image de prod (construite à partir de celle de
+    # Martial) s'obtient avec ODOO_IMAGE=odoo-14-custom:latest dans un
+    # fichier .env à côté de ce compose — elle n'est indispensable que pour
+    # reproduire des paquets Python supplémentaires propres à la prod.
+    image: ${ODOO_IMAGE:-odoo:14}
     container_name: odoo-14-dev
     restart: unless-stopped
     depends_on:
@@ -40,11 +45,13 @@ services:
       # Mount OCA/custom addons. Adjust host paths to your local checkout.
       - ../../odoo/addons:/opt/custom_addons_v14:ro
       # odoo14-dev.conf's addons_path requires /opt/oca_addons_v14 — Odoo
-      # will not start without it. Clone these four 14.0 branches into one
-      # local directory and mount it here (see odoo/README.md § Dépendances
-      # OCA for exactly which modules from each are required):
-      #   OCA/field-service, OCA/project, OCA/timesheet, OCA/web
-      # - /path/to/oca_addons_v14:/opt/oca_addons_v14:ro
+      # will not start without it. Clone the four required 14.0 branches
+      # into ./oca-addons (see odoo/README.md § Dépendances OCA), which is
+      # gitignored, then this mount works as-is:
+      #   cd odoo/dev && mkdir -p oca-addons && cd oca-addons
+      #   for r in field-service project timesheet web; do \
+      #     git clone --depth 1 -b 14.0 https://github.com/OCA/$r.git; done
+      - ./oca-addons:/opt/oca_addons_v14:ro
       - odoo14-dev-logs:/var/log/odoo:rw
     command:
       - odoo

@@ -1,9 +1,8 @@
 # Copyright 2026 Ocleaneo
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-import json
 import logging
-from odoo import http, _
+from odoo import http
 from odoo.http import request
 from odoo.exceptions import AccessDenied
 
@@ -168,7 +167,6 @@ class MobileAuthController(http.Controller):
         if not user:
             return {"error": "unauthorized", "code": 401}
 
-        env = request.env(user=user.id)
         company = user.company_id
 
         return {

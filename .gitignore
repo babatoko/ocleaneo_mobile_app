@@ -12,6 +12,7 @@ odoo/dev/.env
 # Logs
 *.log
 npm-debug.log*
+odoo/dev/oca-addons/
 odoo/dev/logs/
 odoo/dev/*.log
 

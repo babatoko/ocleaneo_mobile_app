@@ -3,7 +3,7 @@
 {
     "name": "Timesheet Duration Auto-Compute",
     "summary": "Compute unit_amount automatically from date_time and date_time_end on account.analytic.line, for UI and API.",
-    "version": "14.0.1.0.4",
+    "version": "14.0.1.0.5",
     "license": "AGPL-3",
     "author": "Ocleaneo",
     "category": "Timesheet",
