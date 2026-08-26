@@ -81,20 +81,15 @@ class MobileAuthController(http.Controller):
             return {"error": "barcode required", "code": 400}
 
         env = request.env
-        Employee = env["hr.employee"].sudo()
-        matches = Employee.search([("barcode", "=", barcode)], limit=2)
-        if not matches:
+        # A single match is guaranteed by hr.employee's own SQL constraint
+        # (`unique (barcode)`, verified in PostgreSQL) — two employees
+        # cannot share a badge, so there is no ambiguity to arbitrate here.
+        # search() also filters on active=True, which is what we want: an
+        # archived employee's badge stops working, without a special case.
+        employee = env["hr.employee"].sudo().search([("barcode", "=", barcode)], limit=1)
+        if not employee:
             return {"error": "Invalid badge", "code": 401}
-        if len(matches) > 1:
-            # barcode is expected to be unique per employee; if it isn't
-            # (data entry error, or two employees sharing a code), refuse
-            # rather than silently authenticate as whichever one the
-            # search happened to return first.
-            _logger.error("Mobile badge login: barcode %r matches more than one hr.employee", barcode)
-            return {"error": "badge is not uniquely assigned; contact an administrator", "code": 409}
-        employee = matches
-        user = employee.user_id
-        return self._issue_mobile_token(env, user, employee)
+        return self._issue_mobile_token(env, employee.user_id, employee)
 
     def _issue_mobile_token(self, env, user, employee):
         """Shared by login() and login_badge(): validate the employee/user

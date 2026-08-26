@@ -266,62 +266,90 @@ class MobilePointageController(http.Controller):
         """Create or update hr.attendance records.
 
         Rule:
-        - arrivee: open a new attendance.
-        - depart: close the open attendance.
-        - pause_debut: close the current morning attendance.
-        - pause_fin: open an afternoon attendance.
+        - arrivee / pause_fin: the worker is (back) on the clock — reuse the
+          open attendance if there is one, otherwise open a new one.
+        - depart / pause_debut: the worker is off the clock — close the open
+          attendance if there is one.
 
-        If a pause has been recorded, there must be at least two attendances for the day.
+        hr.attendance enforces two invariants of its own (see its
+        _check_validity constraint, verified against the real Odoo 14
+        source): at most ONE open record per employee, and no overlapping
+        slices. Every create() below is therefore guarded by the
+        open_attendance check — an unguarded create raises ValidationError
+        rather than producing a second open record.
+
+        This used to bite in two reachable ways:
+        - "arrivee" only reused the open attendance when it started on the
+          server's current date. A worker who forgot to clock out the day
+          before (frequent enough that the app ships a dedicated
+          forgotten-checkout reminder) had an open attendance dated
+          yesterday, fell through to create(), and got a hard error — they
+          could not clock in at all until someone fixed the data by hand.
+        - "pause_fin" created unconditionally. In the normal flow
+          pause_debut has just closed the attendance, so it worked; but a
+          double tap, an offline replay arriving out of order, or any
+          app/server state desync left an attendance open and produced the
+          same hard error.
         """
         Attendance = env["hr.attendance"].sudo()
-        today = fields.Date.today()
 
         open_attendance = Attendance.search([
             ("employee_id", "=", employee.id),
             ("check_out", "=", False),
         ], limit=1, order="check_in desc")
 
-        if pointage_type == "arrivee":
-            if open_attendance and open_attendance.check_in.date() == today:
+        if pointage_type in ("arrivee", "pause_fin"):
+            if open_attendance:
+                # Deliberately NOT closing a stale open attendance to open a
+                # fresh one: we would have to invent a check_out time we
+                # never observed, and this record feeds payroll. Reusing it
+                # keeps the clocking working and leaves the anomaly visible
+                # (and fixable) in Odoo rather than papering over it.
+                if open_attendance.check_in and open_attendance.check_in.date() != now.date():
+                    _logger.warning(
+                        "Employee %s (%s) clocked '%s' while attendance #%s from %s is still open "
+                        "— missing check-out, attendance data needs review",
+                        employee.name, employee.id, pointage_type,
+                        open_attendance.id, open_attendance.check_in,
+                    )
                 return [open_attendance.id]
-            attendance = Attendance.create({
-                "employee_id": employee.id,
-                "check_in": now,
-            })
-            return [attendance.id]
+            return self._create_attendance(Attendance, employee, {"check_in": now})
 
-        if pointage_type == "pause_debut":
+        if pointage_type in ("pause_debut", "depart"):
             if open_attendance:
                 open_attendance.check_out = now
                 return [open_attendance.id]
-            # Edge case: no open attendance; create a morning-only stub
-            attendance = Attendance.create({
-                "employee_id": employee.id,
-                "check_in": now,
-                "check_out": now,
-            })
-            return [attendance.id]
-
-        if pointage_type == "pause_fin":
-            attendance = Attendance.create({
-                "employee_id": employee.id,
-                "check_in": now,
-            })
-            return [attendance.id]
-
-        if pointage_type == "depart":
-            if open_attendance:
-                open_attendance.check_out = now
-                return [open_attendance.id]
-            # Edge case: depart without open attendance
-            attendance = Attendance.create({
-                "employee_id": employee.id,
-                "check_in": now,
-                "check_out": now,
-            })
-            return [attendance.id]
+            # No open attendance to close (clock-out without a matching
+            # clock-in, e.g. an offline queue replaying out of order): record
+            # a zero-length slice so the event is not lost entirely.
+            return self._create_attendance(
+                Attendance, employee, {"check_in": now, "check_out": now}
+            )
 
         return []
+
+    def _create_attendance(self, Attendance, employee, vals):
+        """Create an hr.attendance, converting a rejected write into a logged
+        warning instead of an exception.
+
+        hr.attendance's own constraints can still reject a write we cannot
+        anticipate here — most plausibly the no-overlap rule, when an
+        offline pointage is replayed carrying an old timestamp that lands
+        inside an already-recorded slice. hr.attendance is a *derived*
+        mirror of the clocking; ocleaneo.mobile.pointage is the record of
+        what the worker actually did. Letting a bookkeeping conflict in the
+        mirror propagate would fail the whole request and lose the
+        clocking itself, which is the one thing that must never happen.
+        """
+        try:
+            attendance = Attendance.create(dict(vals, employee_id=employee.id))
+            return [attendance.id]
+        except ValidationError as e:
+            _logger.warning(
+                "Could not mirror clocking into hr.attendance for employee %s (%s) at %s: %s",
+                employee.name, employee.id, vals.get("check_in"), e,
+            )
+            return []
 
     def _manage_timesheet(self, env, employee, pointage, pointage_type, now, description=None):
         """Create or update account.analytic.line records linked to the FSM order.
