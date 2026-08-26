@@ -4,30 +4,17 @@
 from odoo import http, fields
 from odoo.http import request
 import logging
-import dateutil.parser
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     MOBILE_CORS_ORIGIN,
     authenticate_mobile_request,
 )
-from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import local_day_bounds_utc
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import local_day_bounds_utc, parse_date
 
 _logger = logging.getLogger(__name__)
 
 
 class MobilePlanningController(http.Controller):
-
-    def _parse_date(self, date_str):
-        if not date_str:
-            return fields.Date.today()
-        try:
-            return fields.Date.from_string(date_str)
-        except Exception:
-            try:
-                return dateutil.parser.parse(date_str).date()
-            except Exception as e:
-                _logger.warning("Failed to parse date '%s': %s", date_str, e)
-                return fields.Date.today()
 
     @http.route("/api/mobile/planning", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def planning(self, date=None, date_from=None, date_to=None, view=None, **kwargs):
@@ -49,10 +36,10 @@ class MobilePlanningController(http.Controller):
         date_from = kwargs.get("date_from", date_from)
         date_to = kwargs.get("date_to", date_to)
         if date_from or date_to:
-            range_start = self._parse_date(date_from) if date_from else fields.Date.today()
-            range_end = self._parse_date(date_to) if date_to else range_start
+            range_start = parse_date(date_from) if date_from else fields.Date.today()
+            range_end = parse_date(date_to) if date_to else range_start
         else:
-            range_start = range_end = self._parse_date(kwargs.get("date", date))
+            range_start = range_end = parse_date(kwargs.get("date", date))
 
         # Day boundaries in the worker's local timezone, converted to UTC —
         # not a naive "00:00-23:59 in UTC" window, which would drop or

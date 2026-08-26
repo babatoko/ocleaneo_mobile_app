@@ -10,7 +10,7 @@ from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     MOBILE_CORS_ORIGIN,
     authenticate_mobile_request,
 )
-from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import local_to_utc
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import local_day_bounds_utc, local_to_utc, parse_date
 
 _logger = logging.getLogger(__name__)
 
@@ -60,6 +60,61 @@ class MobilePointageController(http.Controller):
                 "date_end": order.date_end.isoformat() if order.date_end else False,
             })
         return {"count": len(result), "orders": result}
+
+    @http.route("/api/mobile/pointage/mine", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    def pointage_mine(self, date=None, date_from=None, date_to=None, **kwargs):
+        """Return the authenticated worker's own clocking records.
+
+        No read endpoint existed for ocleaneo.mobile.pointage before this —
+        POST /api/mobile/pointage could only create records, leaving a
+        provider with no way to show today's status or clocking history
+        after the fact. Query parameters:
+        - date: YYYY-MM-DD, single day (defaults to today). Ignored if
+          date_from/date_to are given.
+        - date_from, date_to: YYYY-MM-DD, inclusive range.
+        """
+        user, employee = authenticate_mobile_request()
+        if not user:
+            return {"error": "unauthorized", "code": 401}
+
+        env = request.env(user=user.id)
+        date_from = kwargs.get("date_from", date_from)
+        date_to = kwargs.get("date_to", date_to)
+        if date_from or date_to:
+            range_start = parse_date(date_from) if date_from else fields.Date.today()
+            range_end = parse_date(date_to) if date_to else range_start
+        else:
+            range_start = range_end = parse_date(kwargs.get("date", date))
+
+        # Same local-day-boundary handling as chantiers/aujourdhui and
+        # planning — a naive UTC window would misplace clockings for
+        # shifts starting before dawn or crossing midnight.
+        date_start, _ = local_day_bounds_utc(range_start, user.tz)
+        _, date_end = local_day_bounds_utc(range_end, user.tz)
+
+        Pointage = env["ocleaneo.mobile.pointage"].sudo()
+        records = Pointage.search([
+            ("user_id", "=", user.id),
+            ("datetime", ">=", date_start),
+            ("datetime", "<=", date_end),
+        ], order="datetime asc")
+
+        entries = [{
+            "id": p.id,
+            "type": p.type,
+            "datetime": p.datetime.isoformat() if p.datetime else False,
+            "fsm_order_id": p.fsm_order_id.id if p.fsm_order_id else False,
+            "fsm_location_id": p.fsm_location_id.id if p.fsm_location_id else False,
+            "commentaire": p.commentaire or False,
+            "client_ref": p.client_ref or False,
+        } for p in records]
+
+        return {
+            "date_from": str(range_start),
+            "date_to": str(range_end),
+            "count": len(entries),
+            "entries": entries,
+        }
 
     @http.route("/api/mobile/pointage", type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def pointage(self, type=None, fsm_order_id=None, gps_latitude=None, gps_longitude=None,

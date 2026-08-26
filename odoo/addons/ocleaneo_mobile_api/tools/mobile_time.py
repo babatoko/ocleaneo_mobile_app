@@ -48,6 +48,23 @@ def local_to_utc(datetime_iso, fallback_tz=None):
         return fields.Datetime.now()
 
 
+def parse_date(date_str):
+    """Parse a YYYY-MM-DD (or otherwise dateutil-parseable) date string,
+    falling back to today (server date) if missing or unparseable. Shared
+    by every controller that accepts an optional ?date= style param.
+    """
+    if not date_str:
+        return fields.Date.today()
+    try:
+        return fields.Date.from_string(date_str)
+    except Exception:
+        try:
+            return dateutil.parser.parse(date_str).date()
+        except Exception as e:
+            _logger.warning("Failed to parse date '%s': %s", date_str, e)
+            return fields.Date.today()
+
+
 def local_day_bounds_utc(target_date, fallback_tz=None):
     """Return (start_utc, end_utc) naive Datetimes covering the full local
     day (00:00:00 to 23:59:59.999999) for target_date in the requesting
