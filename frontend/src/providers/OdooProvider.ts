@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { DEFAULT_ODOO_BASE_URL, getOdooBaseUrl, initOdooBaseUrl, odooClient, setOdooBaseUrl } from './odooClient';
 import { DataProvider, ProviderError, ProviderNetworkError } from './DataProvider';
+import type { ProviderFeature } from './DataProvider';
 import type {
   Chantier,
   CreateTimeEntryPayload,
@@ -13,6 +14,9 @@ import type {
   TimeEntryType,
   TodayTimeEntries,
 } from '../types/models';
+
+/** Domaines sans équivalent côté Odoo aujourd'hui — voir supports(). */
+const UNSUPPORTED_FEATURES = new Set<ProviderFeature>(['products', 'inventory', 'orders']);
 
 /**
  * Implémentation Odoo 14 du contrat DataProvider — parle au backend sous
@@ -39,6 +43,15 @@ import type {
  * côté Odoo.
  */
 export class OdooProvider extends DataProvider {
+  /** Le backend Odoo n'expose aucune route pour le stock ni les commandes
+   *  (voir odoo/README.md § Vérification). Le déclarer permet aux écrans
+   *  concernés d'afficher une explication au lieu de tenter un appel qui
+   *  échouera — et à ceux qui marchent (planning, pointage) de continuer
+   *  normalement. */
+  supports(feature: ProviderFeature): boolean {
+    return !UNSUPPORTED_FEATURES.has(feature);
+  }
+
   async init(): Promise<void> {
     await initOdooBaseUrl();
   }

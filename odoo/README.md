@@ -63,6 +63,14 @@ Le job `odoo` de `.github/workflows/ci.yml` exécute exactement cette procédure
 
 Voir `docs/backend-integration-plan.md` à la racine du repo, et `frontend/src/providers/OdooProvider.ts` pour l'adaptateur qui consomme ces routes.
 
+### Périmètre couvert, et ce que l'app en fait
+
+Ce backend couvre le **planning**, le **pointage**, les **chantiers** et l'**authentification**. Il n'expose aujourd'hui **aucune route** pour trois domaines que l'app sait pourtant afficher : catalogue produits, inventaire, commandes.
+
+Ces trois-là ne sont pas laissés à échouer à l'exécution. Le contrat `DataProvider` porte une déclaration de capacités (`supports(feature)`, cf. `frontend/src/providers/DataProvider.ts`) ; `OdooProvider` déclare les trois domaines non couverts, et les écrans concernés (`CatalogueView`, `InventaireView`, `HistoriqueView`) interrogent cette déclaration **avant** d'appeler. Ils affichent alors une explication en français — sans bouton « Réessayer », puisque réessayer ne peut rien y changer — au lieu d'un spinner suivi du nom de la méthode manquante. `ChantierDetailView` dégrade de la même façon : la vacation s'affiche normalement, seuls les boutons Stock et Inventaire disparaissent.
+
+Conséquence pratique : quand les routes manquantes existeront côté Odoo, il suffira de retirer le domaine correspondant de `UNSUPPORTED_FEATURES` dans `OdooProvider.ts` pour rallumer l'onglet — rien à changer côté écrans. Le comportement est verrouillé par `frontend/src/providers/__tests__/capabilities.test.ts`.
+
 ## Configuration
 
 Comme le frontend (`frontend/.env.example`), la configuration se fait par variable d'environnement plutôt que par valeur codée en dur, pour permettre des valeurs différentes en dev/staging/prod sans changement de code :

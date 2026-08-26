@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonContent, IonItem, IonLabel, IonList, IonNote, IonPage } from '@ionic/vue';
 import { provider } from '../../providers';
-import { ProviderNetworkError } from '../../providers/DataProvider';
+import { ProviderNetworkError, UNSUPPORTED_MESSAGES } from '../../providers/DataProvider';
 import AppHeader from '../../components/AppHeader.vue';
 import DataState from '../../components/DataState.vue';
 import type { Order } from '../../types/models';
@@ -13,8 +13,15 @@ const router = useRouter();
 const orders = ref<Order[]>([]);
 const loading = ref(true);
 const error = ref('');
+// Constant sur la durée de la session : le provider actif est figé au
+// démarrage (voir providers/index.ts).
+const unavailable = provider.supports('orders') ? '' : UNSUPPORTED_MESSAGES.orders;
 
 async function load() {
+  if (unavailable) {
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   error.value = '';
   try {
@@ -35,7 +42,13 @@ onMounted(load);
   <ion-page>
     <AppHeader title="Historique des commandes" />
     <ion-content>
-      <DataState :loading="loading" :error="error" :empty="!orders.length" @retry="load">
+      <DataState
+        :loading="loading"
+        :unavailable="unavailable"
+        :error="error"
+        :empty="!orders.length"
+        @retry="load"
+      >
         <template #empty>Aucune commande pour le moment.</template>
         <ion-list class="list" lines="none">
           <ion-item

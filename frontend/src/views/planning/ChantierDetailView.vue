@@ -35,6 +35,12 @@ const shift = ref<Shift | null>(null);
 const loading = ref(true);
 const error = ref('');
 const stockPreview = ref<StockPreviewItem[]>([]);
+// Le détail d'une vacation relève du planning (supporté partout), mais
+// l'aperçu de stock et les raccourcis Stock/Inventaire dépendent de
+// domaines qu'un backend peut ne pas couvrir. Sans ce garde-fou, un
+// backend sans stock faisait échouer TOUTE la fiche — planning compris —
+// pour une section secondaire.
+const stockSupported = provider.supports('products') && provider.supports('inventory');
 
 function timeRange(s: Shift): string {
   const fmt = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -104,7 +110,7 @@ async function load() {
       const data = await provider.fetchShifts({ from: date, to: date });
       shift.value = data.find((s) => String(s.id) === props.id) || null;
     }
-    if (shift.value) await loadStockPreview(shift.value.chantier_id);
+    if (shift.value && stockSupported) await loadStockPreview(shift.value.chantier_id);
   } catch (e) {
     // Sans ce catch, une panne serveur (pas seulement une coupure réseau)
     // laissait shift.value à null et affichait « Vacation introuvable » —
@@ -139,10 +145,10 @@ onMounted(load);
           <ion-button class="dbtn" fill="clear" :href="itineraryHref(shift!)" target="_blank" rel="noopener">
             <div><ion-icon :icon="mapOutline"></ion-icon><span>Itinéraire</span></div>
           </ion-button>
-          <ion-button class="dbtn" fill="clear" @click="goToStock">
+          <ion-button v-if="stockSupported" class="dbtn" fill="clear" @click="goToStock">
             <div><ion-icon :icon="cubeOutline"></ion-icon><span>Stock</span></div>
           </ion-button>
-          <ion-button class="dbtn" fill="clear" @click="goToInventaire">
+          <ion-button v-if="stockSupported" class="dbtn" fill="clear" @click="goToInventaire">
             <div><ion-icon :icon="clipboardOutline"></ion-icon><span>Inventaire</span></div>
           </ion-button>
         </div>

@@ -16,7 +16,7 @@ import {
 } from '@ionic/vue';
 import { arrowForwardOutline, businessOutline, chevronDownOutline, chevronForwardOutline, clipboardOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
-import { ProviderNetworkError } from '../../providers/DataProvider';
+import { ProviderNetworkError, UNSUPPORTED_MESSAGES } from '../../providers/DataProvider';
 import { useCartStore } from '../../stores/cart';
 import { useChantiersStore } from '../../stores/chantiers';
 import { iconForProduct } from '../../utils/productIcons';
@@ -40,6 +40,12 @@ const stockByProduct = reactive<Record<number, StockInfo>>({});
 const orderQty = reactive<Record<number, number>>({});
 const loading = ref(true);
 const error = ref('');
+// Le catalogue a besoin des produits ET du stock : si l'un des deux
+// manque côté serveur, l'écran n'a rien à montrer (voir
+// DataProvider.supports et odoo/README.md § Vérification).
+const unavailable = provider.supports('products') && provider.supports('inventory')
+  ? ''
+  : UNSUPPORTED_MESSAGES.products;
 
 function defaultPackaging(product: Product): Packaging | undefined {
   return product.packagings.find((pk) => pk.is_default) || product.packagings[0];
@@ -88,6 +94,10 @@ async function loadStock() {
 }
 
 async function load() {
+  if (unavailable) {
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   error.value = '';
   try {
@@ -152,7 +162,11 @@ function goToOrder() {
     </div>
   </div>
 
-  <div class="site-select">
+  <!-- Masqués quand le serveur ne couvre pas le stock : `load()` sort avant
+       `chantiers.fetchMine()`, le sélecteur resterait donc vide, et choisir un
+       site ne mènerait à rien. Un contrôle sans effet au-dessus du message
+       le contredirait. -->
+  <div v-if="!unavailable" class="site-select">
     <ion-icon :icon="businessOutline"></ion-icon>
     <ion-select v-model="chantiers.selectedId" interface="popover" aria-label="Chantier">
       <ion-select-option v-for="c in chantiers.list" :key="c.id" :value="c.id">{{ c.name }}</ion-select-option>
@@ -161,7 +175,7 @@ function goToOrder() {
   </div>
 
   <RouterLink
-    v-if="chantiers.selectedId"
+    v-if="!unavailable && chantiers.selectedId"
     class="inventaire-link"
     :to="{ name: 'inventaire', query: { chantier: chantiers.selectedId } }"
   >
@@ -170,7 +184,13 @@ function goToOrder() {
     <ion-icon :icon="chevronForwardOutline" class="chev"></ion-icon>
   </RouterLink>
 
-  <DataState :loading="loading" :error="error" :empty="!products.length" @retry="load">
+  <DataState
+    :loading="loading"
+    :unavailable="unavailable"
+    :error="error"
+    :empty="!products.length"
+    @retry="load"
+  >
     <template #empty>Aucun produit au catalogue.</template>
 
     <ion-grid class="stock-grid">
