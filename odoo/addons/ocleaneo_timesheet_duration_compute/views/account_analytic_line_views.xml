@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_account_analytic_line_tree_duration_onchange" model="ir.ui.view">
+        <field name="name">account.analytic.line tree: auto-compute duration</field>
+        <field name="model">account.analytic.line</field>
+        <field name="inherit_id" ref="project_timesheet_time_control.account_analytic_line_tree" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='date_time']" position="attributes">
+                <attribute name="on_change">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='date_time_end']" position="attributes">
+                <attribute name="on_change">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_analytic_line_form_duration_onchange" model="ir.ui.view">
+        <field name="name">account.analytic.line form: auto-compute duration</field>
+        <field name="model">account.analytic.line</field>
+        <field name="inherit_id" ref="project_timesheet_time_control.hr_timesheet_line_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='date_time']" position="attributes">
+                <attribute name="on_change">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='date_time_end']" position="attributes">
+                <attribute name="on_change">1</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

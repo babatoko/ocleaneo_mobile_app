@@ -1,0 +1,79 @@
+# Copyright 2026 Ocleaneo
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
+
+
+class OcleaneoMobilePointage(models.Model):
+    _name = "ocleaneo.mobile.pointage"
+    _description = "Mobile clocking log"
+    _order = "datetime desc, id desc"
+
+    user_id = fields.Many2one("res.users", string="User", required=True, index=True)
+    employee_id = fields.Many2one("hr.employee", string="Employee", index=True)
+    fsm_order_id = fields.Many2one("fsm.order", string="FSM Order", index=True)
+    fsm_location_id = fields.Many2one("fsm.location", string="FSM Location", index=True)
+
+    type = fields.Selection([
+        ("arrivee", "Arrivée"),
+        ("depart", "Départ"),
+        ("pause_debut", "Début de pause"),
+        ("pause_fin", "Fin de pause"),
+    ], string="Type", required=True)
+
+    datetime = fields.Datetime(string="Date/Heure", required=True, default=fields.Datetime.now)
+    gps_latitude = fields.Float(string="Latitude", digits=(10, 7))
+    gps_longitude = fields.Float(string="Longitude", digits=(10, 7))
+    gps_accuracy = fields.Float(string="GPS Accuracy (m)")
+    nfc_tag_id = fields.Char(string="NFC Tag ID")
+    photo_id = fields.Many2one("ir.attachment", string="Photo")
+    commentaire = fields.Text(string="Commentaire")
+    source = fields.Selection([
+        ("mobile", "Mobile"),
+        ("manuel", "Manuel"),
+        ("import", "Import"),
+    ], string="Source", default="mobile", required=True)
+
+    state = fields.Selection([
+        ("brouillon", "Brouillon"),
+        ("valide", "Validé"),
+        ("annule", "Annulé"),
+    ], string="État", default="valide", required=True)
+
+    company_id = fields.Many2one(
+        "res.company",
+        string="Company",
+        required=True,
+        default=lambda self: self.env.company,
+    )
+
+    hr_attendance_id = fields.Many2one("hr.attendance", string="Attendance record", readonly=True)
+    timesheet_line_ids = fields.Many2many(
+        "account.analytic.line",
+        "ocleaneo_mobile_pointage_timesheet_rel",
+        "pointage_id",
+        "timesheet_id",
+        string="Timesheet lines",
+        readonly=True,
+    )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get("employee_id") and vals.get("user_id"):
+                user = self.env["res.users"].sudo().browse(vals["user_id"])
+                employee = user.get_employee_for_mobile()
+                if employee:
+                    vals["employee_id"] = employee.id
+                    vals["company_id"] = employee.company_id.id or user.company_id.id
+            if not vals.get("company_id") and vals.get("user_id"):
+                user = self.env["res.users"].sudo().browse(vals["user_id"])
+                vals["company_id"] = user.company_id.id
+        return super(OcleaneoMobilePointage, self).create(vals_list)
+
+    def action_valider(self):
+        self.write({"state": "valide"})
+
+    def action_annuler(self):
+        self.write({"state": "annule"})

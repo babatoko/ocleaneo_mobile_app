@@ -1,0 +1,51 @@
+# Copyright 2026 Ocleaneo
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+
+from odoo import api, models, fields
+from datetime import timedelta
+
+
+class AccountAnalyticLine(models.Model):
+    _inherit = "account.analytic.line"
+
+    # Replace the computed date_time_end from project_timesheet_time_control
+    # with a stored, user-controlled datetime. This prevents Odoo from
+    # overwriting the user's input when they edit the end time.
+    date_time_end = fields.Datetime(
+        string="End Time",
+        store=True,
+        copy=False,
+    )
+
+    @api.onchange("date_time", "date_time_end")
+    def _onchange_date_time_duration(self):
+        """Recalculate unit_amount in real time when start/end times change."""
+        for line in self:
+            if line.date_time and line.date_time_end and line.date_time_end > line.date_time:
+                duration_hours = (line.date_time_end - line.date_time).total_seconds() / 3600.0
+                line.unit_amount = round(duration_hours, 2)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            vals = self._compute_duration(vals)
+        return super(AccountAnalyticLine, self).create(vals_list)
+
+    def write(self, vals):
+        vals = self._compute_duration(vals)
+        return super(AccountAnalyticLine, self).write(vals)
+
+    def _compute_duration(self, vals):
+        """Compute unit_amount from date_time and date_time_end when applicable.
+        If both date_time and date_time_end are provided, recalculate unit_amount
+        unless the user explicitly set a non-zero unit_amount in the same call."""
+        if vals.get('date_time') and vals.get('date_time_end'):
+            # If user explicitly supplied a non-zero unit_amount, respect it.
+            if vals.get('unit_amount'):
+                return vals
+            start = fields.Datetime.from_string(vals['date_time']) if isinstance(vals['date_time'], str) else vals['date_time']
+            end = fields.Datetime.from_string(vals['date_time_end']) if isinstance(vals['date_time_end'], str) else vals['date_time_end']
+            if start and end and end > start:
+                duration_hours = (end - start).total_seconds() / 3600.0
+                vals['unit_amount'] = round(duration_hours, 2)
+        return vals

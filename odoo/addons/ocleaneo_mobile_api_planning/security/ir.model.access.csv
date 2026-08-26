@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mobile_api_planning_config_user,mobile.api.planning.config user,ocleaneo_mobile_api_planning.model_mobile_api_planning_config,base.group_user,1,0,0,0

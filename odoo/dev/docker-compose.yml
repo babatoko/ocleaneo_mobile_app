@@ -1,0 +1,64 @@
+services:
+  odoo-14-db-dev:
+    image: postgres:15-alpine
+    container_name: odoo-14-db-dev
+    restart: unless-stopped
+    networks:
+      - odoo-dev-net
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    ports:
+      - "127.0.0.1:5438:5432"
+    volumes:
+      - odoo14-dev-pgdata:/var/lib/postgresql/data
+    shm_size: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  odoo-14-dev:
+    image: odoo-14-custom:latest
+    container_name: odoo-14-dev
+    restart: unless-stopped
+    depends_on:
+      odoo-14-db-dev:
+        condition: service_healthy
+    environment:
+      ODOO_RC: /etc/odoo/odoo.conf
+      ODOO_DATABASE: odoo14_dev
+    ports:
+      - "127.0.0.1:8074:8069"
+      - "127.0.0.1:8075:8072"
+    volumes:
+      - odoo14-dev-filestore:/var/lib/odoo/filestore:rw
+      - ./odoo14-dev.conf:/etc/odoo/odoo.conf:ro
+      # Mount OCA/custom addons. Adjust host paths to your local checkout.
+      - ../../odoo/addons:/opt/custom_addons_v14:ro
+      # If OCA addons live elsewhere, update or add another volume below.
+      # - /path/to/oca_addons_v14:/opt/oca_addons_v14:ro
+      - odoo14-dev-logs:/var/log/odoo:rw
+    command:
+      - odoo
+      - --config=/etc/odoo/odoo.conf
+      - --database=odoo14_dev
+      - --db_host=odoo-14-db-dev
+      - --db_port=5432
+      - --db_user=odoo
+      - --db_password=odoo
+    networks:
+      - odoo-dev-net
+
+volumes:
+  odoo14-dev-pgdata:
+  odoo14-dev-filestore:
+  odoo14-dev-logs:
+
+networks:
+  odoo-dev-net:
+    name: odoo-dev-net
+    driver: bridge

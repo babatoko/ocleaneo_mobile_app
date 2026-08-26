@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_res_users_mobile_api,res_users mobile api,base.model_res_users,base.group_user,1,1,0,0
+access_mobile_module_config_user,mobile.module.config user,ocleaneo_mobile_api.model_mobile_module_config,base.group_user,1,0,0,0
+access_mobile_module_config_manager,mobile.module.config manager,ocleaneo_mobile_api.model_mobile_module_config,base.group_system,1,1,1,1
