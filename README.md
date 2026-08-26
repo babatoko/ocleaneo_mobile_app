@@ -232,6 +232,18 @@ Quatre axes ajoutés au-dessus des vues de base :
 
 ## Intégration Odoo
 
+> **Mise à jour** : deux chemins d'intégration coexistent maintenant dans ce repo, pas encore réconciliés.
+> Cette section (`RestProvider.ts` + `base_rest`, ci-dessous) reste le plan initialement documenté pour
+> l'instance de production existante, mais **n'a jamais été implémenté côté Odoo** — `base_rest` n'a jamais
+> été installé, ces services n'existent pas.
+> Un second chemin, différent, a depuis été construit et **vérifié en conditions réelles** (Odoo 14 +
+> Postgres, appels HTTP réels, test de bout en bout par navigateur) : des modules Odoo custom
+> (`odoo/addons/ocleaneo_mobile_*`, JSON-RPC natif plutôt que `base_rest`) et **`providers/OdooProvider.ts`**
+> qui les consomme (`VITE_DATA_PROVIDER=odoo`). Voir `odoo/README.md` pour le détail des routes et l'état
+> exact de ce qui est couvert (catalogue produits/inventaire/commandes n'ont pas d'équivalent Odoo
+> aujourd'hui). Si l'instance de production `entretien-maconnais.fr` finit par exposer `base_rest` comme
+> décrit ci-dessous, `RestProvider.ts` reste l'autre chemin disponible sans changement de code frontend.
+
 Le backend est une **instance Odoo 14 existante**, avec des modules **OCA**. Décisions encore ouvertes avant de rebrancher le frontend :
 
 1. **URL et accès de l'instance** — instance confirmée : `https://www.entretien-maconnais.fr/`. Reste à fournir des identifiants/API key de service, et à savoir si le module `base_rest` (point 2 ci-dessous) y est déjà installé.
