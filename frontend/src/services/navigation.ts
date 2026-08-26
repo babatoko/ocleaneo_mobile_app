@@ -13,7 +13,10 @@ interface NavigationTarget {
  * sinon fonctionnent quand même dans le navigateur.
  */
 export function turnByTurnHref({ latitude, longitude, address }: NavigationTarget): string {
-  if (latitude && longitude) {
+  // `!= null` (pas une vérité JS) : 0 est une coordonnée réelle (équateur,
+  // méridien de Greenwich), pas une valeur "manquante" — même correction que
+  // checkGeofence() dans services/geofence.ts.
+  if (latitude != null && longitude != null) {
     if (Capacitor.getPlatform() === 'ios') {
       return `https://maps.apple.com/?daddr=${latitude},${longitude}&dirflg=d`;
     }

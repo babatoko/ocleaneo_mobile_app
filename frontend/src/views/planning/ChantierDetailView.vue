@@ -4,12 +4,14 @@ import { useRoute, useRouter } from 'vue-router';
 import { IonButton, IonCard, IonCardContent, IonContent, IonIcon, IonItem, IonLabel, IonPage } from '@ionic/vue';
 import { alertCircleOutline, chevronForwardOutline, clipboardOutline, cubeOutline, locationOutline, mapOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
+import { ProviderNetworkError } from '../../providers/DataProvider';
 import { useChantiersStore } from '../../stores/chantiers';
 import { usePlanningStore } from '../../stores/planning';
 import { iconForProduct } from '../../utils/productIcons';
 import { turnByTurnHref } from '../../services/navigation';
 import { todayIso } from '../../utils/date';
 import AppHeader from '../../components/AppHeader.vue';
+import DataState from '../../components/DataState.vue';
 import type { Shift } from '../../types/models';
 
 const props = defineProps({
@@ -31,6 +33,7 @@ const planning = usePlanningStore();
 
 const shift = ref<Shift | null>(null);
 const loading = ref(true);
+const error = ref('');
 const stockPreview = ref<StockPreviewItem[]>([]);
 
 function timeRange(s: Shift): string {
@@ -89,8 +92,9 @@ async function loadStockPreview(chantierId: number) {
   });
 }
 
-onMounted(async () => {
+async function load() {
   loading.value = true;
+  error.value = '';
   try {
     await chantiers.fetchMine(); // pour le lien Itinéraire avec guidage direct (coordonnées)
     if (planning.selectedShift && String(planning.selectedShift.id) === props.id) {
@@ -101,27 +105,38 @@ onMounted(async () => {
       shift.value = data.find((s) => String(s.id) === props.id) || null;
     }
     if (shift.value) await loadStockPreview(shift.value.chantier_id);
+  } catch (e) {
+    // Sans ce catch, une panne serveur (pas seulement une coupure réseau)
+    // laissait shift.value à null et affichait « Vacation introuvable » —
+    // message qui laisse croire à une vacation supprimée, pas à une panne.
+    error.value = e instanceof ProviderNetworkError
+      ? "Pas de connexion — le détail du chantier n'a pas pu être chargé."
+      : (e instanceof Error && e.message) || 'Détail du chantier indisponible.';
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 </script>
 
 <template>
   <ion-page>
     <AppHeader title="Détail du chantier" />
     <ion-content>
-      <template v-if="shift">
+      <DataState :loading="loading" :error="error" :empty="!shift" @retry="load">
+        <template #empty>Vacation introuvable.</template>
+
         <ion-card class="detail-hero">
           <ion-card-content>
-            <p class="dtime">{{ timeRange(shift) }}</p>
-            <p class="dclient">{{ shift.chantier_name }}</p>
-            <p class="daddr"><ion-icon :icon="locationOutline"></ion-icon> {{ shift.chantier_address || shift.chantier_name }}</p>
+            <p class="dtime">{{ timeRange(shift!) }}</p>
+            <p class="dclient">{{ shift!.chantier_name }}</p>
+            <p class="daddr"><ion-icon :icon="locationOutline"></ion-icon> {{ shift!.chantier_address || shift!.chantier_name }}</p>
           </ion-card-content>
         </ion-card>
 
         <div class="detail-actions">
-          <ion-button class="dbtn" fill="clear" :href="itineraryHref(shift)" target="_blank" rel="noopener">
+          <ion-button class="dbtn" fill="clear" :href="itineraryHref(shift!)" target="_blank" rel="noopener">
             <div><ion-icon :icon="mapOutline"></ion-icon><span>Itinéraire</span></div>
           </ion-button>
           <ion-button class="dbtn" fill="clear" @click="goToStock">
@@ -132,9 +147,9 @@ onMounted(async () => {
           </ion-button>
         </div>
 
-        <ion-item v-if="shift.note" class="note-box" color="warning" lines="none">
+        <ion-item v-if="shift!.note" class="note-box" color="warning" lines="none">
           <ion-icon slot="start" :icon="alertCircleOutline"></ion-icon>
-          <ion-label class="ion-text-wrap">{{ shift.note }}</ion-label>
+          <ion-label class="ion-text-wrap">{{ shift!.note }}</ion-label>
         </ion-item>
 
         <div v-if="stockPreview.length" class="detail-block">
@@ -152,9 +167,7 @@ onMounted(async () => {
             </ion-card>
           </div>
         </div>
-      </template>
-
-      <p v-else-if="!loading" class="trip-empty">Vacation introuvable.</p>
+      </DataState>
     </ion-content>
   </ion-page>
 </template>

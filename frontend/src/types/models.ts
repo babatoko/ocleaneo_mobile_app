@@ -46,6 +46,9 @@ export interface TimeEntry {
   shift_id?: number;
   recorded_at: string;
   pending?: boolean;
+  /** Clé d'idempotence du pointage d'origine (voir CreateTimeEntryPayload.clientRef).
+   *  Optionnelle côté lecture : un provider n'est pas tenu de la renvoyer. */
+  client_ref?: string;
 }
 
 export interface TodayTimeEntries {
@@ -114,6 +117,14 @@ export interface CreateTimeEntryPayload {
   latitude?: number;
   longitude?: number;
   outOfRange?: boolean;
+  /** Généré une fois côté client au moment du pointage (voir stores/pointage.ts,
+   *  postEntry) et réutilisé tel quel à chaque tentative — y compris après une
+   *  mise en file hors ligne et un rejeu. Sert de clé d'idempotence : si une
+   *  tentative réussit côté serveur mais que la réponse se perd (coupure au
+   *  mauvais moment), le client la revoit comme une erreur réseau et
+   *  réessaiera — sans cette clé, le serveur n'a aucun moyen de reconnaître
+   *  le rejeu et crée un doublon. */
+  clientRef: string;
 }
 
 export interface SubmitInventoryItemPayload {

@@ -301,7 +301,9 @@ async function loadTournee() {
     const withCoords: Required<Pick<TrippablePoint, 'id' | 'name' | 'address' | 'latitude' | 'longitude' | 'shiftDurationSeconds' | 'startAt'>>[] = [];
     for (const s of dayShifts) {
       const chantier = chantiers.list.find((c) => c.id === s.chantier_id);
-      if (chantier?.latitude && chantier?.longitude) {
+      // `!= null` : 0 est une coordonnée réelle (équateur/méridien), pas une
+      // valeur "manquante" — même correction que checkGeofence().
+      if (chantier?.latitude != null && chantier?.longitude != null) {
         withCoords.push({
           id: s.chantier_id,
           name: s.chantier_name,

@@ -136,6 +136,13 @@ export class MockProvider extends DataProvider {
 
   async createTimeEntry(payload: CreateTimeEntryPayload): Promise<TimeEntry> {
     await delay();
+    // Preuve que le contrat tient : un rejeu (même clientRef, ex. après une
+    // réponse perdue puis un pointage remis en file hors ligne) renvoie
+    // l'entrée déjà créée plutôt que d'en créer une deuxième — exactement ce
+    // qu'un backend réel doit faire avec cette clé (voir README § Contrat Odoo).
+    const existing = timeEntries.find((e) => e.client_ref === payload.clientRef);
+    if (existing) return existing;
+
     const chantier = chantiers.find((c) => c.id === payload.chantierId);
     const entry: TimeEntry = {
       id: nextEntryId++,
@@ -143,6 +150,7 @@ export class MockProvider extends DataProvider {
       chantier_id: payload.chantierId,
       chantier_name: chantier?.name || '',
       recorded_at: payload.recordedAt || new Date().toISOString(),
+      client_ref: payload.clientRef,
     };
     timeEntries.push(entry);
     return entry;

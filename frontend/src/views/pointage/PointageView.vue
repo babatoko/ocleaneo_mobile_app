@@ -256,12 +256,12 @@ function fmtTime(iso: string | Date | null | undefined): string {
     </p>
 
     <div v-if="pointage.status === 'in'" class="pause-actions">
-      <ion-button class="pause-btn" fill="solid" @click="pointage.startPause()">
+      <ion-button class="pause-btn" fill="solid" :disabled="pointage.pauseActionPending" @click="pointage.startPause()">
         <ion-icon slot="start" :icon="pauseOutline"></ion-icon> Pause
       </ion-button>
     </div>
     <div v-else-if="pointage.status === 'paused'" class="pause-actions">
-      <ion-button class="pause-btn resume" fill="solid" @click="pointage.endPause()">
+      <ion-button class="pause-btn resume" fill="solid" :disabled="pointage.pauseActionPending" @click="pointage.endPause()">
         <ion-icon slot="start" :icon="playOutline"></ion-icon> Reprendre
       </ion-button>
     </div>

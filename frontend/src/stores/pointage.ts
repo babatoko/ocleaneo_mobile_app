@@ -19,6 +19,11 @@ import { startOfWeekIso } from '../utils/week';
 import { todayIso } from '../utils/date';
 import type { Position, Shift, TimeEntry, TimeEntryType } from '../types/models';
 
+function newClientRef(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `cr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function getPosition(): Promise<Position | null> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
@@ -70,6 +75,16 @@ export function computeWorkedHours(entries: TimeEntry[], now: Date = new Date())
 // seulement quand l'écran Pointage est ouvert.
 let listenersReady = false;
 
+// Garde de réentrance dédiée à un évènement NFC déjà en cours de traitement —
+// distincte de `state.scanning`, qui reste ouvert pendant toute une session
+// iOS manuelle (bouton pressé, en attente d'un tap) : la traiter comme une
+// garde de réentrance bloquerait le tap qui doit justement la faire aboutir.
+// Un module-level `let`, pas du state Pinia : ce n'est pas un signal affiché
+// à l'écran, juste une protection contre un double évènement `NFC.onRead`
+// pour un seul passage de badge — un défaut réel documenté sur certains
+// lecteurs Android, qui créerait sinon deux pointages pour un seul geste.
+let processingTag = false;
+
 type PointageMessage = { type: 'queued' | 'warn'; text: string } | null;
 
 interface PostEntryOptions {
@@ -90,6 +105,10 @@ interface PointageState {
   pendingTagUid: string | null;
   offlineQueueCount: number;
   tick: number;
+  /** Empêche un double-tap sur Pause/Reprendre de poster deux fois avant que
+   *  `status` (dérivé de `entries`, mis à jour seulement après la requête)
+   *  n'ait eu le temps de refléter la première action. */
+  pauseActionPending: boolean;
 }
 
 export const usePointageStore = defineStore('pointage', {
@@ -103,6 +122,7 @@ export const usePointageStore = defineStore('pointage', {
     lastMessage: null, // feedback transitoire non bloquant
     pendingTagUid: null, // badge lu avant que le salarié soit authentifié
     offlineQueueCount: 0,
+    pauseActionPending: false,
     // Horloge réactive : sans elle, weekWorkedHours (un getter) ne se
     // recalculerait jamais, puisqu'un `new Date()` interne n'est pas une
     // dépendance réactive. Le compteur resterait figé à la valeur du
@@ -212,6 +232,11 @@ export const usePointageStore = defineStore('pointage', {
         shiftId,
         type,
         recordedAt,
+        // Généré une seule fois ici, avant la première tentative : si celle-ci
+        // réussit côté serveur mais que la réponse se perd (vue comme une
+        // panne réseau), le rejeu depuis la file hors ligne portera la même
+        // clé — au serveur de reconnaître le doublon plutôt que de le créer.
+        clientRef: newClientRef(),
         ...(position || {}),
         ...(geo ? { outOfRange: !geo.withinRange } : {}),
       };
@@ -282,19 +307,31 @@ export const usePointageStore = defineStore('pointage', {
     // Pause / reprise : action manuelle (le badge du chantier ne peut pas à
     // lui seul distinguer « je pars » de « je fais une pause »).
     async startPause(): Promise<void> {
+      if (this.pauseActionPending) return;
       const lastEntry = this.lastEntry as TimeEntry | undefined;
       if ((this.status as string) !== 'in' || !lastEntry) return;
       hapticTap();
-      const shift = this.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
-      await this.postEntry('pause_start', { chantierId: lastEntry.chantier_id, shiftId: shift?.id });
+      this.pauseActionPending = true;
+      try {
+        const shift = this.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
+        await this.postEntry('pause_start', { chantierId: lastEntry.chantier_id, shiftId: shift?.id });
+      } finally {
+        this.pauseActionPending = false;
+      }
     },
 
     async endPause(): Promise<void> {
+      if (this.pauseActionPending) return;
       const lastEntry = this.lastEntry as TimeEntry | undefined;
       if ((this.status as string) !== 'paused' || !lastEntry) return;
       hapticTap();
-      const shift = this.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
-      await this.postEntry('pause_end', { chantierId: lastEntry.chantier_id, shiftId: shift?.id });
+      this.pauseActionPending = true;
+      try {
+        const shift = this.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
+        await this.postEntry('pause_end', { chantierId: lastEntry.chantier_id, shiftId: shift?.id });
+      } finally {
+        this.pauseActionPending = false;
+      }
     },
 
     initGlobalListener(router: Router): void {
@@ -312,25 +349,31 @@ export const usePointageStore = defineStore('pointage', {
     },
 
     async handleTagRead(uid: string, router: Router): Promise<void> {
-      const auth = useAuthStore();
-      if (!auth.isAuthenticated) {
-        // L'app vient peut-être d'être lancée par ce tap : on garde le badge en
-        // attente et on le traitera juste après la connexion.
-        this.pendingTagUid = uid;
-        if (router.currentRoute.value.name !== 'login') {
-          router.push({ name: 'login' });
-        }
-        return;
-      }
-
-      this.scanning = true;
+      if (processingTag) return; // second évènement NFC pour le même geste : ignoré
+      processingTag = true;
       try {
-        await this.clockWithTag(uid);
+        const auth = useAuthStore();
+        if (!auth.isAuthenticated) {
+          // L'app vient peut-être d'être lancée par ce tap : on garde le badge en
+          // attente et on le traitera juste après la connexion.
+          this.pendingTagUid = uid;
+          if (router.currentRoute.value.name !== 'login') {
+            router.push({ name: 'login' });
+          }
+          return;
+        }
+
+        this.scanning = true;
+        try {
+          await this.clockWithTag(uid);
+        } finally {
+          this.scanning = false;
+        }
+        if (router.currentRoute.value.name !== 'pointage') {
+          router.push({ name: 'pointage' });
+        }
       } finally {
-        this.scanning = false;
-      }
-      if (router.currentRoute.value.name !== 'pointage') {
-        router.push({ name: 'pointage' });
+        processingTag = false;
       }
     },
 
