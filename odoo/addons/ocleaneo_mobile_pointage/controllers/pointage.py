@@ -130,7 +130,15 @@ class MobilePointageController(http.Controller):
         date_start, _ = local_day_bounds_utc(range_start, user.tz)
         _, date_end = local_day_bounds_utc(range_end, user.tz)
 
-        Pointage = env["ocleaneo.mobile.pointage"].sudo()
+        # Read as the worker, NOT sudo. The user_id filter below is still the
+        # primary scoping, but running under the worker's own rights makes
+        # ir_rule_ocleaneo_mobile_pointage_self a real second line: a future
+        # edit that drops or loosens that filter returns nothing extra
+        # instead of leaking the whole company's clockings. The rule cannot
+        # replace the filter (see the module's security/record_rules.xml for
+        # why per-channel scoping is not expressible as a rule at all), but
+        # it can catch the day someone forgets it.
+        Pointage = env["ocleaneo.mobile.pointage"]
         records = Pointage.search([
             ("user_id", "=", user.id),
             ("datetime", ">=", date_start),
@@ -181,7 +189,11 @@ class MobilePointageController(http.Controller):
             return {"error": "invalid type", "code": 400}
 
         if client_ref:
-            existing = env["ocleaneo.mobile.pointage"].sudo().search([
+            # Also read as the worker (see pointage_mine): a client_ref is
+            # generated on the device and is not secret, so a lookup that
+            # forgot to scope by user_id would let one worker's retry hand
+            # back another worker's clocking.
+            existing = env["ocleaneo.mobile.pointage"].search([
                 ("user_id", "=", user.id),
                 ("client_ref", "=", client_ref),
             ], limit=1)
@@ -276,6 +288,15 @@ class MobilePointageController(http.Controller):
         response — which is exactly the idempotency the key is for. So the
         losing insert is re-raised as a serialization failure to hand the
         request back to that machinery.
+
+        sudo() is kept on the write path, unlike the reads in pointage() and
+        pointage_mine(). The clocking is only half of what this records: the
+        request goes on to open or close an hr.attendance and an
+        account.analytic.line on the worker's behalf, and a cleaning agent
+        holds neither the Attendance nor the Timesheet rights that would
+        allow it. `vals` is built by the caller with user_id/employee_id
+        taken from the authenticated token, never from the payload, so the
+        elevation cannot be steered into writing someone else's row.
         """
         Pointage = env["ocleaneo.mobile.pointage"].sudo()
         if not client_ref:

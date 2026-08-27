@@ -1,3 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_ocleaneo_mobile_pointage_user,ocleaneo.mobile.pointage user,model_ocleaneo_mobile_pointage,base.group_user,1,1,1,0
 access_ocleaneo_mobile_pointage_manager,ocleaneo.mobile.pointage manager,model_ocleaneo_mobile_pointage,base.group_system,1,1,1,1
+access_ocleaneo_mobile_pointage_hr_manager,ocleaneo.mobile.pointage HR attendance manager,model_ocleaneo_mobile_pointage,hr_attendance.group_hr_attendance_manager,1,1,1,1

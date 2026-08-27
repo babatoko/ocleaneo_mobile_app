@@ -157,6 +157,22 @@ Les correctifs successifs sur ce module ont d'abord été validés par lecture d
 
 Cette installation de test n'est pas conservée dans le repo (faite dans un environnement jetable) ; à refaire pour toute modification future touchant à l'interaction avec les modules OCA.
 
+### Règles d'accès (`ir.rule`) et portée de l'API mobile
+
+**Ce qu'une `ir.rule` ne peut pas faire ici.** Il est tentant de vouloir remplacer les filtres écrits à la main dans les contrôleurs (`("user_id", "=", user.id)`, contrôle de propriété des `fsm.order`) par des règles d'accès. Ce n'est pas possible, et essayer reproduit la régression `res.users` décrite plus bas :
+
+- `ir_rule._eval_context()` ne fournit que `user`, `time`, `company_id(s)`, et son commentaire est explicite : *« use an empty context for 'user' to make the domain evaluation independent from the context »*. Une règle **ne peut pas savoir** que la requête arrive par l'API mobile.
+- Le salarié mobile est le même `res.users` que dans le backoffice. Restreindre un modèle partagé par une règle le restreint donc **partout**, backoffice compris.
+- Les règles se combinent en `AND(globales, OU(groupes))` (`ir_rule._compute_domain`). Une règle attachée à un groupe « mobile » supplémentaire serait soit OU-ée avec celle de `base.group_user` — donc diluée —, soit, si elle est seule, restrictive partout. Aucune combinaison ne donne une portée par canal.
+
+**Conclusion appliquée** : la portée de l'API mobile est assurée par ses contrôleurs, et les `ir.rule` ne servent qu'à exprimer ce qui est vrai sur *tous* les canaux. Sur `ocleaneo.mobile.pointage`, c'est le cas : un salarié ne voit que ses propres pointages, quel que soit le canal.
+
+**Ce qui a été corrigé.** L'ACL « manager » du modèle était lettre morte. La règle « ses propres pointages » était attachée à `base.group_user` et était la **seule** règle du modèle — elle s'appliquait donc aussi aux gestionnaires, membres de `base.group_user` comme tout le monde. L'ACL leur accordait tout, la règle leur reprenait tout. Mesuré sur Odoo 14 : un utilisateur Settings comme un responsable Présences voyaient **0 pointage sur 2**, alors que le modèle sert précisément à contrôler la paie. Une règle permissive (`[(1,'=',1)]`) attachée à `hr_attendance.group_hr_attendance_manager` et `base.group_system` rétablit leur visibilité par le OU, sans rien changer pour le salarié.
+
+**La règle est désormais porteuse, plus décorative.** Les lectures côté salarié (`/api/mobile/pointage/mine`, la recherche d'idempotence `client_ref`) ne passent plus par `sudo()` : elles s'exécutent avec les droits du salarié, si bien que la règle constitue une seconde ligne réelle. Le filtre `user_id` reste la protection principale — la règle ne peut pas le remplacer — mais elle rattrape le jour où quelqu'un l'oublie. Le `sudo()` est conservé sur le chemin d'écriture, et documenté : la requête ouvre aussi une `hr.attendance` et une ligne de timesheet, droits qu'un agent d'entretien n'a pas.
+
+Le tout est verrouillé par `ocleaneo_mobile_pointage/tests/test_record_rules.py`, confronté aux deux régressions : sans la règle gestionnaire, 2 échecs ; sans la règle « ses propres pointages », 4.
+
 ### Audit de sécurité — deux régressions `res.users` corrigées
 
 Un second passage sur la même installation réelle a mis au jour deux problèmes créés par les fichiers de sécurité livrés au commit initial. Tous deux datent de l'époque où le token mobile vivait sur `res.users` ; le token a depuis été déplacé sur `hr.employee`, mais les deux enregistrements de sécurité sont restés.
