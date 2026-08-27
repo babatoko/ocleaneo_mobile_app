@@ -1,17 +1,24 @@
 <script setup lang="ts">
 import { IonButton, IonIcon, IonSkeletonText } from '@ionic/vue';
-import { cloudOfflineOutline, refreshOutline } from 'ionicons/icons';
+import { cloudOfflineOutline, informationCircleOutline, refreshOutline } from 'ionicons/icons';
 
 /**
- * États d'un écran alimenté par des données distantes : chargement, erreur,
- * vide, contenu. Existe pour qu'aucun écran ne puisse plus afficher « vide »
- * alors que le chargement a échoué — un vide et une panne réseau ne veulent
- * pas dire la même chose pour le salarié, et l'un des deux mérite un bouton
- * Réessayer.
+ * États d'un écran alimenté par des données distantes : chargement,
+ * indisponibilité, erreur, vide, contenu. Existe pour qu'aucun écran ne
+ * puisse plus afficher « vide » alors que le chargement a échoué — un vide
+ * et une panne réseau ne veulent pas dire la même chose pour le salarié, et
+ * l'un des deux mérite un bouton Réessayer.
+ *
+ * `unavailable` est un cas distinct d'`error` : le serveur configuré ne
+ * couvre pas cette fonctionnalité (voir DataProvider.supports). Rien n'est
+ * en panne et réessayer n'y changera rien — donc pas de bouton Réessayer,
+ * proposer une action sans effet serait mensonger. Passe avant `error`
+ * dans le rendu : une indisponibilité connue explique mieux qu'une erreur.
  */
 defineProps({
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
+  unavailable: { type: String, default: '' },
   empty: { type: Boolean, default: false },
   /** Nombre de cartes fantômes affichées pendant le chargement. */
   skeletonCount: { type: Number, default: 3 },
@@ -24,6 +31,16 @@ defineEmits(['retry']);
   <div v-if="loading" class="ds-skeletons" aria-busy="true" aria-live="polite">
     <span class="sr-only">Chargement en cours…</span>
     <ion-skeleton-text v-for="i in skeletonCount" :key="i" class="ds-skeleton" animated></ion-skeleton-text>
+  </div>
+
+  <div v-else-if="unavailable" class="ds-unavailable" role="status">
+    <ion-icon :icon="informationCircleOutline" aria-hidden="true"></ion-icon>
+    <p class="ds-msg">{{ unavailable }}</p>
+    <p class="ds-hint">
+      <slot name="unavailable-hint">
+        Le planning et le pointage fonctionnent normalement.
+      </slot>
+    </p>
   </div>
 
   <div v-else-if="error" class="ds-error" role="alert">
@@ -57,7 +74,8 @@ defineEmits(['retry']);
   --background-rgb: 0, 0, 0;
 }
 
-.ds-error {
+.ds-error,
+.ds-unavailable {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -66,9 +84,17 @@ defineEmits(['retry']);
   text-align: center;
 }
 
-.ds-error ion-icon {
+.ds-error ion-icon,
+.ds-unavailable ion-icon {
   font-size: 30px;
   color: var(--text-muted);
+}
+
+.ds-hint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 10px 0 0;
+  max-width: 30ch;
 }
 
 .ds-msg {

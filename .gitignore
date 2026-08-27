@@ -7,12 +7,22 @@ frontend/dist/
 # Env files
 .env
 frontend/.env
+odoo/dev/.env
 
 # Logs
 *.log
 npm-debug.log*
+odoo/dev/oca-addons/
+odoo/dev/logs/
+odoo/dev/*.log
 
 # OS / editor
 .DS_Store
 .vscode/
 .idea/
+
+# Odoo Python
+odoo/addons/**/__pycache__/
+odoo/addons/**/*.pyc
+odoo/addons/**/*.pyo
+odoo/addons/**/.pytest_cache/

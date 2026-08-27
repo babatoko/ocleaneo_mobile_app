@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- noupdate="1" : cette règle est livrée depuis la première version et
+         des instances la portent déjà telle quelle. -->
+    <data noupdate="1">
+        <record id="ir_rule_ocleaneo_mobile_pointage_self" model="ir.rule">
+            <field name="name">Mobile Pointage: employees see only their own clockings</field>
+            <field name="model_id" ref="model_ocleaneo_mobile_pointage"/>
+            <field name="domain_force">[('user_id','=',user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+    </data>
+
+    <!-- Délibérément HORS du bloc noupdate : une correction de règle de
+         sécurité doit pouvoir se propager aux instances existantes. Le
+         nettoyage des données orphelines d'Odoo ignore les enregistrements
+         noupdate, ce qui a déjà laissé une règle obsolète et nuisible en place
+         sur res.users (voir ocleaneo_mobile_api/tests/test_security.py et sa
+         migration). -->
+    <data>
+        <record id="ir_rule_ocleaneo_mobile_pointage_manager" model="ir.rule">
+            <field name="name">Mobile Pointage: managers see every clocking</field>
+            <field name="model_id" ref="model_ocleaneo_mobile_pointage"/>
+            <!-- Les règles de groupe se combinent en OU
+                 (ir_rule._compute_domain : AND(global, OR(groupes))). Sans
+                 règle permissive ici, celle du dessus était la SEULE à
+                 s'appliquer — y compris à un gestionnaire, lui aussi membre de
+                 base.group_user. L'ACL « manager » lui accordait tout et la
+                 règle lui reprenait tout. Mesuré sur Odoo 14 : un utilisateur
+                 Settings comme un responsable Présences voyaient 0 pointage
+                 sur 2. Le modèle sert précisément à contrôler la paie, et
+                 personne ne pouvait le faire. -->
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="groups" eval="[
+                (4, ref('hr_attendance.group_hr_attendance_manager')),
+                (4, ref('base.group_system')),
+            ]"/>
+        </record>
+    </data>
+</odoo>

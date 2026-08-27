@@ -28,7 +28,35 @@ import type {
  * qu'un provider concret ne l'a pas (encore) implémentée, plutôt que
  * d'échouer silencieusement.
  */
+/**
+ * Domaines fonctionnels qu'un backend peut ne pas couvrir. Tous les
+ * backends ne se valent pas : le provider Odoo actuel sait pointer et
+ * planifier, mais n'a aucune route pour le stock ni les commandes (voir
+ * `OdooProvider.ts` et `odoo/README.md`). Plutôt que de laisser l'écran
+ * appeler puis échouer — spinner, puis message d'erreur technique — une
+ * vue demande d'abord `provider.supports(...)` et affiche une explication.
+ */
+export type ProviderFeature = 'products' | 'inventory' | 'orders';
+
+/** Phrase montrée au salarié quand un domaine n'est pas couvert. Écrite
+ *  pour quelqu'un sur le terrain : ce qui ne marche pas, et le fait que
+ *  ce n'est pas une panne de son téléphone. */
+export const UNSUPPORTED_MESSAGES: Record<ProviderFeature, string> = {
+  products: "Le catalogue produits n'est pas disponible avec ce serveur.",
+  inventory: "L'inventaire n'est pas disponible avec ce serveur.",
+  orders: "Les commandes ne sont pas disponibles avec ce serveur.",
+};
+
 export abstract class DataProvider {
+  // --- Capacités -----------------------------------------------------------
+
+  /** Un provider qui ne couvre pas un domaine le déclare ici. Par défaut
+   *  tout est supporté : c'est au provider incomplet de se signaler, pas à
+   *  chaque nouveau provider de penser à s'autoriser. */
+  supports(_feature: ProviderFeature): boolean {
+    return true;
+  }
+
   // --- Cycle de vie --------------------------------------------------------
 
   /** Appelé une fois au démarrage de l'app, avant le premier appel de données
@@ -134,7 +162,32 @@ export abstract class DataProvider {
 }
 
 function notImplemented(method: string): Error {
-  return new Error(`DataProvider.${method}() n'est pas implémenté par ce provider.`);
+  return new ProviderUnsupportedError(
+    `Cette fonctionnalité n'est pas disponible avec ce serveur.`,
+    method,
+  );
+}
+
+/**
+ * Le provider actif ne couvre pas ce domaine — ce n'est ni une panne ni une
+ * coupure réseau, et réessayer n'y changera rien. Type distinct pour que les
+ * écrans l'affichent comme une indisponibilité (message explicatif, sans
+ * bouton Réessayer) au lieu d'une erreur ; sans ça le salarié voyait remonter
+ * le nom de la méthode manquante, du jargon qui ne lui apprend rien.
+ *
+ * Filet de sécurité seulement : un écran bien écrit interroge
+ * `provider.supports()` avant d'appeler (voir ProviderFeature).
+ */
+export class ProviderUnsupportedError extends Error {
+  isUnsupported = true;
+  /** Méthode du contrat qui manque — pour les logs, jamais pour l'écran. */
+  method?: string;
+
+  constructor(message = "Cette fonctionnalité n'est pas disponible avec ce serveur.", method?: string) {
+    super(message);
+    this.name = 'ProviderUnsupportedError';
+    this.method = method;
+  }
 }
 
 /**

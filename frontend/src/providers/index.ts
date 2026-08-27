@@ -1,4 +1,5 @@
 import { RestProvider } from './RestProvider';
+import { OdooProvider } from './OdooProvider';
 import { MockProvider } from './MockProvider';
 import type { DataProvider } from './DataProvider';
 
@@ -8,6 +9,7 @@ import type { DataProvider } from './DataProvider';
 // d'environnement — voir README § Architecture backend-agnostique.
 const factories: Record<string, () => DataProvider> = {
   rest: () => new RestProvider(),
+  odoo: () => new OdooProvider(),
   mock: () => new MockProvider(),
 };
 

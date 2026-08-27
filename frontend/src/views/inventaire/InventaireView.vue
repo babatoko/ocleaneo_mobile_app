@@ -18,7 +18,7 @@ import {
 } from '@ionic/vue';
 import { alertCircleOutline, businessOutline, checkmarkCircleOutline, chevronDownOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
-import { ProviderNetworkError } from '../../providers/DataProvider';
+import { ProviderNetworkError, UNSUPPORTED_MESSAGES } from '../../providers/DataProvider';
 import { useChantiersStore } from '../../stores/chantiers';
 import { iconForProduct } from '../../utils/productIcons';
 import AppHeader from '../../components/AppHeader.vue';
@@ -31,11 +31,20 @@ const products = ref<Product[]>([]);
 const quantities = ref<Record<number, string>>({}); // packagingId -> quantity (chaîne du champ, '' = non saisi)
 const loading = ref(true);
 const loadError = ref('');
+// L'inventaire liste des produits et enregistre leur stock : les deux
+// domaines doivent exister côté serveur (voir DataProvider.supports).
+const unavailable = provider.supports('inventory') && provider.supports('products')
+  ? ''
+  : UNSUPPORTED_MESSAGES.inventory;
 const submitting = ref(false);
 const submitError = ref('');
 const done = ref(false);
 
 async function load() {
+  if (unavailable) {
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   loadError.value = '';
   try {
@@ -137,7 +146,13 @@ const filledCount = () =>
       </div>
 
       <template v-else>
-        <DataState :loading="loading" :error="loadError" :empty="!products.length" @retry="load">
+        <DataState
+          :loading="loading"
+          :unavailable="unavailable"
+          :error="loadError"
+          :empty="!products.length"
+          @retry="load"
+        >
           <template #empty>Aucun produit au catalogue.</template>
 
           <div class="site-select">

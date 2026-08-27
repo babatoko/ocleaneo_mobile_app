@@ -42,3 +42,98 @@ jobs:
         # Vérifie que l'application reste fonctionnelle sans backend : c'est la
         # garantie que le contrat DataProvider n'a pas été contourné.
         run: VITE_DATA_PROVIDER=mock npm run build
+
+  odoo:
+    # Le backend Odoo n'avait aucun filet : les bugs trouvés à la main
+    # (IDOR, fusion de champs date_time_end, filtre de date du timesheet,
+    # préflight CORS, attendance bloquante) étaient tous détectables par un
+    # test. Ce job les rejoue à chaque push.
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ocleaneo
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Dépendances système d'Odoo 14
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libxml2-dev libxslt1-dev libldap2-dev \
+            libsasl2-dev libjpeg-dev libpq-dev
+
+      # Odoo et les modules OCA ne sont pas versionnés dans ce repo (voir
+      # odoo/README.md § Dépendances OCA). Clonage superficiel : seule la
+      # branche 14.0 nous intéresse, l'historique complet ferait ~1 Go.
+      - name: Cloner Odoo 14 et les dépôts OCA requis
+        run: |
+          git clone --depth 1 --branch 14.0 https://github.com/odoo/odoo.git odoo
+          for repo in field-service project timesheet web; do
+            git clone --depth 1 --branch 14.0 "https://github.com/OCA/$repo.git" "oca-$repo"
+          done
+
+      - name: Installer les dépendances Python
+        run: |
+          # setuptools est épinglé sous 81, pas laissé « --upgrade » : Odoo 14
+          # fait `import pkg_resources` dès son démarrage
+          # (odoo/modules/module.py), or setuptools a retiré ce paquet en
+          # 82.0.0 — mesuré, 81.x l'a encore, 82.0.0 ne l'a plus. Sans le pin,
+          # `pip install --upgrade setuptools` prend la dernière version et
+          # odoo-bin meurt sur ModuleNotFoundError avant même de charger un
+          # module, donc avant le moindre test. 81.x avertit déjà « pin to
+          # Setuptools<81 » : on suit cette consigne amont plutôt que la seule
+          # limite technique. À lever le jour où le backend passera à une
+          # version d'Odoo qui n'importe plus pkg_resources.
+          python -m pip install --upgrade pip wheel
+          python -m pip install --upgrade 'setuptools<81'
+          # gevent est exclu : sa version épinglée par Odoo 14 ne compile pas
+          # sur Python récent, et elle ne sert qu'au worker longpolling —
+          # inutile pour une exécution de tests en --stop-after-init.
+          grep -v -i '^gevent' odoo/requirements.txt > requirements-ci.txt
+          pip install -r requirements-ci.txt
+          pip install pyflakes
+
+      - name: Lint Python
+        working-directory: ocleaneo
+        # Les __init__.py d'un module Odoo n'importent que pour déclencher le
+        # chargement : leurs imports « inutilisés » sont le mécanisme, pas un
+        # défaut.
+        run: |
+          python -m pyflakes odoo/addons/ | grep -v '__init__.py' > pyflakes.out || true
+          if [ -s pyflakes.out ]; then cat pyflakes.out; exit 1; fi
+
+      - name: Tests des modules Odoo
+        run: |
+          createdb -h localhost -U odoo odoo_ci
+          python odoo/odoo-bin \
+            -d odoo_ci \
+            --db_host=localhost --db_user=odoo --db_password=odoo \
+            --addons-path="odoo/addons,odoo/odoo/addons,oca-field-service,oca-project,oca-timesheet,oca-web,ocleaneo/odoo/addons" \
+            -i ocleaneo_mobile_api,ocleaneo_mobile_pointage,ocleaneo_mobile_api_planning,ocleaneo_fieldservice_timesheet,ocleaneo_timesheet_duration_compute \
+            --test-enable \
+            --test-tags '/ocleaneo_mobile_api,/ocleaneo_mobile_pointage,/ocleaneo_mobile_api_planning,/ocleaneo_fieldservice_timesheet,/ocleaneo_timesheet_duration_compute' \
+            --stop-after-init --without-demo=all --log-level=test
+          # odoo-bin propage l'échec dans son code retour
+          # (service/server.py : rc += 1 si le rapport d'assertions n'est pas
+          # concluant, puis sys.exit(rc)) — vérifié empiriquement : 0 sur
+          # suite verte, 1 sur suite rouge. Pas besoin de grepper le log.
+        env:
+          PGPASSWORD: odoo
