@@ -144,3 +144,38 @@ def authenticate_mobile_request():
             return None, None
         return employee.user_id, employee
     return None, None
+
+
+# --- API versioning -------------------------------------------------------
+#
+# Aucune route n'etait versionnee. Ce n'est pas un probleme tant que le seul
+# client est celui qu'on livre en meme temps que le serveur — mais
+# l'application s'installe sur les telephones des salaries et se met a jour a
+# LEUR rythme, pas a celui du serveur. Le jour ou une reponse doit changer de
+# forme, anciens et nouveaux clients coexistent pendant des semaines, et sans
+# version dans le chemin il ne reste que deux options : casser le terrain, ou
+# ne plus jamais faire evoluer un contrat.
+#
+# Le versionnement est pose MAINTENANT, avant tout deploiement, parce que
+# c'est le seul moment ou il ne coute rien. Aucune application n'est installee
+# aujourd'hui : il n'y a donc aucun alias non versionne a maintenir, et
+# `mobile_routes()` ne rend qu'un seul chemin. Le jour ou une v2 sera
+# necessaire, c'est a ce moment-la que les deux versions cohabiteront — et le
+# mecanisme sera deja en place.
+#
+# /api/mobile/config annonce `api_version` et `supported_versions` pour qu'un
+# client sache a quoi il parle sans le deduire d'un 404.
+API_VERSION = "v1"
+SUPPORTED_VERSIONS = [API_VERSION]
+
+
+def mobile_routes(path):
+    """Return the route list for one mobile endpoint.
+
+    `path` is the part after /api/mobile — e.g. "planning" or "auth/login".
+    Une liste (et non une chaine) parce qu'une future v2 devra servir deux
+    versions en parallele : la forme du retour n'aura pas a changer, seul son
+    contenu.
+    """
+    path = path.strip("/")
+    return ["/api/mobile/%s/%s" % (API_VERSION, path)]

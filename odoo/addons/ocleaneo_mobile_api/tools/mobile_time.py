@@ -102,3 +102,59 @@ def local_day_bounds_utc(target_date, fallback_tz=None):
         local_start.astimezone(pytz.utc).replace(tzinfo=None),
         local_end.astimezone(pytz.utc).replace(tzinfo=None),
     )
+
+
+# --- Bornes des plages de dates -------------------------------------------
+#
+# /planning et /pointage/mine acceptaient date_from/date_to sans aucune
+# limite, et lançaient un search() sans `limit`. Rien n'empêchait
+# date_from=1970-01-01&date_to=2999-12-31 : Odoo chargeait alors l'intégralité
+# de l'historique en mémoire dans un worker, pour le sérialiser en JSON vers
+# un téléphone. Pas besoin de malveillance pour y arriver — une vue « année »
+# ajoutée côté client, ou un date_to mal calculé, suffit.
+#
+# Deux bornes, de nature différente :
+#
+# - MAX_RANGE_DAYS refuse la requête plutôt que de la tronquer. Sur des
+#   données de pointage qui alimentent la paie, rendre 400 réponses en
+#   annonçant une plage d'un an serait pire que l'erreur : le client
+#   croirait avoir tout reçu.
+# - MAX_RECORDS est un garde-fou de dernier recours, accompagné d'un drapeau
+#   `truncated` dans la réponse. Il ne devrait jamais être atteint dans la
+#   plage autorisée ; s'il l'est, le client doit pouvoir le savoir.
+MAX_RANGE_DAYS = 366
+MAX_RECORDS = 2000
+
+
+class DateRangeError(ValueError):
+    """Plage refusée. Porte la charge utile JSON à renvoyer telle quelle."""
+
+    def __init__(self, payload):
+        super().__init__(payload.get("error"))
+        self.payload = payload
+
+
+def check_range(range_start, range_end):
+    """Valide une plage de dates avant toute requête.
+
+    Lève DateRangeError si la plage est inversée ou trop large. Les deux cas
+    étaient auparavant silencieux : une plage inversée produisait une fenêtre
+    vide et donc « aucune vacation », indiscernable d'une vraie journée libre
+    — exactement la classe de défaut déjà corrigée côté frontend (un écran
+    vide qui ment sur la réalité).
+    """
+    if range_end < range_start:
+        raise DateRangeError({
+            "error": "invalid_range",
+            "code": 400,
+            "detail": "date_to (%s) précède date_from (%s)." % (range_end, range_start),
+        })
+    span = (range_end - range_start).days + 1
+    if span > MAX_RANGE_DAYS:
+        raise DateRangeError({
+            "error": "range_too_wide",
+            "code": 400,
+            "detail": "Plage de %s jours demandée, maximum %s." % (span, MAX_RANGE_DAYS),
+            "max_days": MAX_RANGE_DAYS,
+        })
+    return span

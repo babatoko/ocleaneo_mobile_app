@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { clearToken, currentToken } from '../services/tokenStore';
 import { Preferences } from '@capacitor/preferences';
 
 // Client HTTP interne au RestProvider : rien en dehors de providers/RestProvider.js
@@ -36,7 +37,7 @@ export async function setApiBaseUrl(url: string): Promise<void> {
 }
 
 restClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('ocleaneo_token');
+  const token = currentToken();
   if (token) config.headers.set('Authorization', `Bearer ${token}`);
   return config;
 });
@@ -45,7 +46,7 @@ restClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('ocleaneo_token');
+      void clearToken();
     }
     return Promise.reject(error);
   }

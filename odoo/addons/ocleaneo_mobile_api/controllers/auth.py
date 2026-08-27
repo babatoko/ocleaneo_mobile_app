@@ -7,7 +7,10 @@ from odoo.http import request
 from odoo.exceptions import AccessDenied
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
+    API_VERSION,
     MOBILE_CORS_ORIGIN,
+    SUPPORTED_VERSIONS,
+    mobile_routes,
     authenticate_mobile_request,
     check_auth_rate_limit,
     clear_auth_failures,
@@ -19,7 +22,7 @@ _logger = logging.getLogger(__name__)
 
 class MobileAuthController(http.Controller):
 
-    @http.route("/api/mobile/config", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("config"), type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def config(self, **kwargs):
         """Return active mobile modules and app-level configuration for the current user."""
         user, employee = authenticate_mobile_request()
@@ -31,12 +34,17 @@ class MobileAuthController(http.Controller):
         configs = ModuleConfig.get_modules_for_user(user)
 
         return {
+            # Annoncé ici pour qu'un client sache à quoi il parle sans avoir
+            # à le déduire d'un 404 sur un chemin versionné. `config` est le
+            # premier appel de l'application : c'est le bon endroit.
+            "api_version": API_VERSION,
+            "supported_versions": SUPPORTED_VERSIONS,
             "company_id": user.company_id.id,
             "company_name": user.company_id.name,
             "modules": [c.to_mobile_dict() for c in configs],
         }
 
-    @http.route("/api/mobile/auth/login", type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("auth/login"), type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def login(self, login=None, password=None, **kwargs):
         """Authenticate user and return a mobile API token."""
         login = kwargs.get("login", login)
@@ -70,7 +78,7 @@ class MobileAuthController(http.Controller):
         employee = user.get_employee_for_mobile()
         return self._issue_mobile_token(env, user, employee)
 
-    @http.route("/api/mobile/auth/login_badge", type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("auth/login_badge"), type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def login_badge(self, barcode=None, **kwargs):
         """Authenticate by badge/NFC identifier alone and return a mobile API token.
 
@@ -152,7 +160,7 @@ class MobileAuthController(http.Controller):
             "modules": [c.to_mobile_dict() for c in configs],
         }
 
-    @http.route("/api/mobile/auth/logout", type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("auth/logout"), type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def logout(self, **kwargs):
         """Invalidate the mobile API token used for this request.
 
@@ -168,7 +176,7 @@ class MobileAuthController(http.Controller):
         employee.invalidate_mobile_api_token()
         return {"status": "ok"}
 
-    @http.route("/api/mobile/auth/me", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("auth/me"), type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def auth_me(self, **kwargs):
         """Return current user/employee profile (used by mobile app on cold start)."""
         user, employee = authenticate_mobile_request()

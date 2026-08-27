@@ -7,9 +7,13 @@ import logging
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     MOBILE_CORS_ORIGIN,
+    mobile_routes,
     authenticate_mobile_request,
 )
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import (
+    MAX_RECORDS,
+    DateRangeError,
+    check_range,
     local_day_bounds_utc,
     parse_date,
     today_local,
@@ -20,7 +24,7 @@ _logger = logging.getLogger(__name__)
 
 class MobilePlanningController(http.Controller):
 
-    @http.route("/api/mobile/planning", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("planning"), type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def planning(self, date=None, date_from=None, date_to=None, view=None, **kwargs):
         """Return the worker's FSM orders for a date or a date range.
 
@@ -47,6 +51,12 @@ class MobilePlanningController(http.Controller):
         else:
             range_start = range_end = parse_date(kwargs.get("date", date), user.tz)
 
+        # Refuse an unbounded or inverted window before touching the ORM.
+        try:
+            check_range(range_start, range_end)
+        except DateRangeError as e:
+            return e.payload
+
         # Day boundaries in the worker's local timezone, converted to UTC —
         # not a naive "00:00-23:59 in UTC" window, which would drop or
         # misplace shifts starting before dawn or ending late at night
@@ -57,7 +67,16 @@ class MobilePlanningController(http.Controller):
         # Resolve worker via fsm.person
         person = env["fsm.person"].sudo().search([("partner_id", "=", user.partner_id.id)], limit=1)
         if not person:
-            return {"count": 0, "date_from": str(range_start), "date_to": str(range_end), "orders": []}
+            # `truncated` figure aussi ici : une clé présente dans un cas et
+            # absente dans l'autre obligerait chaque client à la tester avant
+            # de la lire, et le premier qui l'oublierait lirait `undefined`.
+            return {
+                "count": 0,
+                "date_from": str(range_start),
+                "date_to": str(range_end),
+                "truncated": False,
+                "orders": [],
+            }
 
         # Load planning config for the user's company
         config = env["mobile.api.planning.config"].sudo().search([
@@ -76,7 +95,18 @@ class MobilePlanningController(http.Controller):
             ("scheduled_date_end", "=", False),
         ]
 
-        orders = env["fsm.order"].sudo().search(domain, order="scheduled_date_start asc, id asc")
+        # limit=MAX_RECORDS + 1 : un enregistrement de plus que la limite
+        # annoncée, uniquement pour SAVOIR si la liste a été coupée. Sans lui,
+        # un résultat pile à la limite serait indiscernable d'un résultat
+        # complet, et le client afficherait une liste tronquée sans le dire.
+        orders = env["fsm.order"].sudo().search(
+            domain, order="scheduled_date_start asc, id asc", limit=MAX_RECORDS + 1)
+        truncated = len(orders) > MAX_RECORDS
+        if truncated:
+            orders = orders[:MAX_RECORDS]
+            _logger.warning(
+                "planning: %s dépassé pour l'utilisateur %s sur %s..%s",
+                MAX_RECORDS, user.login, range_start, range_end)
         result = []
         for order in orders:
             loc = order.location_id
@@ -128,5 +158,6 @@ class MobilePlanningController(http.Controller):
             "date_to": str(range_end),
             "view": view or default_view,
             "count": len(result),
+            "truncated": truncated,
             "orders": result,
         }

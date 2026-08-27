@@ -133,6 +133,24 @@ Identifiant + mot de passe, stockés sur la fiche employé (côté Odoo). L'empr
 
 `frontend/src/services/biometric.ts` encapsule tous les appels au plugin ; `LoginView.vue` ne fait que consommer `isBiometricAvailable()` / `hasSavedCredentials()` / `getSavedCredentials()` / `saveCredentials()`.
 
+### Où vit le jeton de session
+
+Le jeton obtenu à la connexion vivait dans `localStorage`. Sur mobile, c'est le stockage de la WebView : un fichier **en clair** dans le bac à sable de l'application. Il survit à une sauvegarde de l'appareil, se lit sur un téléphone rooté ou débloqué, et n'est protégé par rien d'autre que les permissions de fichiers — alors qu'il donne accès au planning, aux chantiers et aux pointages d'un salarié.
+
+Il est désormais confié au **Trousseau (iOS) / Keystore (Android)** via `NativeBiometric.setData`, qui chiffre au repos. Le plugin était déjà une dépendance du projet : aucune dépendance nouvelle, aucun build natif à revoir.
+
+`frontend/src/services/tokenStore.ts` est le **seul** point d'accès au jeton — plus aucun `localStorage.getItem('ocleaneo_token')` ailleurs dans le code.
+
+Trois points méritent d'être connus :
+
+- **Aucune protection biométrique sur le jeton lui-même** (`accessControl` non posé, donc `getData` et non `getSecureData`). C'est délibéré : le jeton doit se relire au démarrage sans invite. En protéger la lecture ferait apparaître une demande d'empreinte à chaque lancement, y compris pour un salarié qui n'a jamais activé la biométrie. On chiffre au repos, on n'ajoute pas une porte devant l'application — l'empreinte garde sa place là où elle a du sens, sur le mot de passe.
+
+- **Reprise de l'existant, à portée modeste.** Au premier démarrage, un jeton laissé en clair par la version précédente est déplacé vers le stockage sécurisé puis effacé de `localStorage`. L'application n'étant pas déployée, personne d'extérieur n'est concerné — mais les installations de test déjà posées sur les téléphones de l'équipe portent bien un jeton en clair, puisque c'est ce que fait le code actuel. Cela leur évite une déconnexion, pour le coût d'une lecture infructueuse au démarrage.
+
+- **Lecture synchrone.** Les intercepteurs axios posent l'en-tête `Authorization` de façon synchrone et ne peuvent pas attendre une promesse, alors que le stockage sécurisé est asynchrone. `loadToken()` est donc appelé une fois dans `main.ts`, **avant** le premier appel réseau et avant la création du store d'authentification ; les intercepteurs lisent ensuite le cache mémoire.
+
+**Limite assumée : en PWA, `localStorage` reste le seul stockage disponible** — un navigateur n'expose ni Trousseau ni Keystore. C'est le prix de l'installation sans passer par un store. Le comportement des deux plateformes est verrouillé par `frontend/src/services/__tests__/tokenStore.test.ts`.
+
 ## Pointage — sélection du chantier par badge NFC
 
 Le chantier n'est **pas choisi manuellement** : il est déterminé par la lecture du badge NFC posé sur site, via [`@exxili/capacitor-nfc`](https://github.com/Exxili/capacitor-nfc). La logique de correspondance badge → chantier → type de pointage (arrivée/départ) vit dans **`frontend/src/stores/pointage.ts`** (`clockWithTag(uid)`), pas dans l'écran, pour pouvoir être déclenchée depuis n'importe où dans l'app (voir ci-dessous).

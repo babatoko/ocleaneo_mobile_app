@@ -1,7 +1,7 @@
 # Copyright 2026 Ocleaneo
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-"""End-to-end tests of the /api/mobile/* routes over real HTTP.
+"""End-to-end tests of the mobile API routes over real HTTP.
 
 Covers what only shows up once the whole chain runs: JSON-RPC enveloping,
 Bearer-token authentication, the ownership check on fsm_order_id, and
@@ -15,6 +15,7 @@ from odoo.addons.ocleaneo_mobile_api.models.mobile_auth_attempt import (
     MAX_ATTEMPTS,
     MAX_IP_ATTEMPTS,
 )
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import mobile_routes
 from odoo.tests.common import HOST, HttpCase
 
 from .common import MobilePointageCommon
@@ -22,7 +23,50 @@ from .common import MobilePointageCommon
 PASSWORD = "TestPass123!"
 
 
-class TestMobileApi(MobilePointageCommon, HttpCase):
+class MobileRpcMixin:
+    """Appel JSON-RPC vers l'API mobile, partagé par les classes de ce module.
+
+    Les deux classes en portaient chacune leur copie. Lors du passage aux
+    chemins versionnés, seule la première a été corrigée : la seconde a
+    continué d'appeler une URL qui n'existait plus, et ses six tests sont
+    tombés. Une seule définition, donc — un helper dupliqué est un correctif
+    qu'on n'appliquera qu'à moitié.
+    """
+
+    def _rpc(self, endpoint, params=None, token=None):
+        """POST un appel JSON-RPC 2.0 et rend le corps décodé.
+
+        `endpoint` est le suffixe ("auth/login"), pas un chemin complet : il
+        est résolu par mobile_routes(), la MÊME fonction que les contrôleurs.
+        Écrire "/api/mobile/v1/auth/login" en dur ferait passer ces tests à
+        côté du jour où la version change — ils vérifieraient une v1 que plus
+        personne ne sert.
+        """
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = "Bearer %s" % token
+        response = self.url_open(
+            mobile_routes(endpoint)[0],
+            data=json.dumps({
+                "jsonrpc": "2.0",
+                "method": "call",
+                "id": 1,
+                "params": params or {},
+            }),
+            headers=headers,
+        )
+        return response.json()
+
+    def _result(self, endpoint, params=None, token=None):
+        body = self._rpc(endpoint, params, token)
+        self.assertNotIn(
+            "error", body,
+            "unexpected server exception: %s" % body.get("error"),
+        )
+        return body["result"]
+
+
+class TestMobileApi(MobileRpcMixin, MobilePointageCommon, HttpCase):
 
     def setUp(self):
         super().setUp()
@@ -42,36 +86,10 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
             self.other_person, "Chantier Autre"
         )
 
-    # --- helpers ---------------------------------------------------------
-
-    def _rpc(self, path, params=None, token=None):
-        """POST a JSON-RPC 2.0 call and return the decoded body."""
-        headers = {"Content-Type": "application/json"}
-        if token:
-            headers["Authorization"] = "Bearer %s" % token
-        response = self.url_open(
-            path,
-            data=json.dumps({
-                "jsonrpc": "2.0",
-                "method": "call",
-                "id": 1,
-                "params": params or {},
-            }),
-            headers=headers,
-        )
-        return response.json()
-
-    def _result(self, path, params=None, token=None):
-        body = self._rpc(path, params, token)
-        self.assertNotIn(
-            "error", body,
-            "unexpected server exception: %s" % body.get("error"),
-        )
-        return body["result"]
 
     def _login(self):
         result = self._result(
-            "/api/mobile/auth/login",
+            "auth/login",
             {"login": self.user.login, "password": PASSWORD},
         )
         return result["token"]
@@ -80,7 +98,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
 
     def test_login_returns_token_and_identity(self):
         result = self._result(
-            "/api/mobile/auth/login",
+            "auth/login",
             {"login": self.user.login, "password": PASSWORD},
         )
         self.assertTrue(result["token"])
@@ -99,20 +117,20 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         self.assertNotIn("mobile_api_token", self.env["res.users"]._fields)
 
     def test_request_without_token_is_unauthorized(self):
-        result = self._result("/api/mobile/me")
+        result = self._result("me")
         self.assertEqual(result["code"], 401)
 
     def test_request_with_garbage_token_is_unauthorized(self):
-        result = self._result("/api/mobile/me", token="not-a-real-token")
+        result = self._result("me", token="not-a-real-token")
         self.assertEqual(result["code"], 401)
 
     def test_logout_revokes_the_token(self):
         token = self._login()
-        self.assertEqual(self._result("/api/mobile/me", token=token)["user_id"], self.user.id)
+        self.assertEqual(self._result("me", token=token)["user_id"], self.user.id)
 
-        self._result("/api/mobile/auth/logout", token=token)
+        self._result("auth/logout", token=token)
 
-        self.assertEqual(self._result("/api/mobile/me", token=token)["code"], 401)
+        self.assertEqual(self._result("me", token=token)["code"], 401)
 
     def test_expired_token_is_rejected(self):
         from datetime import timedelta
@@ -121,20 +139,20 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         token = self._login()
         self.employee.mobile_api_token_expire = fields.Datetime.now() - timedelta(minutes=1)
 
-        self.assertEqual(self._result("/api/mobile/me", token=token)["code"], 401)
+        self.assertEqual(self._result("me", token=token)["code"], 401)
 
     # --- badge login -----------------------------------------------------
 
     def test_login_badge_returns_token(self):
         result = self._result(
-            "/api/mobile/auth/login_badge", {"barcode": "BADGE-WORKER-1"}
+            "auth/login_badge", {"barcode": "BADGE-WORKER-1"}
         )
         self.assertTrue(result["token"])
         self.assertEqual(result["employee_id"], self.employee.id)
 
     def test_login_badge_with_unknown_barcode_is_rejected(self):
         result = self._result(
-            "/api/mobile/auth/login_badge", {"barcode": "BADGE-INCONNU"}
+            "auth/login_badge", {"barcode": "BADGE-INCONNU"}
         )
         self.assertEqual(result["code"], 401)
 
@@ -160,7 +178,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         self.employee.active = False
 
         result = self._result(
-            "/api/mobile/auth/login_badge", {"barcode": "BADGE-WORKER-1"}
+            "auth/login_badge", {"barcode": "BADGE-WORKER-1"}
         )
 
         self.assertEqual(result["code"], 401)
@@ -170,7 +188,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
     def test_cannot_clock_on_another_workers_order(self):
         token = self._login()
 
-        result = self._result("/api/mobile/pointage", {
+        result = self._result("pointage", {
             "type": "arrivee",
             "fsm_order_id": self.other_order.id,
             "datetime": "2026-03-10T08:00:00",
@@ -189,7 +207,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         token = self._login()
         stage_before = self.other_order.stage_id
 
-        self._result("/api/mobile/pointage", {
+        self._result("pointage", {
             "type": "depart",
             "fsm_order_id": self.other_order.id,
             "datetime": "2026-03-10T17:00:00",
@@ -200,7 +218,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
     def test_clocking_on_own_order_succeeds(self):
         token = self._login()
 
-        result = self._result("/api/mobile/pointage", {
+        result = self._result("pointage", {
             "type": "arrivee",
             "fsm_order_id": self.order.id,
             "datetime": "2026-03-10T08:00:00",
@@ -211,7 +229,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
 
     def test_non_numeric_order_id_is_a_clean_400(self):
         token = self._login()
-        result = self._result("/api/mobile/pointage", {
+        result = self._result("pointage", {
             "type": "arrivee",
             "fsm_order_id": "abc",
             "datetime": "2026-03-10T08:00:00",
@@ -220,7 +238,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
 
     def test_unknown_order_id_is_a_clean_404(self):
         token = self._login()
-        result = self._result("/api/mobile/pointage", {
+        result = self._result("pointage", {
             "type": "arrivee",
             "fsm_order_id": 999999999,
             "datetime": "2026-03-10T08:00:00",
@@ -229,7 +247,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
 
     def test_invalid_type_is_a_clean_400(self):
         token = self._login()
-        result = self._result("/api/mobile/pointage", {
+        result = self._result("pointage", {
             "type": "not_a_type",
             "datetime": "2026-03-10T08:00:00",
         }, token=token)
@@ -247,8 +265,8 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
             "client_ref": "idem-key-001",
         }
 
-        first = self._result("/api/mobile/pointage", params, token=token)
-        second = self._result("/api/mobile/pointage", params, token=token)
+        first = self._result("pointage", params, token=token)
+        second = self._result("pointage", params, token=token)
 
         self.assertEqual(first["id"], second["id"])
         self.assertEqual(
@@ -261,7 +279,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
     def test_client_ref_is_scoped_per_user(self):
         """Two workers may legitimately generate the same key."""
         token = self._login()
-        self._result("/api/mobile/pointage", {
+        self._result("pointage", {
             "type": "arrivee",
             "fsm_order_id": self.order.id,
             "datetime": "2026-03-10T08:00:00",
@@ -269,10 +287,10 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         }, token=token)
 
         self.other_user.password = PASSWORD
-        other_token = self._result("/api/mobile/auth/login", {
+        other_token = self._result("auth/login", {
             "login": self.other_user.login, "password": PASSWORD,
         })["token"]
-        self._result("/api/mobile/pointage", {
+        self._result("pointage", {
             "type": "arrivee",
             "fsm_order_id": self.other_order.id,
             "datetime": "2026-03-10T08:00:00",
@@ -290,7 +308,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
 
     def test_pointage_mine_returns_only_own_clockings(self):
         token = self._login()
-        self._result("/api/mobile/pointage", {
+        self._result("pointage", {
             "type": "arrivee",
             "fsm_order_id": self.order.id,
             "datetime": "2026-03-10T08:00:00",
@@ -305,7 +323,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         })
 
         result = self._result(
-            "/api/mobile/pointage/mine", {"date": "2026-03-10"}, token=token
+            "pointage/mine", {"date": "2026-03-10"}, token=token
         )
 
         self.assertEqual(result["count"], 1)
@@ -315,7 +333,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         self.location.write({"partner_latitude": 48.8566, "partner_longitude": 2.3522})
         token = self._login()
 
-        result = self._result("/api/mobile/chantiers/aujourdhui", token=token)
+        result = self._result("chantiers/aujourdhui", token=token)
 
         self.assertEqual(result["count"], 1)
         order = result["orders"][0]
@@ -344,7 +362,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
 
         # 23:30 UTC == 00:30 the next morning in Paris.
         self._result(
-            "/api/mobile/pointage",
+            "pointage",
             {
                 "type": "arrivee",
                 "fsm_order_id": self.order.id,
@@ -353,7 +371,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
             token=token,
         )
 
-        result = self._result("/api/mobile/me", token=token)
+        result = self._result("me", token=token)
 
         self.assertTrue(
             result["current_attendance_id"],
@@ -380,7 +398,7 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         self.assertTrue(response.headers.get("Access-Control-Allow-Origin"))
 
 
-class TestMobileAuthFailures(MobilePointageCommon, HttpCase):
+class TestMobileAuthFailures(MobileRpcMixin, MobilePointageCommon, HttpCase):
     """Tests that deliberately fail authentication, kept in their own class.
 
     Two Odoo behaviours make failed logins messy to test alongside
@@ -411,26 +429,9 @@ class TestMobileAuthFailures(MobilePointageCommon, HttpCase):
         self.env["ir.config_parameter"].sudo().set_param("base.login_cooldown_after", "0")
         self.Attempt = self.env["ocleaneo.mobile.auth.attempt"]
 
-    def _rpc(self, path, params=None, token=None):
-        headers = {"Content-Type": "application/json"}
-        if token:
-            headers["Authorization"] = "Bearer %s" % token
-        response = self.url_open(
-            path,
-            data=json.dumps({
-                "jsonrpc": "2.0", "method": "call", "id": 1, "params": params or {},
-            }),
-            headers=headers,
-        )
-        return response.json()
-
-    def _result(self, path, params=None, token=None):
-        body = self._rpc(path, params, token)
-        self.assertNotIn("error", body, "unexpected server exception: %s" % body.get("error"))
-        return body["result"]
 
     def _bad_login(self):
-        return self._result("/api/mobile/auth/login", {
+        return self._result("auth/login", {
             "login": self.user.login, "password": "wrong",
         })
 
@@ -450,7 +451,7 @@ class TestMobileAuthFailures(MobilePointageCommon, HttpCase):
         for _ in range(MAX_ATTEMPTS):
             self._bad_login()
 
-        result = self._result("/api/mobile/auth/login", {
+        result = self._result("auth/login", {
             "login": self.user.login, "password": PASSWORD,
         })
 
@@ -459,14 +460,14 @@ class TestMobileAuthFailures(MobilePointageCommon, HttpCase):
     def test_badge_enumeration_is_stopped_by_the_address_budget(self):
         """Guessing a different badge each time never fills the per-badge
         bucket — only the shared per-address one stops the sweep."""
-        first = self._result("/api/mobile/auth/login_badge", {"barcode": "BADGE-GUESS-1"})
+        first = self._result("auth/login_badge", {"barcode": "BADGE-GUESS-1"})
         self.assertEqual(first["code"], 401)
 
         # Fast-forward the sweep rather than issuing MAX_IP_ATTEMPTS requests.
         for _ in range(MAX_IP_ATTEMPTS):
             self.Attempt.record_failure("ip", "127.0.0.1", ip="127.0.0.1")
 
-        later = self._result("/api/mobile/auth/login_badge", {"barcode": "BADGE-GUESS-2"})
+        later = self._result("auth/login_badge", {"barcode": "BADGE-GUESS-2"})
         self.assertEqual(later["code"], 429)
 
     def test_a_valid_login_cannot_reset_the_address_budget(self):
@@ -476,7 +477,7 @@ class TestMobileAuthFailures(MobilePointageCommon, HttpCase):
             self.Attempt.record_failure("ip", "127.0.0.1", ip="127.0.0.1")
 
         self.assertEqual(
-            self._result("/api/mobile/auth/login", {
+            self._result("auth/login", {
                 "login": self.user.login, "password": PASSWORD,
             })["code"],
             429,
@@ -501,7 +502,7 @@ class TestMobileAuthFailures(MobilePointageCommon, HttpCase):
             MAX_ATTEMPTS - 1,
         )
 
-        result = self._result("/api/mobile/auth/login", {
+        result = self._result("auth/login", {
             "login": self.user.login, "password": PASSWORD,
         })
 

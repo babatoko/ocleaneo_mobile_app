@@ -10,9 +10,13 @@ import logging
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     MOBILE_CORS_ORIGIN,
+    mobile_routes,
     authenticate_mobile_request,
 )
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import (
+    MAX_RECORDS,
+    DateRangeError,
+    check_range,
     local_day_bounds_utc,
     local_to_utc,
     parse_date,
@@ -47,7 +51,7 @@ class MobilePointageController(http.Controller):
         """Resolve the fsm.person linked to the authenticated user's partner."""
         return env["fsm.person"].sudo().search([("partner_id", "=", user.partner_id.id)], limit=1)
 
-    @http.route("/api/mobile/chantiers/aujourdhui", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("chantiers/aujourdhui"), type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def chantiers_aujourdhui(self, **kwargs):
         """Return the connected worker's open FSM orders.
 
@@ -95,7 +99,7 @@ class MobilePointageController(http.Controller):
             })
         return {"count": len(result), "orders": result}
 
-    @http.route("/api/mobile/pointage/mine", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("pointage/mine"), type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def pointage_mine(self, date=None, date_from=None, date_to=None, **kwargs):
         """Return the authenticated worker's own clocking records.
 
@@ -124,6 +128,14 @@ class MobilePointageController(http.Controller):
         else:
             range_start = range_end = parse_date(kwargs.get("date", date), user.tz)
 
+        # Refuse an unbounded or inverted window before touching the ORM.
+        # On payroll-adjacent data, silently returning a truncated list would
+        # be worse than an error: the client would believe it had everything.
+        try:
+            check_range(range_start, range_end)
+        except DateRangeError as e:
+            return e.payload
+
         # Same local-day-boundary handling as chantiers/aujourdhui and
         # planning — a naive UTC window would misplace clockings for
         # shifts starting before dawn or crossing midnight.
@@ -139,11 +151,20 @@ class MobilePointageController(http.Controller):
         # why per-channel scoping is not expressible as a rule at all), but
         # it can catch the day someone forgets it.
         Pointage = env["ocleaneo.mobile.pointage"]
+        # limit=MAX_RECORDS + 1 : un de plus que la limite annoncée, seulement
+        # pour savoir si la liste a été coupée — sinon un résultat pile à la
+        # limite serait indiscernable d'un résultat complet.
         records = Pointage.search([
             ("user_id", "=", user.id),
             ("datetime", ">=", date_start),
             ("datetime", "<=", date_end),
-        ], order="datetime asc")
+        ], order="datetime asc", limit=MAX_RECORDS + 1)
+        truncated = len(records) > MAX_RECORDS
+        if truncated:
+            records = records[:MAX_RECORDS]
+            _logger.warning(
+                "pointage/mine: %s dépassé pour l'utilisateur %s sur %s..%s",
+                MAX_RECORDS, user.login, range_start, range_end)
 
         entries = [{
             "id": p.id,
@@ -159,10 +180,11 @@ class MobilePointageController(http.Controller):
             "date_from": str(range_start),
             "date_to": str(range_end),
             "count": len(entries),
+            "truncated": truncated,
             "entries": entries,
         }
 
-    @http.route("/api/mobile/pointage", type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("pointage"), type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def pointage(self, type=None, fsm_order_id=None, gps_latitude=None, gps_longitude=None,
                  gps_accuracy=None, nfc_tag_id=None, commentaire=None,
                  datetime=None, description=None, client_ref=None, **kwargs):

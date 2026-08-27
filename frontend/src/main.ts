@@ -7,6 +7,7 @@ import { usePointageStore } from './stores/pointage';
 import { ensureNotificationChannel } from './services/notifications';
 import { initProvider } from './providers';
 import { installErrorHandlers } from './services/errorLog';
+import { loadToken } from './services/tokenStore';
 
 // Ionic apporte les mécanismes (transitions de page, geste de retour iOS,
 // clavier/scroll adaptatifs, safe-area) — le style visuel Ocleaneo reste
@@ -24,6 +25,13 @@ installErrorHandlers(app);
 app.use(IonicVue, { mode: 'ios' }); // un seul look, cohérent sur les deux plateformes — pas de rendu Material/Cupertino qui diverge de l'identité Ocleaneo
 const pinia = createPinia();
 app.use(pinia);
+
+// Le jeton vit dans le Trousseau/Keystore sur natif, dont la lecture est
+// asynchrone, alors que les intercepteurs axios posent l'en-tête
+// Authorization de façon synchrone. On hydrate donc le cache ici, avant le
+// premier appel réseau ET avant la création du store d'authentification, qui
+// lit ce cache pour son état initial. Voir services/tokenStore.ts.
+await loadToken();
 
 // L'URL de serveur (personnalisable depuis le profil) doit être appliquée
 // avant le premier appel réseau. `app.use(router)` déclenche déjà, en
