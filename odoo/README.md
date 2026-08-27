@@ -61,7 +61,11 @@ Le job `odoo` de `.github/workflows/ci.yml` exécute exactement cette procédure
 
 **Quand la CI se déclenche.** Sur un push vers **n'importe quelle branche**, et sur chaque pull request. Le réglage d'origine ne couvrait que `main` : une branche poussée sans PR ne déclenchait rien, et les 21 commits de l'intégration Odoo n'ont ainsi jamais été vus par la CI avant l'ouverture de la PR — qui a immédiatement révélé un échec au démarrage d'Odoo, invisible en local où l'environnement datait d'avant la suppression de `pkg_resources`.
 
-L'évènement `pull_request` est conservé en plus du `push`, et ce n'est pas un doublon inutile : il teste le résultat de la **fusion** avec la base, là où `push` ne teste que la branche seule. C'est ce qui attrape « ma branche passe, mais elle casse une fois fusionnée avec `main` ». Le coût est une exécution supplémentaire par PR ; un bloc `concurrency` annule en contrepartie les runs rendus caducs par un push plus récent — sauf sur `main`, dont l'historique de CI doit rester la trace de ce qui a été validé.
+L'évènement `pull_request` est conservé en plus du `push`, et ce n'est pas un doublon inutile : il teste le résultat de la **fusion** avec la base, là où `push` ne teste que la branche seule. C'est ce qui attrape « ma branche passe, mais elle casse une fois fusionnée avec `main` ».
+
+Il est en revanche restreint à `types: [opened, reopened]`. Par défaut GitHub y ajoute `synchronize`, c'est-à-dire chaque push sur une branche ayant une PR ouverte — ce qui faisait tourner le job `odoo` **deux fois par push** : mesuré 4 min 54 + 5 min 12 pour un seul commit. Or les deux exécutions ne testent le même arbre que si `main` n'a pas bougé, ce qui est le cas courant sur des branches courtes. Le contrôle de fusion garde donc sa valeur là où elle existe — à la création de la PR, seul moment où l'écart avec la base est certain — et itérer sur une PR ouverte ne coûte plus qu'un run. Si `main` bouge ensuite, c'est l'option « Require branches to be up to date » de la protection de branche qui impose de resynchroniser.
+
+Un bloc `concurrency` annule par ailleurs les runs rendus caducs par un push plus récent — sauf sur `main`, dont l'historique de CI doit rester la trace de ce qui a été validé.
 
 **Ce que la CI ne fait pas.** Elle n'empêche pas un `main` rouge : rien ne bloque un push direct. Seule la protection de branche côté GitHub (checks verts obligatoires avant fusion) transforme l'intention en contrainte.
 

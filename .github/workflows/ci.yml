@@ -15,10 +15,25 @@ name: CI
 # teste le résultat de la FUSION avec la base, là où `push` ne teste que la
 # branche seule. C'est ce qui attrape « ma branche passe, mais elle casse une
 # fois fusionnée avec main ».
+#
+# En revanche il est restreint à l'ouverture. Par défaut GitHub écoute
+# [opened, synchronize, reopened], et c'est `synchronize` — chaque push sur
+# une branche ayant une PR ouverte — qui faisait tourner le job odoo DEUX
+# fois par push : mesuré 4 min 54 + 5 min 12 pour un seul commit. Or ces deux
+# exécutions ne testent le même arbre que si main n'a pas bougé, ce qui est
+# le cas courant sur des branches courtes.
+#
+# Le contrôle de fusion garde donc sa valeur là où elle existe (à la création
+# de la PR, seul moment où l'écart avec la base est certain), et l'itération
+# sur une PR ouverte ne coûte plus qu'un run. Si main bouge ensuite, c'est
+# l'option « Require branches to be up to date » de la protection de branche
+# qui impose de resynchroniser — pas une exécution de CI toutes les cinq
+# minutes.
 on:
   push:
     branches: ['**']
   pull_request:
+    types: [opened, reopened]
 
 # Sans ceci, chaque correction poussée coup sur coup laisserait tourner les
 # runs précédents jusqu'au bout — le job odoo dure ~5 min (clonage d'Odoo 14
