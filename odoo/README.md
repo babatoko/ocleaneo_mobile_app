@@ -119,7 +119,7 @@ Le point le plus concret que ce commit reprend : la recherche du token entrant n
 
 Décisions produit tranchées sur ces deux points :
 - **Une seule session par employé** (confirmé) : cohérent avec « le téléphone est le badge » — un salarié = un appareil = un badge. Pas de modèle un-vers-plusieurs comme `res.users.apikeys`.
-- **Rate limiting sur la vérification de token** : toujours un point ouvert, non traité dans ce module (chaque requête `/api/mobile/*` vérifie le token sans limite de tentatives, contrairement à `_assert_can_auth()` côté natif).
+- **Rate limiting sur la vérification de token** : volontairement absent, contrairement aux routes d'identifiants (`login`, `login_badge`) qui, elles, sont limitées. Un token fait 256 bits d'entropie (`secrets.token_urlsafe(32)`) : le deviner n'est pas une attaque réaliste, alors qu'écrire une ligne par requête non authentifiée offrirait à n'importe qui un moyen simple de saturer la table des tentatives. Décision documentée dans `tools/mobile_auth.check_auth_rate_limit`.
 
 ### Connexion par badge (`POST /api/mobile/auth/login_badge`)
 

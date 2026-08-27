@@ -323,6 +323,48 @@ class TestMobileApi(MobilePointageCommon, HttpCase):
         self.assertAlmostEqual(order["location_latitude"], 48.8566, places=4)
         self.assertAlmostEqual(order["location_longitude"], 2.3522, places=4)
 
+    def test_me_finds_the_current_job_on_a_night_shift(self):
+        """GET /api/mobile/me used to lose the job across midnight.
+
+        It looked the running timesheet line up by
+        `date = attendance.check_in.date()` — a UTC date — while
+        project_timesheet_time_control rewrites that column from date_time
+        with fields.Date.context_today, i.e. in the worker's timezone. For
+        a clock-in at 23:30 UTC (00:30 in Paris) the two differ by a day,
+        the search matched nothing, and a worker demonstrably on the clock
+        got current_fsm_order_id = False.
+
+        The same trap had already been fixed once in _manage_timesheet;
+        this route had escaped it, and escaped it because nothing covered
+        the crossing-midnight case here. It does now.
+        """
+        self.user.tz = "Europe/Paris"
+        self.user.flush()
+        token = self._login()
+
+        # 23:30 UTC == 00:30 the next morning in Paris.
+        self._result(
+            "/api/mobile/pointage",
+            {
+                "type": "arrivee",
+                "fsm_order_id": self.order.id,
+                "datetime": "2026-03-10T23:30:00Z",
+            },
+            token=token,
+        )
+
+        result = self._result("/api/mobile/me", token=token)
+
+        self.assertTrue(
+            result["current_attendance_id"],
+            "the clocking above must have opened an attendance",
+        )
+        self.assertEqual(
+            result["current_fsm_order_id"], self.order.id,
+            "the worker is clocked in on this job; /me must report it "
+            "whichever side of midnight the shift started",
+        )
+
     def test_cors_preflight_is_answered(self):
         """type='json' routes answer no preflight of their own — a dedicated
         type='http' OPTIONS route exists precisely for this, and without it

@@ -35,12 +35,26 @@ class MobileMeController(http.Controller):
         current_fsm_order = False
         if employee and attendances:
             Timesheet = env["account.analytic.line"].sudo()
+            # No date filter, deliberately — the same trap already fixed in
+            # ocleaneo_mobile_pointage._manage_timesheet(), which this had
+            # escaped. Filtering on `date = attendances.check_in.date()`
+            # compares a UTC date against a field that
+            # project_timesheet_time_control rewrites from date_time using
+            # fields.Date.context_today, i.e. in the *worker's* timezone.
+            # For a shift starting at 23:30 UTC (00:30 in Paris) the two
+            # differ by a day and the search matches nothing: the worker is
+            # clocked in on a job, and current_fsm_order_id comes back
+            # False. Reproduced on a live Odoo 14 — exactly the night and
+            # pre-dawn crews this app is for.
+            #
+            # The open attendance above already establishes that the worker
+            # is on the clock; the still-running line (unit_amount = 0) is
+            # the job they are on, whichever calendar day it was opened.
             ts = Timesheet.search([
                 ("employee_id", "=", employee.id),
-                ("date", "=", attendances.check_in.date()),
                 ("fsm_order_id", "!=", False),
                 ("unit_amount", "=", 0),
-            ], limit=1)
+            ], limit=1, order="date_time desc")
             if ts and ts.fsm_order_id:
                 current_fsm_order = ts.fsm_order_id
 

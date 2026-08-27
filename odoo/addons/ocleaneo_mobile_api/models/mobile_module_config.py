@@ -52,7 +52,16 @@ class MobileModuleConfig(models.Model):
 
     @api.model
     def get_modules_for_user(self, user):
-        """Return active mobile module configs for a given user/company."""
+        """Return active mobile module configs for a given user/company.
+
+        `requires_role` is carried into the payload but NOT filtered on
+        here, and no caller filters on it either — the frontend ignores the
+        `modules` list entirely today (OdooProvider keeps only the token and
+        the employee from the login response). It is declarative metadata
+        for a later phase, never an access control: anything that must
+        actually be denied to a worker has to be denied by the route that
+        serves it, not by leaving an entry out of this list.
+        """
         company_id = user.company_id.id
         domain = [
             ("active", "=", True),
