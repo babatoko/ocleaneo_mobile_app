@@ -92,7 +92,18 @@ jobs:
 
       - name: Installer les dépendances Python
         run: |
-          python -m pip install --upgrade pip wheel setuptools
+          # setuptools est épinglé sous 81, pas laissé « --upgrade » : Odoo 14
+          # fait `import pkg_resources` dès son démarrage
+          # (odoo/modules/module.py), or setuptools a retiré ce paquet en
+          # 82.0.0 — mesuré, 81.x l'a encore, 82.0.0 ne l'a plus. Sans le pin,
+          # `pip install --upgrade setuptools` prend la dernière version et
+          # odoo-bin meurt sur ModuleNotFoundError avant même de charger un
+          # module, donc avant le moindre test. 81.x avertit déjà « pin to
+          # Setuptools<81 » : on suit cette consigne amont plutôt que la seule
+          # limite technique. À lever le jour où le backend passera à une
+          # version d'Odoo qui n'importe plus pkg_resources.
+          python -m pip install --upgrade pip wheel
+          python -m pip install --upgrade 'setuptools<81'
           # gevent est exclu : sa version épinglée par Odoo 14 ne compile pas
           # sur Python récent, et elle ne sert qu'au worker longpolling —
           # inutile pour une exécution de tests en --stop-after-init.

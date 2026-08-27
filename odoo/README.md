@@ -59,6 +59,10 @@ odoo-bin -d <base> --addons-path=<...>,odoo/addons \
 
 Le job `odoo` de `.github/workflows/ci.yml` exécute exactement cette procédure à chaque push (clonage d'Odoo 14 et des quatre dépôts OCA, Postgres en service, lint `pyflakes` puis tests). `odoo-bin` propage l'échec dans son code retour, le job échoue donc si un test casse.
 
+**`setuptools` y est épinglé sous 81**, et ce n'est pas cosmétique : Odoo 14 fait `import pkg_resources` dès son démarrage (`odoo/modules/module.py`), or setuptools a retiré ce paquet en **82.0.0** (mesuré : 81.x l'a encore, 82.0.0 ne l'a plus). Un `pip install --upgrade setuptools` sans borne prend la dernière version et `odoo-bin` meurt sur `ModuleNotFoundError` avant de charger le moindre module — donc avant le premier test, sans qu'aucun test ne soit en cause. C'est exactement ce qui est arrivé au premier run de CI de la branche d'intégration. 81.x avertit déjà lui-même « pin to Setuptools<81 » ; on suit cette consigne amont plutôt que la seule limite technique. À lever le jour où le backend passera à une version d'Odoo qui n'importe plus `pkg_resources`.
+
+Le même piège attend toute reconstruction d'environnement local : un venv créé aujourd'hui sans borne ne démarrera pas Odoo 14.
+
 ## Intégration avec le frontend
 
 Voir `docs/backend-integration-plan.md` à la racine du repo, et `frontend/src/providers/OdooProvider.ts` pour l'adaptateur qui consomme ces routes.
