@@ -73,6 +73,50 @@ export async function queueLength(): Promise<number> {
   return (await readQueue()).length;
 }
 
+/**
+ * Pointages que le serveur a refusés pour une raison métier (validation,
+ * droits, requête invalide) — conservés au lieu d'être détruits.
+ *
+ * Le rejeu ne peut pas les garder en file : ils échoueraient à chaque
+ * tentative et bloqueraient les pointages suivants derrière eux. Mais les
+ * effacer revient à supprimer du temps de travail sur la foi d'une erreur
+ * peut-être transitoire, sans que personne ne l'apprenne. Ils sont donc mis
+ * de côté ici, avec le motif du refus, et leur nombre remonte à l'écran
+ * Profil pour qu'un salarié puisse le signaler plutôt que de découvrir une
+ * paie incomplète.
+ */
+const FAILED_KEY = 'ocleaneo_pointage_failed_entries';
+
+export interface FailedEntry extends QueuedEntry {
+  failedAt: string;
+  reason: string;
+}
+
+async function setAside(entry: QueuedEntry, reason: string): Promise<void> {
+  await withQueueLock(async () => {
+    const { value } = await Preferences.get({ key: FAILED_KEY });
+    const failed: FailedEntry[] = value ? JSON.parse(value) : [];
+    failed.push({ ...entry, failedAt: new Date().toISOString(), reason });
+    await Preferences.set({ key: FAILED_KEY, value: JSON.stringify(failed) });
+  });
+}
+
+export async function failedEntries(): Promise<FailedEntry[]> {
+  const { value } = await Preferences.get({ key: FAILED_KEY });
+  return value ? JSON.parse(value) : [];
+}
+
+export async function failedCount(): Promise<number> {
+  return (await failedEntries()).length;
+}
+
+/** Vide la liste des refus, une fois qu'ils ont été traités côté gestion. */
+export async function clearFailedEntries(): Promise<void> {
+  await withQueueLock(async () => {
+    await Preferences.remove({ key: FAILED_KEY });
+  });
+}
+
 /** Retire une entrée précise, par identité et jamais par position.
  *
  *  Le rejeu relit la file après chaque envoi réseau, et elle a pu changer
@@ -107,10 +151,13 @@ async function drainQueue(): Promise<{ flushed: number; remaining: number }> {
       flushed += 1;
     } catch (e) {
       if (isNetworkError(e)) break;
-      // Erreur métier (ex: doublon rejeté par le serveur) : on abandonne cette
-      // entrée plutôt que de bloquer indéfiniment les suivantes derrière elle.
-      // Reste à traiter (F-04 de l'audit) : l'abandon est silencieux, alors
-      // qu'il porte sur du temps de travail.
+      // Erreur métier (validation, droits, requête invalide) : l'entrée sort
+      // de la file, sinon elle échouerait à chaque tentative et bloquerait
+      // les pointages suivants derrière elle. Mais elle n'est pas détruite —
+      // elle part de côté avec son motif, et son nombre remonte à l'écran
+      // Profil. Effacer du temps de travail sans que personne ne l'apprenne
+      // n'est pas une option acceptable ici.
+      await setAside(next, e instanceof Error ? e.message : String(e));
     }
     await removeFromQueue(next.localId);
   }

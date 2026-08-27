@@ -11,7 +11,7 @@ import {
   isBiometricAvailable,
 } from '../services/biometric';
 import { areNotificationsEnabled, setNotificationsEnabled } from '../services/notifications';
-import { queueLength } from '../services/offlineQueue';
+import { failedCount, queueLength } from '../services/offlineQueue';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -20,6 +20,7 @@ const biometricAvailable = ref(false);
 const biometricSaved = ref(false);
 const notificationsEnabled = ref(true);
 const pendingCount = ref(0);
+const failedPointages = ref(0);
 const loading = ref(true);
 
 const defaultServerUrl = provider.getDefaultServerUrl();
@@ -48,6 +49,7 @@ onMounted(async () => {
     if (biometricAvailable.value) biometricSaved.value = await hasSavedCredentials();
     notificationsEnabled.value = await areNotificationsEnabled();
     pendingCount.value = await queueLength();
+    failedPointages.value = await failedCount();
   } finally {
     loading.value = false;
   }
@@ -158,6 +160,20 @@ async function resetServerUrl() {
               <p class="srow-sub">Pointages enregistrés localement, en attente d'envoi</p>
             </ion-label>
             <ion-note slot="end" class="srow-value">{{ pendingCount }}</ion-note>
+          </ion-item>
+
+          <!-- N'apparaît que s'il y a quelque chose à signaler : une ligne à
+               zéro en permanence ferait du bruit et finirait ignorée — ce qui
+               est exactement ce qu'on veut éviter pour ces pointages-là. -->
+          <ion-item v-if="failedPointages" class="settings-row">
+            <ion-label class="ion-text-wrap">
+              <p class="srow-label">Pointages refusés</p>
+              <p class="srow-sub">
+                Non enregistrés par le serveur, conservés ici — signalez-les à
+                votre responsable pour qu'ils soient repris à la main.
+              </p>
+            </ion-label>
+            <ion-note slot="end" class="srow-value srow-alert">{{ failedPointages }}</ion-note>
           </ion-item>
         </ion-list>
 
@@ -271,6 +287,14 @@ async function resetServerUrl() {
 .srow-value {
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+/* Les pointages refusés portent une couleur d'alerte : le compteur voisin
+   (file d'attente) est une information neutre, celui-ci demande une action.
+   Les deux tokens sont redéfinis en thème sombre, donc pas de #hex ici. */
+.srow-alert {
+  color: var(--danger);
+  font-weight: 600;
 }
 
 /* ion-toggle : le comportement (piste, poignée, animation, disabled,

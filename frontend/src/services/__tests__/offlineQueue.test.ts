@@ -25,6 +25,10 @@ vi.mock('@capacitor/preferences', () => ({
       await tick();
       store[key] = value;
     },
+    remove: async ({ key }: { key: string }) => {
+      await tick();
+      delete store[key];
+    },
   },
 }));
 
@@ -51,7 +55,15 @@ vi.mock('../../providers', () => ({
 }));
 
 const { ProviderNetworkError } = await import('../../providers/DataProvider');
-const { enqueue, flushQueue, queueLength, watchConnectivity } = await import('../offlineQueue');
+const {
+  enqueue,
+  flushQueue,
+  queueLength,
+  watchConnectivity,
+  failedEntries,
+  failedCount,
+  clearFailedEntries,
+} = await import('../offlineQueue');
 
 /** Latence réseau réaliste : un POST est bien plus lent qu'une écriture de
  *  stockage local. C'est cet ordonnancement qui révèle la course — avec un
@@ -149,14 +161,66 @@ describe('file hors ligne — ordre et reprise', () => {
     await enqueue(entry('A'));
     await enqueue(entry('B'));
 
-    // Erreur métier, pas réseau : l'entrée est abandonnée pour ne pas bloquer
-    // les suivantes. L'abandon reste silencieux — voir F-04 de l'audit.
+    // Erreur métier, pas réseau : l'entrée sort de la file, sinon elle
+    // échouerait à chaque tentative et bloquerait les suivantes.
     createTimeEntry.mockImplementationOnce(() => Promise.reject(new Error('400 refusé')));
 
     const { remaining } = await flushQueue();
 
     expect(sentRefs()).toEqual(['A', 'B']);
     expect(remaining).toBe(0);
+  });
+});
+
+describe('file hors ligne — un refus ne détruit pas le pointage', () => {
+  it('met de côté le pointage refusé au lieu de l’effacer', async () => {
+    await enqueue(entry('A'));
+    createTimeEntry.mockImplementationOnce(() => Promise.reject(new Error('400 refusé')));
+
+    await flushQueue();
+
+    // Le pointage a quitté la file, mais il existe encore : effacer du temps
+    // de travail sans trace n'est pas acceptable.
+    expect(await queueLength()).toBe(0);
+    const failed = await failedEntries();
+    expect(failed).toHaveLength(1);
+    expect(failed[0].clientRef).toBe('A');
+  });
+
+  it('conserve le motif du refus et la date, pour pouvoir le reprendre', async () => {
+    await enqueue(entry('A'));
+    createTimeEntry.mockImplementationOnce(() =>
+      Promise.reject(new Error('chantier non assigné')),
+    );
+
+    await flushQueue();
+
+    const [failed] = await failedEntries();
+    expect(failed.reason).toBe('chantier non assigné');
+    expect(Date.parse(failed.failedAt)).not.toBeNaN();
+  });
+
+  it("ne compte pas un refus réseau comme un refus définitif", async () => {
+    await enqueue(entry('A'));
+    createTimeEntry.mockImplementationOnce(() => Promise.reject(new ProviderNetworkError()));
+
+    await flushQueue();
+
+    // Une coupure n'est pas un refus : le pointage reste en file pour la
+    // prochaine tentative, et rien ne part de côté.
+    expect(await queueLength()).toBe(1);
+    expect(await failedCount()).toBe(0);
+  });
+
+  it('peut être vidé une fois les refus traités', async () => {
+    await enqueue(entry('A'));
+    createTimeEntry.mockImplementationOnce(() => Promise.reject(new Error('400')));
+    await flushQueue();
+    expect(await failedCount()).toBe(1);
+
+    await clearFailedEntries();
+
+    expect(await failedCount()).toBe(0);
   });
 
   it('ne rejoue pas indéfiniment une file vide', async () => {
