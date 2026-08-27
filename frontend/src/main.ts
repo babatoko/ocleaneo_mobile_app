@@ -6,6 +6,7 @@ import router from './router';
 import { usePointageStore } from './stores/pointage';
 import { ensureNotificationChannel } from './services/notifications';
 import { initProvider } from './providers';
+import { installErrorHandlers } from './services/errorLog';
 
 // Ionic apporte les mécanismes (transitions de page, geste de retour iOS,
 // clavier/scroll adaptatifs, safe-area) — le style visuel Ocleaneo reste
@@ -17,6 +18,9 @@ import '@ionic/vue/css/typography.css';
 import './style.css';
 
 const app = createApp(App);
+// Posé avant tout le reste : une erreur pendant l'initialisation est
+// exactement celle qu'on ne veut pas perdre, et c'est la plus probable.
+installErrorHandlers(app);
 app.use(IonicVue, { mode: 'ios' }); // un seul look, cohérent sur les deux plateformes — pas de rendu Material/Cupertino qui diverge de l'identité Ocleaneo
 const pinia = createPinia();
 app.use(pinia);

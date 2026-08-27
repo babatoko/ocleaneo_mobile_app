@@ -12,6 +12,8 @@ import {
 } from '../services/biometric';
 import { areNotificationsEnabled, setNotificationsEnabled } from '../services/notifications';
 import { failedCount, queueLength } from '../services/offlineQueue';
+import { clearErrorLog, errorCount, formatErrorLog } from '../services/errorLog';
+import { Share } from '@capacitor/share';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -21,6 +23,7 @@ const biometricSaved = ref(false);
 const notificationsEnabled = ref(true);
 const pendingCount = ref(0);
 const failedPointages = ref(0);
+const errorsLogged = ref(0);
 const loading = ref(true);
 
 const defaultServerUrl = provider.getDefaultServerUrl();
@@ -50,10 +53,28 @@ onMounted(async () => {
     notificationsEnabled.value = await areNotificationsEnabled();
     pendingCount.value = await queueLength();
     failedPointages.value = await failedCount();
+    errorsLogged.value = await errorCount();
   } finally {
     loading.value = false;
   }
 });
+
+/** Transmettre le journal est le seul moyen, aujourd'hui, de faire remonter
+ *  un plantage : rien n'est envoyé automatiquement (voir services/errorLog.ts). */
+async function shareErrorLog() {
+  const text = await formatErrorLog();
+  try {
+    await Share.share({ title: 'Journal d\'erreurs Ocleaneo', text });
+  } catch {
+    // Partage annulé, ou indisponible en navigateur : sans conséquence, le
+    // journal reste sur l'appareil.
+  }
+}
+
+async function forgetErrorLog() {
+  await clearErrorLog();
+  errorsLogged.value = 0;
+}
 
 async function toggleNotifications() {
   const next = !notificationsEnabled.value;
@@ -176,6 +197,37 @@ async function resetServerUrl() {
             <ion-note slot="end" class="srow-value srow-alert">{{ failedPointages }}</ion-note>
           </ion-item>
         </ion-list>
+
+        <!-- Même principe que les pointages refusés : rien à afficher tant
+             qu'il n'y a rien à signaler. Un plantage était jusqu'ici invisible
+             de bout en bout ; le transmettre depuis ici est aujourd'hui le
+             seul chemin pour qu'il soit corrigé. -->
+        <template v-if="errorsLogged">
+          <p class="section-title">Diagnostic</p>
+          <ion-list class="detail-block settings-list" lines="full">
+            <ion-item class="settings-row">
+              <ion-label class="ion-text-wrap">
+                <p class="srow-label">Incidents enregistrés</p>
+                <p class="srow-sub">
+                  Anomalies techniques relevées sur cet appareil. Rien n'est
+                  envoyé automatiquement — transmettez-les pour qu'elles soient
+                  corrigées.
+                </p>
+              </ion-label>
+              <ion-note slot="end" class="srow-value">{{ errorsLogged }}</ion-note>
+            </ion-item>
+          </ion-list>
+          <div class="detail-block" style="padding: 0 18px;">
+            <div class="server-url-actions">
+              <ion-button class="server-url-save" expand="block" @click="shareErrorLog">
+                Transmettre le diagnostic
+              </ion-button>
+              <ion-button class="server-url-reset" expand="block" fill="clear" @click="forgetErrorLog">
+                Effacer
+              </ion-button>
+            </div>
+          </div>
+        </template>
 
         <template v-if="showServerSetting">
           <p class="section-title">Serveur</p>
