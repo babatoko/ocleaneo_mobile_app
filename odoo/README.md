@@ -77,7 +77,7 @@ Comme le frontend (`frontend/.env.example`), la configuration se fait par variab
 
 | Variable | Défaut | Rôle |
 |----------|--------|------|
-| `OCLEANEO_MOBILE_CORS_ORIGIN` | `http://127.0.0.1:5173` | Origine autorisée en CORS sur les routes `/api/mobile/*`. À restreindre à l'origine réelle de l'app en production. |
+| `OCLEANEO_MOBILE_CORS_ORIGIN` | `http://127.0.0.1:5173` | Origine autorisée en CORS sur les routes `/api/mobile/*`. Le défaut (serveur de dev Vite) convient à l'app native : Capacitor appelle l'API depuis une WebView, où le CORS ne s'applique pas. Il est en revanche faux pour un déploiement **PWA**, où le navigateur l'applique — à régler alors sur l'origine du site. Un `info` est journalisé au démarrage quand la variable n'est pas définie, pour que l'oubli se voie dans le log plutôt qu'en mur de requêtes bloquées. |
 | `OCLEANEO_MOBILE_TOKEN_TTL_DAYS` | `30` | Durée de validité d'un token API mobile généré par `/api/mobile/auth/login`. |
 | `OCLEANEO_MOBILE_AUTH_MAX_ATTEMPTS` | `10` | Échecs d'authentification tolérés par identifiant (login ou badge) sur la fenêtre, avant refus. |
 | `OCLEANEO_MOBILE_AUTH_MAX_IP_ATTEMPTS` | `50` | Idem par adresse source. Volontairement plus large : une équipe entière partage souvent une seule connexion (wifi de site, NAT 4G). |
@@ -167,6 +167,18 @@ Un second passage sur la même installation réelle a mis au jour deux problème
 Aucun des deux n'était nécessaire : tous les contrôleurs mobiles passent par `sudo()`. Les deux ont été supprimés, et `tests/test_security.py` échoue si l'un ou l'autre revient.
 
 **Point d'exploitation important** : supprimer le fichier XML ne suffit pas sur une instance déjà installée. La règle était déclarée dans `<data noupdate="1">`, et le nettoyage des données orphelines d'Odoo ignore délibérément les enregistrements `noupdate`. Vérifié : après `-u ocleaneo_mobile_api`, l'ACL obsolète avait disparu mais la règle était toujours là et toujours active. D'où `migrations/14.0.1.0.10/post-migration.py`, qui la supprime explicitement — testé sur le vrai chemin de production (installation en 14.0.1.0.9 puis upgrade).
+
+### Idempotence des pointages (`client_ref`)
+
+L'app génère un `client_ref` par pointage physique et le renvoie inchangé à chaque nouvelle tentative (rejeu de la file hors-ligne, réponse perdue après traitement côté serveur). La recherche faite en tête de `POST /api/mobile/pointage` couvre le cas séquentiel, mais c'est un *check-then-act* : deux tentatives simultanées ne trouvent rien toutes les deux et créent chacune un pointage — l'arrivée du salarié est enregistrée deux fois, et ses heures comptées deux fois.
+
+L'arbitrage est donc confié à la base, via un index unique `(user_id, client_ref)`. Postgres autorisant autant de `NULL` qu'on veut dans un index unique, les pointages sans clé (saisie backoffice, imports) ne sont pas concernés.
+
+Le perdant de la course **ne peut pas** simplement relire la ligne gagnante : les curseurs Odoo tournent en `REPEATABLE READ` (`sql_db.Cursor`, `serialized=True` par défaut), donc le snapshot de la transaction précède le commit concurrent et une relecture après `ROLLBACK TO SAVEPOINT` ne trouve toujours rien — vérifié sur PostgreSQL 16. Le pattern « catch + re-read », qui paraît évident, est silencieusement faux ici.
+
+Ce qui marche est le mécanisme de reprise d'Odoo lui-même : `service/model.check` rejoue la requête entière sur une erreur de sérialisation, et `http.py:checked_call` fait un `rollback()` du curseur avant chaque tentative (« the request cursor is unusable… to create a new one »). Le rejeu repart donc sur un snapshot neuf, où le court-circuit `client_ref` retrouve la ligne gagnante et renvoie la réponse d'origine. L'insert perdant est donc relevé en erreur de sérialisation pour rendre la main à cette machinerie (voir `_create_pointage`).
+
+**Point d'exploitation** : sur une instance portant déjà des doublons, l'`ALTER TABLE` échoue — et Odoo **laisse l'upgrade se terminer** (`post_constraint` rétrograde l'échec en `info` puis `finalize_constraints` en `warning`, « this is not a deployment showstopper »). Mesuré : sortie 0, contrainte absente, protection inactive, rien au-dessus de `debug` pour le signaler. D'où `migrations/14.0.1.0.8/pre-migration.py`, qui journalise en `ERROR` les groupes fautifs avec leurs ids. Il ne supprime rien : ces lignes alimentent la paie, choisir laquelle des deux est parasite n'est pas une décision de script. Cycle vérifié de bout en bout (doublons → contrainte absente → nettoyage → re-run → contrainte posée).
 
 Un troisième point, plus discret, a été corrigé au passage : la date « aujourd'hui » utilisée par défaut quand l'app n'envoie pas de `?date=` venait de `fields.Date.today()`, c'est-à-dire du fuseau du **serveur** (UTC en déploiement normal), alors que la fenêtre de journée est ensuite découpée dans le fuseau du **salarié**. Entre minuit local et le décalage UTC (00h–01h à Paris, 00h–02h l'été), les deux calendriers divergent et la fenêtre tombait sur la veille : un salarié pointant son arrivée à 00h30 ne voyait pas son propre pointage dans `/pointage/mine`. C'est exactement la fenêtre horaire des équipes qui démarrent avant l'aube. Remplacé par `today_local()` (équivalent de `fields.Date.context_today` d'Odoo), verrouillé par `TestTodayLocal`.
 

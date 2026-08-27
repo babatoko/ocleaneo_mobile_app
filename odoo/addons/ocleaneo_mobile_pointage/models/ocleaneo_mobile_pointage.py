@@ -9,6 +9,21 @@ class OcleaneoMobilePointage(models.Model):
     _description = "Mobile clocking log"
     _order = "datetime desc, id desc"
 
+    # The idempotency key is enforced by the database, not by the search that
+    # POST /api/mobile/pointage runs before creating: that search is a
+    # check-then-act, so two retries arriving at once both find nothing and
+    # both create a clocking. Postgres allows any number of NULLs in a unique
+    # index, so clockings with no client_ref (backoffice entries, imports) are
+    # unaffected. See the controller for how a losing insert is turned back
+    # into the original response.
+    _sql_constraints = [
+        (
+            "client_ref_uniq",
+            "unique (user_id, client_ref)",
+            "This clocking has already been recorded (duplicate client reference).",
+        ),
+    ]
+
     user_id = fields.Many2one("res.users", string="User", required=True, index=True)
     employee_id = fields.Many2one("hr.employee", string="Employee", index=True)
     fsm_order_id = fields.Many2one("fsm.order", string="FSM Order", index=True)

@@ -1,6 +1,8 @@
 # Copyright 2026 Ocleaneo
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
+from psycopg2 import IntegrityError, OperationalError, errorcodes
+
 from odoo import http
 from odoo.http import request
 from odoo.exceptions import ValidationError
@@ -18,6 +20,25 @@ from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import (
 )
 
 _logger = logging.getLogger(__name__)
+
+# Name Postgres gives the model's _sql_constraints entry (table + constraint
+# name). Checked explicitly so an unrelated integrity error — a bad foreign
+# key, a missing required column — is never mistaken for a duplicate retry
+# and silently replayed.
+CLIENT_REF_CONSTRAINT = "ocleaneo_mobile_pointage_client_ref_uniq"
+
+
+class ConcurrentClientRef(OperationalError):
+    """Losing side of a client_ref race, shaped so Odoo replays the request.
+
+    service/model.check retries on pgcode in (LOCK_NOT_AVAILABLE,
+    SERIALIZATION_FAILURE, DEADLOCK_DETECTED). Declaring pgcode as a class
+    attribute shadows psycopg2's read-only descriptor, which is what lets a
+    hand-raised error enter that path. See _create_pointage for why a retry
+    is the only way to read the winning record.
+    """
+
+    pgcode = errorcodes.SERIALIZATION_FAILURE
 
 
 class MobilePointageController(http.Controller):
@@ -203,7 +224,7 @@ class MobilePointageController(http.Controller):
             vals["fsm_order_id"] = order.id
             vals["fsm_location_id"] = order.location_id.id
 
-        pointage = env["ocleaneo.mobile.pointage"].sudo().create(vals)
+        pointage = self._create_pointage(env, vals, client_ref)
 
         # ---- Global attendance (hr.attendance) ----
         attendance_ids = self._manage_hr_attendance(env, employee, pointage_type, now)
@@ -228,6 +249,56 @@ class MobilePointageController(http.Controller):
                     _logger.warning("Could not set FSM order %s to Completed: %s", order.id, e)
 
         return self._pointage_response(pointage, timesheet_ids)
+
+    def _create_pointage(self, env, vals, client_ref):
+        """Create the clocking, letting the database settle a concurrent retry.
+
+        The client_ref lookup at the top of pointage() is a check-then-act:
+        two retries of the same clocking arriving together — an offline queue
+        replay racing the original request, a double tap on a flaky
+        connection — both find nothing and both create a record. The unique
+        index on (user_id, client_ref) makes the database the arbiter, so
+        exactly one insert wins.
+
+        The loser cannot simply re-read the winner's row and return it: Odoo
+        cursors run in REPEATABLE READ (sql_db.Cursor defaults to
+        serialized=True), so this transaction's snapshot predates the
+        concurrent commit and a re-read after ROLLBACK TO SAVEPOINT still
+        finds nothing. Verified against PostgreSQL 16 — the naive
+        catch-and-re-read is silently wrong here.
+
+        What does work is Odoo's own concurrency retry: service/model.check
+        replays the whole request on a serialization failure, and http.py's
+        checked_call rolls the request cursor back before each attempt
+        ("the request cursor is unusable... to create a new one"). The
+        replay therefore starts on a fresh snapshot, where the client_ref
+        short-circuit finds the winner's record and returns the original
+        response — which is exactly the idempotency the key is for. So the
+        losing insert is re-raised as a serialization failure to hand the
+        request back to that machinery.
+        """
+        Pointage = env["ocleaneo.mobile.pointage"].sudo()
+        if not client_ref:
+            # Nothing to collide on: a NULL client_ref never violates the
+            # unique index (Postgres allows any number of NULLs there).
+            return Pointage.create(vals)
+
+        try:
+            # The savepoint keeps the cursor usable for the raise below; an
+            # aborted transaction would reject every later statement.
+            with env.cr.savepoint():
+                return Pointage.create(vals)
+        except IntegrityError as e:
+            if e.diag.constraint_name != CLIENT_REF_CONSTRAINT:
+                raise
+            _logger.info(
+                "Concurrent clocking with client_ref=%s for user %s; retrying "
+                "the request so the idempotent replay returns the first one",
+                client_ref, vals.get("user_id"),
+            )
+            raise ConcurrentClientRef(
+                "concurrent clocking for client_ref=%s" % client_ref
+            ) from e
 
     def _pointage_response(self, pointage, timesheet_ids=None):
         """Build the /api/mobile/pointage response payload for a pointage

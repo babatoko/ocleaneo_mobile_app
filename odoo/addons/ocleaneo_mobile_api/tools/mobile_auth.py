@@ -22,7 +22,25 @@ _logger = logging.getLogger(__name__)
 # variable so dev/staging/prod can each set their own value without a code
 # change — the same pattern the frontend uses for its own runtime
 # configuration (see frontend/.env.example and docker-compose.yml).
-MOBILE_CORS_ORIGIN = os.environ.get("OCLEANEO_MOBILE_CORS_ORIGIN", "http://127.0.0.1:5173")
+#
+# The default is the Vite dev server, which is the right default for the
+# native app: Capacitor calls the API from a WebView, where CORS does not
+# apply at all, so a *narrow* default costs nothing there and keeps a
+# browser from calling this API cross-origin. It is the wrong value for a
+# PWA deployment, where the browser does enforce CORS and the origin must
+# be the site's own — hence the warning below, so an unset variable is
+# noticed in the log rather than discovered as a wall of blocked requests.
+DEV_CORS_ORIGIN = "http://127.0.0.1:5173"
+MOBILE_CORS_ORIGIN = os.environ.get("OCLEANEO_MOBILE_CORS_ORIGIN", DEV_CORS_ORIGIN)
+
+if MOBILE_CORS_ORIGIN == DEV_CORS_ORIGIN:
+    logging.getLogger(__name__).info(
+        "OCLEANEO_MOBILE_CORS_ORIGIN is unset; /api/mobile/* allows the dev "
+        "origin %s only. Fine for the Capacitor app (a WebView does not "
+        "enforce CORS) — set it to the site's own origin before serving the "
+        "frontend as a PWA.",
+        DEV_CORS_ORIGIN,
+    )
 
 
 def request_ip():

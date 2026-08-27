@@ -106,6 +106,14 @@ class MobileAuthController(http.Controller):
             record_auth_failure(env, "badge", barcode)
             return {"error": "Invalid badge", "code": 401}
 
+        # Cleared here, before _issue_mobile_token, and deliberately so: the
+        # budget tracks *credential guessing*, and a barcode that matched an
+        # active employee has proved it is not a guess. What can still fail
+        # below is a configuration problem (an employee with no linked user
+        # account) answered with a 400, not an authentication failure — it
+        # never calls record_auth_failure, so tying the clear to it would
+        # only leave a legitimate badge carrying failures it already
+        # disproved. Same ordering as login(), for the same reason.
         clear_auth_failures(env, "badge", barcode)
         return self._issue_mobile_token(env, employee.user_id, employee)
 
