@@ -7,6 +7,7 @@ from odoo.http import request
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     MOBILE_CORS_ORIGIN,
+    mobile_routes,
     authenticate_mobile_request,
 )
 
@@ -15,7 +16,7 @@ _logger = logging.getLogger(__name__)
 
 class MobileMeController(http.Controller):
 
-    @http.route("/api/mobile/me", type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    @http.route(mobile_routes("me"), type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def me(self, **kwargs):
         """Return current user/employee profile with open attendance and current FSM order."""
         user, employee = authenticate_mobile_request()

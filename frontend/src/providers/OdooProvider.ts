@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { DEFAULT_ODOO_BASE_URL, getOdooBaseUrl, initOdooBaseUrl, odooClient, setOdooBaseUrl } from './odooClient';
+import { clearToken } from '../services/tokenStore';
+import { DEFAULT_ODOO_BASE_URL, ODOO_API_VERSION, getOdooBaseUrl, initOdooBaseUrl, odooClient, setOdooBaseUrl } from './odooClient';
 import { DataProvider, ProviderError, ProviderNetworkError } from './DataProvider';
 import type { ProviderFeature } from './DataProvider';
 import type {
@@ -346,7 +347,10 @@ let rpcId = 0;
 async function callMobile<T>(path: string, params: Record<string, unknown> = {}): Promise<T> {
   let httpResponse;
   try {
-    httpResponse = await odooClient.post<JsonRpcResponse<T | MobileErrorResult>>(path, {
+    // Le préfixe de version est posé ici, et non dans l'URL de base : celle-ci
+    // est réglable depuis le Profil et déjà enregistrée sans version sur les
+    // téléphones (voir ODOO_API_VERSION).
+    httpResponse = await odooClient.post<JsonRpcResponse<T | MobileErrorResult>>(`/${ODOO_API_VERSION}${path}`, {
       jsonrpc: '2.0',
       method: 'call',
       id: ++rpcId,
@@ -366,7 +370,7 @@ async function callMobile<T>(path: string, params: Record<string, unknown> = {})
   if (isMobileErrorResult(result)) {
     // Contrairement à restClient.ts (RestProvider), un token invalide
     // n'est jamais un 401 HTTP ici — voir la docstring de classe.
-    if (result.code === 401) localStorage.removeItem('ocleaneo_token');
+    if (result.code === 401) void clearToken();
     throw new ProviderError(result.error, result.code);
   }
   return result as T;

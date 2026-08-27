@@ -1,10 +1,26 @@
 import axios from 'axios';
 import { Preferences } from '@capacitor/preferences';
+import { currentToken } from '../services/tokenStore';
 
 // Client HTTP interne à OdooProvider — même rôle que restClient.ts pour
 // RestProvider : rien en dehors de providers/OdooProvider.ts ne doit
 // importer ce fichier.
 export const DEFAULT_ODOO_BASE_URL = import.meta.env.VITE_ODOO_API_URL || 'http://localhost:8069/api/mobile';
+
+/**
+ * Version d'API ciblée par ce client.
+ *
+ * Elle est préfixée aux chemins d'appel (voir callMobile dans
+ * OdooProvider.ts) plutôt qu'incluse dans l'URL de base. C'est délibéré :
+ * l'URL de base est ce qu'un responsable saisit dans l'écran Profil, à
+ * savoir l'adresse du serveur — pas l'adresse d'une version de l'API. Garder
+ * la version hors de ce champ évite d'avoir à la lui expliquer, et versionne
+ * un serveur personnalisé aussi bien que le serveur par défaut.
+ *
+ * Le backend ne sert QUE les chemins versionnés : rien n'étant déployé, il
+ * n'y avait aucun client historique à ménager, donc aucun alias à maintenir.
+ */
+export const ODOO_API_VERSION = 'v1';
 
 const BASE_URL_PREF_KEY = 'ocleaneo_odoo_api_base_url';
 
@@ -35,7 +51,7 @@ export async function setOdooBaseUrl(url: string): Promise<void> {
   }
 }
 
-// Même clé que restClient.ts (localStorage['ocleaneo_token']) : un seul
+// Même dépôt de jetons que restClient.ts (services/tokenStore.ts) : un seul
 // provider est actif à la fois (voir providers/index.ts), donc stores/
 // auth.ts n'a pas besoin de savoir lequel pour écrire le token obtenu par
 // login(). Odoo répond en HTTP 200 même pour un token invalide/expiré
@@ -44,7 +60,7 @@ export async function setOdooBaseUrl(url: string): Promise<void> {
 // token sur un intercepteur de réponse générique ; OdooProvider.ts le fait
 // lui-même après avoir lu ce corps de réponse (voir callMobile()).
 odooClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('ocleaneo_token');
+  const token = currentToken();
   if (token) config.headers.set('Authorization', `Bearer ${token}`);
   return config;
 });

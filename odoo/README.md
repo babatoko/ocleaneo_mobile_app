@@ -85,6 +85,45 @@ Ces trois-là ne sont pas laissés à échouer à l'exécution. Le contrat `Data
 
 Conséquence pratique : quand les routes manquantes existeront côté Odoo, il suffira de retirer le domaine correspondant de `UNSUPPORTED_FEATURES` dans `OdooProvider.ts` pour rallumer l'onglet — rien à changer côté écrans. Le comportement est verrouillé par `frontend/src/providers/__tests__/capabilities.test.ts`.
 
+### Versionnement de l'API
+
+Toutes les routes sont servies sous un préfixe de version, et **uniquement** sous ce préfixe :
+
+```
+/api/mobile/v1/planning
+/api/mobile/v1/auth/login
+...
+```
+
+Le versionnement manquait entièrement. Ce n'est pas gênant tant que le seul client est celui qu'on livre en même temps que le serveur — mais l'application s'installe sur les téléphones des salariés et se met à jour à *leur* rythme, pas à celui du serveur. Le jour où une réponse doit changer de forme, anciens et nouveaux clients coexistent pendant des semaines, et sans version dans le chemin il ne reste que deux options : casser le terrain, ou ne plus jamais faire évoluer un contrat.
+
+**Il est posé maintenant parce que rien n'est encore déployé, et que c'est le seul moment où cela ne coûte rien.** Aucune application n'étant installée, il n'y a aucun alias non versionné à conserver : `mobile_routes()` (`tools/mobile_auth.py`) ne rend qu'un seul chemin. Un alias de compatibilité serait du poids mort dès le premier jour, et inviterait à emprunter une route qu'il faudrait retirer ensuite. La fonction rend malgré tout une *liste* : le jour où une v2 devra cohabiter avec la v1, seule sa valeur de retour changera, pas sa forme ni les appelants.
+
+Le préflight CORS n'a rien demandé : son convertisseur `<path:subpath>` couvre les chemins versionnés par construction.
+
+`/api/mobile/config` annonce `api_version` et `supported_versions`, pour qu'un client sache à quoi il parle sans le déduire d'un 404.
+
+Le test `test_no_declared_route_escapes_the_version` parcourt les contrôleurs **réellement chargés** — pas une liste écrite à la main, qui se périmerait au premier endpoint ajouté — et échoue si une route est servie hors version. Un `@http.route("/api/mobile/x")` écrit en dur, qui est le réflexe naturel, est attrapé là.
+
+Côté frontend, le préfixe est posé **au moment de l'appel** (`callMobile`, cf. `ODOO_API_VERSION` dans `providers/odooClient.ts`) et non dans l'URL de base. L'URL de base est ce qu'un responsable saisit dans l'écran Profil : c'est l'adresse du serveur, pas l'adresse d'une version de l'API. Garder la version hors de ce champ évite d'avoir à la lui expliquer, et versionne un serveur personnalisé aussi bien qu'un serveur par défaut.
+
+### Bornes des plages de dates
+
+`/planning` et `/pointage/mine` acceptaient `date_from`/`date_to` sans aucune limite et lançaient un `search()` sans `limit`. Rien n'empêchait `date_from=1970-01-01&date_to=2999-12-31` : Odoo chargeait alors l'intégralité de l'historique en mémoire dans un worker, pour le sérialiser en JSON vers un téléphone. Aucune malveillance n'est nécessaire — une vue « année » ajoutée côté client, ou un `date_to` mal calculé, suffit.
+
+Deux bornes, de nature différente (`tools/mobile_time.py`) :
+
+| Borne | Valeur | Comportement |
+|---|---|---|
+| `MAX_RANGE_DAYS` | 366 | **refuse** la requête (`range_too_wide`, code 400) |
+| `MAX_RECORDS` | 2000 | tronque, avec `truncated: true` dans la réponse |
+
+Le refus plutôt que la troncature n'est pas un détail : sur des données de pointage qui alimentent la paie, rendre 400 lignes en annonçant une plage d'un an serait *pire* que l'erreur, puisque le client croirait avoir tout reçu. `MAX_RECORDS` reste un garde-fou de dernier recours — inatteignable dans la plage autorisée — et il est signalé dans la réponse quand il joue.
+
+Une plage **inversée** (`date_to` avant `date_from`) est refusée elle aussi (`invalid_range`). Auparavant elle produisait une fenêtre vide, donc « aucune vacation » — indiscernable d'une vraie journée libre. C'est exactement la classe de défaut déjà corrigée côté frontend : un écran vide qui ment sur la réalité.
+
+Le `search()` demande `limit=MAX_RECORDS + 1`, un enregistrement de plus que la limite annoncée, uniquement pour *savoir* si la liste a été coupée : sans lui, un résultat pile à la limite serait indiscernable d'un résultat complet.
+
 ## Configuration
 
 Comme le frontend (`frontend/.env.example`), la configuration se fait par variable d'environnement plutôt que par valeur codée en dur, pour permettre des valeurs différentes en dev/staging/prod sans changement de code :

@@ -3,10 +3,13 @@ import { createPinia, setActivePinia } from 'pinia';
 
 /**
  * Le store d'authentification n'avait aucun test (constat F-03 de l'audit).
- * C'est pourtant lui qui décide si un salarié peut entrer dans l'application,
- * et le seul endroit où le jeton est écrit sur le disque : s'il se désynchronise
- * de localStorage, l'app redémarre dans un état incohérent — un jeton présent
- * au disque mais absent en mémoire, ou l'inverse.
+ * C'est pourtant lui qui décide si un salarié peut entrer dans l'application.
+ *
+ * Depuis F-07, il n'écrit plus lui-même sur le disque : le jeton appartient à
+ * services/tokenStore.ts, qui le confie au Trousseau/Keystore sur natif. Le
+ * contrat vérifié ici est donc « le store délègue au dépôt », et le stockage
+ * lui-même est couvert par tokenStore.test.ts. La frontière est la même que
+ * pour la garde de navigation : chaque test vise une seule responsabilité.
  */
 
 const provider = {
@@ -16,39 +19,44 @@ const provider = {
 
 vi.mock('../../providers', () => ({ provider }));
 
-/** La suite tourne sous Node (aucun jsdom installé, en ajouter un pour ces
- *  tests alourdirait chaque exécution). localStorage est donc simulé — ce qui
- *  a l'avantage de rendre son contenu directement observable. */
-let disk: Record<string, string> = {};
+/** Dépôt de jetons simulé : ce qu'il contient est directement observable, et
+ *  aucun test du store ne dépend de la plateforme de stockage réelle. */
+let stored: string | null = null;
+
+vi.mock('../../services/tokenStore', () => ({
+  currentToken: () => stored,
+  saveToken: vi.fn(async (t: string) => {
+    stored = t;
+  }),
+  clearToken: vi.fn(async () => {
+    stored = null;
+  }),
+}));
+
+const { saveToken, clearToken } = await import('../../services/tokenStore');
 
 const employee = { id: 7, name: 'Awa Diallo' };
 
-beforeEach(async () => {
-  disk = {};
-  vi.stubGlobal('localStorage', {
-    getItem: (k: string) => disk[k] ?? null,
-    setItem: (k: string, v: string) => {
-      disk[k] = v;
-    },
-    removeItem: (k: string) => {
-      delete disk[k];
-    },
-  });
+beforeEach(() => {
+  stored = null;
   provider.login.mockReset();
   provider.fetchMe.mockReset();
+  vi.mocked(saveToken).mockClear();
+  vi.mocked(clearToken).mockClear();
   setActivePinia(createPinia());
 });
 
-/** Import différé : l'état initial lit localStorage, il faut donc que le stub
- *  soit posé avant la création du store. */
+/** Import différé : l'état initial lit le dépôt, il doit donc être garni
+ *  avant la création du store — exactement comme main.ts appelle loadToken()
+ *  avant de monter l'application. */
 async function store() {
   const { useAuthStore } = await import('../auth');
   return useAuthStore();
 }
 
 describe('store d’authentification', () => {
-  it('repart du jeton laissé sur le disque au démarrage', async () => {
-    disk['ocleaneo_token'] = 'jeton-de-la-veille';
+  it('repart du jeton déjà chargé au démarrage', async () => {
+    stored = 'jeton-de-la-veille';
 
     const auth = await store();
 
@@ -58,14 +66,14 @@ describe('store d’authentification', () => {
     expect(auth.employee).toBeNull();
   });
 
-  it('démarre déconnecté quand le disque est vide', async () => {
+  it('démarre déconnecté quand le dépôt est vide', async () => {
     const auth = await store();
 
     expect(auth.token).toBeNull();
     expect(auth.isAuthenticated).toBe(false);
   });
 
-  it('écrit le jeton sur le disque à la connexion', async () => {
+  it('confie le jeton au dépôt à la connexion', async () => {
     provider.login.mockResolvedValue({ token: 'jeton-neuf', employee });
     const auth = await store();
 
@@ -74,9 +82,10 @@ describe('store d’authentification', () => {
     expect(provider.login).toHaveBeenCalledWith('awa', 'motdepasse');
     expect(auth.token).toBe('jeton-neuf');
     expect(auth.employee).toEqual(employee);
-    // Le point qui compte : mémoire et disque disent la même chose, sinon le
+    // Le point qui compte : mémoire et dépôt disent la même chose, sinon le
     // prochain démarrage repart d'un état faux.
-    expect(disk['ocleaneo_token']).toBe('jeton-neuf');
+    expect(saveToken).toHaveBeenCalledWith('jeton-neuf');
+    expect(stored).toBe('jeton-neuf');
   });
 
   it('ne retient rien quand la connexion échoue', async () => {
@@ -87,11 +96,11 @@ describe('store d’authentification', () => {
 
     expect(auth.token).toBeNull();
     expect(auth.isAuthenticated).toBe(false);
-    expect(disk['ocleaneo_token']).toBeUndefined();
+    expect(saveToken).not.toHaveBeenCalled();
   });
 
-  it('efface mémoire ET disque à la déconnexion', async () => {
-    disk['ocleaneo_token'] = 'jeton-de-la-veille';
+  it('efface mémoire ET dépôt à la déconnexion', async () => {
+    stored = 'jeton-de-la-veille';
     const auth = await store();
     auth.employee = employee;
 
@@ -100,8 +109,8 @@ describe('store d’authentification', () => {
     expect(auth.token).toBeNull();
     expect(auth.employee).toBeNull();
     expect(auth.isAuthenticated).toBe(false);
-    // Sans cette ligne, le jeton révoqué ressusciterait au prochain démarrage.
-    expect(disk['ocleaneo_token']).toBeUndefined();
+    // Sans cet appel, le jeton révoqué ressusciterait au prochain démarrage.
+    expect(clearToken).toHaveBeenCalled();
   });
 
   it('n’interroge pas le serveur sans jeton', async () => {
@@ -116,7 +125,7 @@ describe('store d’authentification', () => {
   });
 
   it('charge l’employé quand un jeton est présent', async () => {
-    disk['ocleaneo_token'] = 'jeton-valide';
+    stored = 'jeton-valide';
     provider.fetchMe.mockResolvedValue(employee);
     const auth = await store();
 
@@ -129,13 +138,13 @@ describe('store d’authentification', () => {
     // La garde de navigation a besoin de cette erreur pour distinguer une
     // coupure réseau d'un jeton révoqué ; c'est elle qui décide de déconnecter,
     // pas le store.
-    disk['ocleaneo_token'] = 'jeton-valide';
+    stored = 'jeton-valide';
     provider.fetchMe.mockRejectedValue(new Error('401'));
     const auth = await store();
 
     await expect(auth.fetchMe()).rejects.toThrow();
 
     expect(auth.token).toBe('jeton-valide');
-    expect(disk['ocleaneo_token']).toBe('jeton-valide');
+    expect(clearToken).not.toHaveBeenCalled();
   });
 });
