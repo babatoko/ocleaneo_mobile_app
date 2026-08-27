@@ -2,10 +2,33 @@ name: CI
 
 # Le filet qui manquait : la régression du message de connexion (toute panne
 # affichée « Identifiants incorrects ») serait passée en une seconde ici.
+#
+# `push` sur TOUTES les branches, et pas seulement main. Avec l'ancien
+# réglage, une branche poussée sans PR ne déclenchait rien : les 21 commits
+# de l'intégration Odoo n'ont ainsi jamais été vus par la CI avant l'ouverture
+# de la PR, qui a immédiatement révélé un échec au démarrage d'Odoo
+# (pkg_resources retiré par setuptools ≥ 82) — invisible en local, où
+# l'environnement datait d'avant. Le retour arrive maintenant au push, sans
+# attendre qu'une PR existe.
+#
+# `pull_request` est conservé, et ce n'est pas un doublon : cet évènement
+# teste le résultat de la FUSION avec la base, là où `push` ne teste que la
+# branche seule. C'est ce qui attrape « ma branche passe, mais elle casse une
+# fois fusionnée avec main ».
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
+
+# Sans ceci, chaque correction poussée coup sur coup laisserait tourner les
+# runs précédents jusqu'au bout — le job odoo dure ~5 min (clonage d'Odoo 14
+# et de quatre dépôts OCA, installation Python, puis les tests). On annule
+# donc les runs rendus caducs par un push plus récent sur la même référence.
+# Sauf sur main : son historique de CI est la trace de ce qui a été validé,
+# et un run annulé n'en est pas une.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   frontend:
