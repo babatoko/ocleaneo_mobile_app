@@ -26,7 +26,12 @@ class HrEmployee(models.Model):
     mobile_api_token = fields.Char(
         string="Mobile API Token",
         copy=False,
-        help="Salted hash of the token used by the mobile app to authenticate API calls for this employee.",
+        help="SHA-256 hash of the token the mobile app uses to authenticate "
+             "API calls for this employee. Unsalted, deliberately: the token "
+             "is 32 random bytes from secrets.token_urlsafe, so there is no "
+             "low-entropy guess space for a salt to defend, and the lookup "
+             "needs a deterministic hash. A password would need both a salt "
+             "and a slow KDF — this is not a password.",
     )
     # First 8 characters of the *raw* token, stored in the clear and
     # indexed, so authenticate_mobile_request() can narrow its search to a
@@ -48,7 +53,16 @@ class HrEmployee(models.Model):
     )
 
     def generate_mobile_api_token(self):
-        """Generate a new token and invalidate the old one."""
+        """Generate a new token for this employee, invalidating the old one.
+
+        Singleton by contract: on a multi-employee recordset the assignments
+        below would write the *same* token hash to every one of them while
+        returning a single raw token, silently giving several workers one
+        shared credential. verify_mobile_api_token() is already singleton-only
+        (it reads self.mobile_api_token); this makes the write side say so too,
+        loudly, instead of corrupting credentials.
+        """
+        self.ensure_one()
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         self.mobile_api_token = token_hash

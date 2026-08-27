@@ -1,7 +1,11 @@
 # Copyright 2026 Ocleaneo
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
+import logging
+
 from odoo import api, models, fields
+
+_logger = logging.getLogger(__name__)
 
 
 class AccountAnalyticLine(models.Model):
@@ -86,4 +90,18 @@ class AccountAnalyticLine(models.Model):
             if start and end and end > start:
                 duration_hours = (end - start).total_seconds() / 3600.0
                 vals['unit_amount'] = round(duration_hours, 2)
+            elif start and end:
+                # end <= start: no duration we could honestly record. Leaving
+                # unit_amount at 0 is the right call — inventing a negative or
+                # absolute duration would put made-up hours into payroll — but
+                # doing it silently is not: this line will read as "worked 0h"
+                # forever and nobody will know why. Reachable when the offline
+                # queue replays a clock-out carrying an older timestamp than
+                # the clock-in it closes, or on a device with a skewed clock.
+                _logger.warning(
+                    "Timesheet end time %s is not after start %s; leaving "
+                    "unit_amount at 0 — this line records no worked time and "
+                    "needs review",
+                    end, start,
+                )
         return vals

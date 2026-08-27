@@ -48,13 +48,38 @@ def local_to_utc(datetime_iso, fallback_tz=None):
         return fields.Datetime.now()
 
 
-def parse_date(date_str):
+def today_local(fallback_tz=None):
+    """Current date as the *worker* sees it, not as the server does.
+
+    fields.Date.today() is date.today(): the date in the server process's
+    own timezone, which is UTC on any normal deployment. Every controller
+    here then turns that date into a day window using the worker's
+    timezone (local_day_bounds_utc). Seeding a local-time window with a
+    UTC-dated "today" mixes two calendars: between local midnight and the
+    UTC offset — 00:00-01:00 in Europe/Paris, 00:00-02:00 in summer — the
+    two disagree and the window silently lands on the previous day.
+
+    That is not a theoretical edge: cleaning crews start before dawn and
+    work across midnight, which is the exact window this app targets. The
+    frontend already had to fix the mirror image of this bug (see
+    frontend/src/utils/date.ts, where Date.toISOString().slice(0, 10)
+    dated in UTC). Equivalent to Odoo's own fields.Date.context_today.
+    """
+    local_tz = pytz.timezone(_user_tz(fallback_tz))
+    return datetime.now(pytz.utc).astimezone(local_tz).date()
+
+
+def parse_date(date_str, fallback_tz=None):
     """Parse a YYYY-MM-DD (or otherwise dateutil-parseable) date string,
-    falling back to today (server date) if missing or unparseable. Shared
-    by every controller that accepts an optional ?date= style param.
+    falling back to the worker's local today if missing or unparseable.
+    Shared by every controller that accepts an optional ?date= style param.
+
+    The fallback is today_local(), not fields.Date.today(): see that
+    function for why a server-dated "today" is the wrong seed for a
+    window that is then cut in local time.
     """
     if not date_str:
-        return fields.Date.today()
+        return today_local(fallback_tz)
     try:
         return fields.Date.from_string(date_str)
     except Exception:
@@ -62,7 +87,7 @@ def parse_date(date_str):
             return dateutil.parser.parse(date_str).date()
         except Exception as e:
             _logger.warning("Failed to parse date '%s': %s", date_str, e)
-            return fields.Date.today()
+            return today_local(fallback_tz)
 
 
 def local_day_bounds_utc(target_date, fallback_tz=None):

@@ -1,7 +1,7 @@
 # Copyright 2026 Ocleaneo
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo import http, fields
+from odoo import http
 from odoo.http import request
 from odoo.exceptions import ValidationError
 import logging
@@ -10,7 +10,12 @@ from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     MOBILE_CORS_ORIGIN,
     authenticate_mobile_request,
 )
-from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import local_day_bounds_utc, local_to_utc, parse_date
+from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import (
+    local_day_bounds_utc,
+    local_to_utc,
+    parse_date,
+    today_local,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -88,11 +93,15 @@ class MobilePointageController(http.Controller):
         env = request.env(user=user.id)
         date_from = kwargs.get("date_from", date_from)
         date_to = kwargs.get("date_to", date_to)
+        # Every date below is resolved in the *worker's* timezone, never the
+        # server's — the day window is cut in local time just after, and
+        # seeding it with a UTC-dated today lands it on the previous day
+        # between local midnight and the UTC offset. See today_local().
         if date_from or date_to:
-            range_start = parse_date(date_from) if date_from else fields.Date.today()
-            range_end = parse_date(date_to) if date_to else range_start
+            range_start = parse_date(date_from, user.tz) if date_from else today_local(user.tz)
+            range_end = parse_date(date_to, user.tz) if date_to else range_start
         else:
-            range_start = range_end = parse_date(kwargs.get("date", date))
+            range_start = range_end = parse_date(kwargs.get("date", date), user.tz)
 
         # Same local-day-boundary handling as chantiers/aujourdhui and
         # planning — a naive UTC window would misplace clockings for

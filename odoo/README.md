@@ -157,6 +157,19 @@ Les correctifs successifs sur ce module ont d'abord été validés par lecture d
 
 Cette installation de test n'est pas conservée dans le repo (faite dans un environnement jetable) ; à refaire pour toute modification future touchant à l'interaction avec les modules OCA.
 
+### Audit de sécurité — deux régressions `res.users` corrigées
+
+Un second passage sur la même installation réelle a mis au jour deux problèmes créés par les fichiers de sécurité livrés au commit initial. Tous deux datent de l'époque où le token mobile vivait sur `res.users` ; le token a depuis été déplacé sur `hr.employee`, mais les deux enregistrements de sécurité sont restés.
+
+- **Escalade de privilèges.** L'ACL `access_res_users_mobile_api` donnait le droit d'**écriture** sur `res.users` à `base.group_user`. Le garde-fou `SELF_WRITEABLE_FIELDS` de `res.users.write()` ne *bloque* pas les champs sensibles — il décide seulement si une écriture sur soi-même peut passer en `sudo`. Ce qui empêche normalement un salarié d'ajouter `groups_id` est l'ACL, qu'Odoo standard ne donne pas. Vérifié sur instance réelle : n'importe quel utilisateur interne pouvait s'ajouter à `base.group_system`.
+- **Backoffice cassé pour tout le monde.** La règle `ir_rule_mobile_api_self_user` (`[('id','=',user.id)]`) s'appliquait à `base.group_user` sur **toute l'instance**, pas seulement à l'API mobile. Un utilisateur interne ne pouvait plus lire aucun autre utilisateur — or les listes d'assignation, les abonnés, les mentions et les activités passent toutes par `res.users`. Mesuré : 1 utilisateur visible avec la règle, 7 sans.
+
+Aucun des deux n'était nécessaire : tous les contrôleurs mobiles passent par `sudo()`. Les deux ont été supprimés, et `tests/test_security.py` échoue si l'un ou l'autre revient.
+
+**Point d'exploitation important** : supprimer le fichier XML ne suffit pas sur une instance déjà installée. La règle était déclarée dans `<data noupdate="1">`, et le nettoyage des données orphelines d'Odoo ignore délibérément les enregistrements `noupdate`. Vérifié : après `-u ocleaneo_mobile_api`, l'ACL obsolète avait disparu mais la règle était toujours là et toujours active. D'où `migrations/14.0.1.0.10/post-migration.py`, qui la supprime explicitement — testé sur le vrai chemin de production (installation en 14.0.1.0.9 puis upgrade).
+
+Un troisième point, plus discret, a été corrigé au passage : la date « aujourd'hui » utilisée par défaut quand l'app n'envoie pas de `?date=` venait de `fields.Date.today()`, c'est-à-dire du fuseau du **serveur** (UTC en déploiement normal), alors que la fenêtre de journée est ensuite découpée dans le fuseau du **salarié**. Entre minuit local et le décalage UTC (00h–01h à Paris, 00h–02h l'été), les deux calendriers divergent et la fenêtre tombait sur la veille : un salarié pointant son arrivée à 00h30 ne voyait pas son propre pointage dans `/pointage/mine`. C'est exactement la fenêtre horaire des équipes qui démarrent avant l'aube. Remplacé par `today_local()` (équivalent de `fields.Date.context_today` d'Odoo), verrouillé par `TestTodayLocal`.
+
 ## Notes
 
 - Les modules OCA (Field Service, etc. — voir § Dépendances OCA) ne sont pas versionnés ici : ils doivent être montés via volume dans `docker-compose.yml` (`/opt/oca_addons_v14`).

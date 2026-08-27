@@ -12,10 +12,13 @@ behaviour, including across a DST change.
 
 from datetime import date, datetime
 
+from freezegun import freeze_time
+
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import (
     local_day_bounds_utc,
     local_to_utc,
     parse_date,
+    today_local,
 )
 from odoo.tests.common import TransactionCase
 
@@ -88,7 +91,55 @@ class TestParseDate(TransactionCase):
         self.assertEqual(parse_date("2026-03-10"), date(2026, 3, 10))
 
     def test_empty_defaults_to_today(self):
-        self.assertEqual(parse_date(None), date.today())
+        self.assertEqual(parse_date(None, "Europe/Paris"), today_local("Europe/Paris"))
 
     def test_unparseable_defaults_to_today(self):
-        self.assertEqual(parse_date("n'importe quoi"), date.today())
+        self.assertEqual(
+            parse_date("n'importe quoi", "Europe/Paris"), today_local("Europe/Paris")
+        )
+
+
+class TestTodayLocal(TransactionCase):
+    """The date a controller falls back to when the app sends no ?date=.
+
+    Every /api/mobile route that accepts a date turns it into a day window
+    in the *worker's* timezone (local_day_bounds_utc). Seeding that window
+    with fields.Date.today() — the date in the *server's* timezone, UTC on
+    any normal deployment — mixes two calendars. These tests pin the seed
+    to the worker's calendar.
+    """
+
+    @freeze_time("2026-03-10 23:30:00")
+    def test_just_after_local_midnight_is_already_the_next_day(self):
+        """The regression this exists for.
+
+        23:30 UTC is 00:30 the next morning in Paris. A worker opening the
+        app at that moment asks for "today" and means the 11th; the server,
+        dating in UTC, still says the 10th. GET /pointage/mine then built
+        its window over the 10th in local time (09 23:00 -> 10 22:59 UTC)
+        and the clock-in this worker had just made — 23:30 UTC — fell
+        outside it. Their own arrival vanished from their own screen, for
+        every pre-dawn crew, every night. Reproduced against a live Odoo 14
+        before the fix.
+        """
+        self.assertEqual(today_local("Europe/Paris"), date(2026, 3, 11))
+
+    @freeze_time("2026-03-10 23:30:00")
+    def test_a_utc_worker_still_sees_the_earlier_day_at_that_instant(self):
+        """Same instant, different worker: the date must follow the person.
+
+        Guards against "fixing" this by hardcoding a Paris offset — the
+        answer depends on the timezone asked for, not on a constant.
+        """
+        self.assertEqual(today_local("UTC"), date(2026, 3, 10))
+
+    @freeze_time("2026-07-10 22:30:00")
+    def test_dst_offset_is_resolved_from_the_date(self):
+        """In July Paris is UTC+2, so 22:30 UTC is already the 11th."""
+        self.assertEqual(today_local("Europe/Paris"), date(2026, 7, 11))
+
+    @freeze_time("2026-03-10 12:00:00")
+    def test_midday_is_the_same_day_everywhere_nearby(self):
+        """A sanity anchor: the fix must not shift ordinary daytime use."""
+        self.assertEqual(today_local("Europe/Paris"), date(2026, 3, 10))
+        self.assertEqual(today_local("UTC"), date(2026, 3, 10))
