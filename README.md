@@ -72,7 +72,7 @@ ocleaneo_mobile_app/
 ├── docs/
 │   ├── mockup-pointage-planning.html   # Mockup de référence (24 écrans, vision produit complète)
 │   └── retour-artefact.html            # Page publique (QR sur porte-clé/porte-carte) : procédure de retour
-└── docker-compose.yml          # Sert la variante web/PWA (VITE_API_URL → Odoo)
+└── docker-compose.yml          # Sert la variante web/PWA (VITE_DATA_PROVIDER=odoo, VITE_ODOO_API_URL → Odoo)
 ```
 
 ## Qualité
@@ -329,10 +329,12 @@ Côté Odoo, ce domaine correspondrait à un modèle type `fsm.equipment` ou `ma
 
 ```bash
 cd frontend
-cp .env.example .env    # VITE_API_URL doit pointer vers l'API Odoo une fois décidée
+cp .env.example .env    # VITE_DATA_PROVIDER=odoo + VITE_ODOO_API_URL vers l'instance Odoo
 npm install
 npm run dev              # démarre sur http://localhost:5173
 ```
+
+`VITE_API_URL` reste dans `.env.example` pour `RestProvider.ts` (voir § Intégration Odoo ci-dessus) — le chemin non encore implémenté côté instance de production, à ne renseigner que si `VITE_DATA_PROVIDER=rest`.
 
 ## Relation avec le bot Telegram
 
