@@ -3,8 +3,8 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonButton, IonContent, IonIcon, IonInput, IonItem, IonLabel, IonList, IonNote, IonPage, IonToggle } from '@ionic/vue';
 import { logOutOutline } from 'ionicons/icons';
-import { provider } from '../providers';
 import { useAuthStore } from '../stores/auth';
+import { useServerUrl } from '../composables/useServerUrl';
 import {
   clearSavedCredentials,
   hasSavedCredentials,
@@ -26,15 +26,17 @@ const failedPointages = ref(0);
 const errorsLogged = ref(0);
 const loading = ref(true);
 
-const defaultServerUrl = provider.getDefaultServerUrl();
-const currentServerUrl = ref(provider.getServerUrl());
-const serverUrlInput = ref(currentServerUrl.value || '');
-const serverUrlError = ref('');
-const savingServerUrl = ref(false);
-
-const showServerSetting = currentServerUrl.value !== null;
-const serverUrlOverridden = computed(() => currentServerUrl.value !== defaultServerUrl);
-const serverUrlChanged = computed(() => serverUrlInput.value.trim().replace(/\/+$/, '') !== currentServerUrl.value);
+const {
+  defaultServerUrl,
+  serverUrlInput,
+  serverUrlError,
+  savingServerUrl,
+  showServerSetting,
+  serverUrlOverridden,
+  serverUrlChanged,
+  saveServerUrl: saveServerUrlValue,
+  resetServerUrl: resetServerUrlValue,
+} = useServerUrl();
 
 const initials = computed(() => {
   const name = auth.employee?.name || '';
@@ -88,44 +90,21 @@ async function disableBiometric() {
   biometricSaved.value = false;
 }
 
-function isValidUrl(value: string) {
-  try {
-    const u = new URL(value);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 function logout() {
   auth.logout();
   router.replace('/login');
 }
 
+// Le jeton de session n'a aucune raison d'être valide sur un autre serveur :
+// tout changement d'URL (y compris le retour à la valeur par défaut)
+// déconnecte, ce que useServerUrl() ne fait pas lui-même (LoginView.vue le
+// réutilise sans session à clore).
 async function saveServerUrl() {
-  const next = serverUrlInput.value.trim();
-  serverUrlError.value = '';
-  if (!isValidUrl(next)) {
-    serverUrlError.value = 'URL invalide (doit commencer par http:// ou https://).';
-    return;
-  }
-  savingServerUrl.value = true;
-  try {
-    await provider.setServerUrl(next);
-  } finally {
-    savingServerUrl.value = false;
-  }
-  // Le jeton de session n'a aucune raison d'être valide sur un autre serveur.
-  logout();
+  if (await saveServerUrlValue()) logout();
 }
 
 async function resetServerUrl() {
-  savingServerUrl.value = true;
-  try {
-    await provider.setServerUrl('');
-  } finally {
-    savingServerUrl.value = false;
-  }
+  await resetServerUrlValue();
   logout();
 }
 </script>

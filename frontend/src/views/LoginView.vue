@@ -2,9 +2,10 @@
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonButton, IonContent, IonIcon, IonInput, IonPage, IonSpinner, alertController } from '@ionic/vue';
-import { fingerPrintOutline, lockClosedOutline, sparklesOutline } from 'ionicons/icons';
+import { fingerPrintOutline, lockClosedOutline, serverOutline, sparklesOutline } from 'ionicons/icons';
 import { useAuthStore } from '../stores/auth';
 import { usePointageStore } from '../stores/pointage';
+import { useServerUrl } from '../composables/useServerUrl';
 import { ProviderNetworkError, ProviderError } from '../providers/DataProvider';
 import {
   clearSavedCredentials,
@@ -29,6 +30,37 @@ const auth = useAuthStore();
 const pointage = usePointageStore();
 const router = useRouter();
 const route = useRoute();
+
+// Avant cet écran, changer l'URL du serveur exigeait d'être déjà connecté
+// (ProfileView.vue, seul écran protégé accessible) — un salarié dont le
+// téléphone pointe vers la mauvaise instance n'avait donc aucun moyen de le
+// corriger : il ne pouvait ni se connecter (mauvais serveur), ni atteindre
+// le réglage qui l'aurait permis (réservé aux salariés déjà connectés).
+const serverPanelOpen = ref(false);
+const {
+  defaultServerUrl,
+  serverUrlInput,
+  serverUrlError,
+  savingServerUrl,
+  showServerSetting,
+  serverUrlOverridden,
+  serverUrlChanged,
+  saveServerUrl: saveServerUrlValue,
+  resetServerUrl: resetServerUrlValue,
+} = useServerUrl();
+
+function toggleServerPanel() {
+  serverPanelOpen.value = !serverPanelOpen.value;
+  error.value = '';
+}
+
+async function saveServerUrl() {
+  if (await saveServerUrlValue()) serverPanelOpen.value = false;
+}
+
+async function resetServerUrl() {
+  await resetServerUrlValue();
+}
 
 onMounted(async () => {
   biometricAvailable.value = await isBiometricAvailable();
@@ -195,6 +227,49 @@ async function submit() {
         </template>
 
         <p v-if="error" class="error">{{ error }}</p>
+
+        <template v-if="showServerSetting">
+          <button class="login-alt server-toggle" type="button" @click="toggleServerPanel">
+            <ion-icon :icon="serverOutline"></ion-icon>
+            {{ serverPanelOpen ? 'Fermer' : 'Configurer le serveur' }}
+          </button>
+
+          <div v-if="serverPanelOpen" class="server-url-field">
+            <ion-input
+              v-model="serverUrlInput"
+              type="url"
+              inputmode="url"
+              fill="outline"
+              placeholder="https://exemple.odoo.com"
+              autocapitalize="none"
+              autocomplete="off"
+            ></ion-input>
+            <p class="server-url-sub">
+              Valeur par défaut : {{ defaultServerUrl }}
+              <template v-if="serverUrlOverridden"> · personnalisée actuellement</template>
+            </p>
+            <p v-if="serverUrlError" class="server-url-error">{{ serverUrlError }}</p>
+            <div class="server-url-actions">
+              <ion-button
+                class="server-url-save"
+                expand="block"
+                :disabled="!serverUrlChanged || savingServerUrl"
+                @click="saveServerUrl"
+              >
+                Enregistrer
+              </ion-button>
+              <ion-button
+                v-if="serverUrlOverridden"
+                class="server-url-reset"
+                fill="clear"
+                :disabled="savingServerUrl"
+                @click="resetServerUrl"
+              >
+                Revenir à la valeur par défaut
+              </ion-button>
+            </div>
+          </div>
+        </template>
       </div>
     </ion-content>
   </ion-page>
@@ -231,5 +306,60 @@ async function submit() {
   color: var(--danger);
   font-size: 13px;
   margin-top: 16px;
+}
+
+.server-toggle {
+  margin-top: 24px;
+}
+
+.server-url-field {
+  width: 100%;
+  padding: 12px 0 0;
+}
+
+.server-url-field ion-input {
+  --background: var(--surface-2);
+  --border-color: var(--border);
+  --border-radius: 10px;
+  --color: var(--text-primary);
+  --padding-start: 14px;
+  --padding-end: 14px;
+}
+
+.server-url-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 6px 0 0;
+}
+
+.server-url-error {
+  color: var(--danger);
+  font-size: 11px;
+  margin: 6px 0 0;
+}
+
+.server-url-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.server-url-save {
+  --border-radius: 10px;
+  --background: var(--accent);
+  --color: var(--on-accent);
+  --box-shadow: none;
+  font-weight: 500;
+  font-size: 13px;
+  text-transform: none;
+  margin: 0;
+}
+
+.server-url-reset {
+  --color: var(--text-secondary);
+  font-size: 12px;
+  text-decoration: underline;
+  margin: 0;
 }
 </style>
