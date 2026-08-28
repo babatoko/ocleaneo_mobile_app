@@ -330,7 +330,11 @@ class TestMobileApi(MobileRpcMixin, MobilePointageCommon, HttpCase):
         self.assertEqual(result["entries"][0]["fsm_order_id"], self.order.id)
 
     def test_chantiers_returns_own_orders_with_coordinates(self):
-        self.location.write({"partner_latitude": 48.8566, "partner_longitude": 2.3522})
+        self.location.write({
+            "partner_latitude": 48.8566,
+            "partner_longitude": 2.3522,
+            "nfc_tag_id": "04A1B2C3",
+        })
         token = self._login()
 
         result = self._result("chantiers/aujourdhui", token=token)
@@ -340,6 +344,7 @@ class TestMobileApi(MobileRpcMixin, MobilePointageCommon, HttpCase):
         self.assertEqual(order["id"], self.order.id)
         self.assertAlmostEqual(order["location_latitude"], 48.8566, places=4)
         self.assertAlmostEqual(order["location_longitude"], 2.3522, places=4)
+        self.assertEqual(order["nfc_tag_id"], "04A1B2C3")
 
     def test_me_finds_the_current_job_on_a_night_shift(self):
         """GET /api/mobile/me used to lose the job across midnight.
