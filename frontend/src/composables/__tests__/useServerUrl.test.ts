@@ -1,3 +1,4 @@
+import { ref } from 'vue';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // L'URL configurée mutable simule providers/odooClient.ts : un axios
@@ -6,10 +7,19 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 let stored: string | null = 'http://defaut.exemple/api';
 const DEFAULT_URL = 'http://defaut.exemple/api';
 
+// providerKind doit rester une vraie ref réactive : useServerUrl() la
+// watch() pour se resynchroniser sur un changement de backend (voir
+// useProviderKind.ts) — un mock non réactif masquerait toute régression sur
+// ce point.
+const providerKind = ref<'rest' | 'odoo' | 'mock'>('odoo');
+
+// providerKind === 'mock' simule MockProvider.ts : ni URL courante ni URL
+// par défaut (comportement par défaut de DataProvider.ts, hérité tel quel).
 vi.mock('../../providers', () => ({
+  providerKind,
   provider: {
-    getDefaultServerUrl: () => DEFAULT_URL,
-    getServerUrl: () => stored,
+    getDefaultServerUrl: () => (providerKind.value === 'mock' ? null : DEFAULT_URL),
+    getServerUrl: () => (providerKind.value === 'mock' ? null : stored),
     setServerUrl: vi.fn(async (url: string) => {
       stored = url || DEFAULT_URL;
     }),
@@ -21,13 +31,14 @@ const { useServerUrl } = await import('../useServerUrl');
 describe('useServerUrl', () => {
   beforeEach(() => {
     stored = DEFAULT_URL;
+    providerKind.value = 'odoo';
   });
 
   it('démarre avec la valeur actuelle du provider et sans erreur', () => {
     const s = useServerUrl();
     expect(s.serverUrlInput.value).toBe(DEFAULT_URL);
     expect(s.serverUrlError.value).toBe('');
-    expect(s.showServerSetting).toBe(true);
+    expect(s.showServerSetting.value).toBe(true);
     expect(s.serverUrlOverridden.value).toBe(false);
   });
 
@@ -78,5 +89,20 @@ describe('useServerUrl', () => {
     // exposée par le composable.
     expect((s as Record<string, unknown>).logout).toBeUndefined();
     await s.saveServerUrl();
+  });
+
+  it("se resynchronise quand le backend actif change (useProviderKind.ts) au lieu de continuer à afficher l'URL de l'ancien", async () => {
+    const s = useServerUrl();
+    s.serverUrlInput.value = 'devrait être écrasé';
+    s.serverUrlError.value = 'devrait être effacée';
+
+    providerKind.value = 'mock';
+    await Promise.resolve(); // laisse le watcher de useServerUrl.ts s'exécuter
+
+    expect(s.showServerSetting.value).toBe(false);
+    expect(s.serverUrlInput.value).toBe('');
+    expect(s.serverUrlError.value).toBe('');
+    expect(s.currentServerUrl.value).toBeNull();
+    expect(s.defaultServerUrl.value).toBeNull();
   });
 });

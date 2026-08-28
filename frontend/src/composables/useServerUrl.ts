@@ -1,5 +1,5 @@
-import { computed, ref } from 'vue';
-import { provider } from '../providers';
+import { computed, ref, watch } from 'vue';
+import { provider, providerKind } from '../providers';
 
 /**
  * État et logique de l'écran « Serveur » — extrait de ProfileView.vue pour
@@ -14,14 +14,24 @@ import { provider } from '../providers';
  * reste à la charge de l'appelant.
  */
 export function useServerUrl() {
-  const defaultServerUrl = provider.getDefaultServerUrl();
+  const defaultServerUrl = ref(provider.getDefaultServerUrl());
   const currentServerUrl = ref(provider.getServerUrl());
   const serverUrlInput = ref(currentServerUrl.value || '');
   const serverUrlError = ref('');
   const savingServerUrl = ref(false);
 
-  const showServerSetting = currentServerUrl.value !== null;
-  const serverUrlOverridden = computed(() => currentServerUrl.value !== defaultServerUrl);
+  // Le provider actif peut changer sous nos pieds (useProviderKind.ts,
+  // utilisé dans le même écran) : resynchronise sur le nouveau backend
+  // plutôt que de continuer à afficher l'URL de l'ancien.
+  watch(providerKind, () => {
+    defaultServerUrl.value = provider.getDefaultServerUrl();
+    currentServerUrl.value = provider.getServerUrl();
+    serverUrlInput.value = currentServerUrl.value || '';
+    serverUrlError.value = '';
+  });
+
+  const showServerSetting = computed(() => currentServerUrl.value !== null);
+  const serverUrlOverridden = computed(() => currentServerUrl.value !== defaultServerUrl.value);
   const serverUrlChanged = computed(() => serverUrlInput.value.trim().replace(/\/+$/, '') !== currentServerUrl.value);
 
   function isValidUrl(value: string) {
