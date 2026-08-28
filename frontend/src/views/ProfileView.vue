@@ -1,10 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonButton, IonContent, IonIcon, IonInput, IonItem, IonLabel, IonList, IonNote, IonPage, IonToggle } from '@ionic/vue';
+import {
+  IonButton,
+  IonContent,
+  IonIcon,
+  IonInput,
+  IonItem,
+  IonLabel,
+  IonList,
+  IonNote,
+  IonPage,
+  IonSegment,
+  IonSegmentButton,
+  IonToggle,
+} from '@ionic/vue';
 import { logOutOutline } from 'ionicons/icons';
 import { useAuthStore } from '../stores/auth';
 import { useServerUrl } from '../composables/useServerUrl';
+import { PROVIDER_KIND_LABELS, PROVIDER_KINDS, useProviderKind } from '../composables/useProviderKind';
+import type { ProviderKind } from '../providers';
 import {
   clearSavedCredentials,
   hasSavedCredentials,
@@ -37,6 +52,8 @@ const {
   saveServerUrl: saveServerUrlValue,
   resetServerUrl: resetServerUrlValue,
 } = useServerUrl();
+
+const { providerKind, savingProviderKind, selectProviderKind } = useProviderKind();
 
 const initials = computed(() => {
   const name = auth.employee?.name || '';
@@ -106,6 +123,11 @@ async function saveServerUrl() {
 async function resetServerUrl() {
   await resetServerUrlValue();
   logout();
+}
+
+async function changeProviderKind(event: CustomEvent) {
+  const kind = event.detail.value as ProviderKind;
+  if (await selectProviderKind(kind)) logout();
 }
 </script>
 
@@ -208,47 +230,56 @@ async function resetServerUrl() {
           </div>
         </template>
 
-        <template v-if="showServerSetting">
-          <p class="section-title">Serveur</p>
-          <div class="detail-block" style="padding: 0 18px;">
-            <div class="server-url-field">
-              <ion-input
-                v-model="serverUrlInput"
-                type="url"
-                inputmode="url"
-                fill="outline"
-                placeholder="https://exemple.odoo.com"
-                autocapitalize="none"
-                autocomplete="off"
-              ></ion-input>
-              <p class="srow-sub">
-                Valeur par défaut : {{ defaultServerUrl }}
-                <template v-if="serverUrlOverridden"> · personnalisée actuellement</template>
-              </p>
-              <p v-if="serverUrlError" class="server-url-error">{{ serverUrlError }}</p>
-              <p class="srow-sub">Changer cette valeur vous déconnectera (le jeton de session n'est valable que sur le serveur d'origine).</p>
-              <div class="server-url-actions">
-                <ion-button
-                  class="server-url-save"
-                  expand="block"
-                  :disabled="!serverUrlChanged || savingServerUrl"
-                  @click="saveServerUrl"
-                >
-                  Enregistrer et se reconnecter
-                </ion-button>
-                <ion-button
-                  v-if="serverUrlOverridden"
-                  class="server-url-reset"
-                  fill="clear"
-                  :disabled="savingServerUrl"
-                  @click="resetServerUrl"
-                >
-                  Revenir à la valeur par défaut
-                </ion-button>
-              </div>
+        <p class="section-title">Serveur</p>
+        <div class="detail-block" style="padding: 0 18px;">
+          <ion-segment
+            :value="providerKind"
+            :disabled="savingProviderKind"
+            @ion-change="changeProviderKind"
+          >
+            <ion-segment-button v-for="kind in PROVIDER_KINDS" :key="kind" :value="kind">
+              <ion-label>{{ PROVIDER_KIND_LABELS[kind] }}</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+          <p class="srow-sub" style="margin-top: 8px;">Changer de backend vous déconnectera (le jeton de session n'est valable que sur le backend d'origine).</p>
+
+          <div v-if="showServerSetting" class="server-url-field">
+            <ion-input
+              v-model="serverUrlInput"
+              type="url"
+              inputmode="url"
+              fill="outline"
+              placeholder="https://exemple.odoo.com"
+              autocapitalize="none"
+              autocomplete="off"
+            ></ion-input>
+            <p class="srow-sub">
+              Valeur par défaut : {{ defaultServerUrl }}
+              <template v-if="serverUrlOverridden"> · personnalisée actuellement</template>
+            </p>
+            <p v-if="serverUrlError" class="server-url-error">{{ serverUrlError }}</p>
+            <p class="srow-sub">Changer cette valeur vous déconnectera (le jeton de session n'est valable que sur le serveur d'origine).</p>
+            <div class="server-url-actions">
+              <ion-button
+                class="server-url-save"
+                expand="block"
+                :disabled="!serverUrlChanged || savingServerUrl"
+                @click="saveServerUrl"
+              >
+                Enregistrer et se reconnecter
+              </ion-button>
+              <ion-button
+                v-if="serverUrlOverridden"
+                class="server-url-reset"
+                fill="clear"
+                :disabled="savingServerUrl"
+                @click="resetServerUrl"
+              >
+                Revenir à la valeur par défaut
+              </ion-button>
             </div>
           </div>
-        </template>
+        </div>
 
         <p class="section-title">Compte</p>
         <ion-list class="menu" lines="none">

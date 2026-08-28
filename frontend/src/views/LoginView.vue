@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonButton, IonContent, IonIcon, IonInput, IonPage, IonSpinner, alertController } from '@ionic/vue';
+import { IonButton, IonContent, IonIcon, IonInput, IonLabel, IonPage, IonSegment, IonSegmentButton, IonSpinner, alertController } from '@ionic/vue';
 import { fingerPrintOutline, lockClosedOutline, serverOutline, sparklesOutline } from 'ionicons/icons';
 import { useAuthStore } from '../stores/auth';
 import { usePointageStore } from '../stores/pointage';
 import { useServerUrl } from '../composables/useServerUrl';
+import { PROVIDER_KIND_LABELS, PROVIDER_KINDS, useProviderKind } from '../composables/useProviderKind';
+import type { ProviderKind } from '../providers';
 import { ProviderNetworkError, ProviderError } from '../providers/DataProvider';
 import {
   clearSavedCredentials,
@@ -49,9 +51,20 @@ const {
   resetServerUrl: resetServerUrlValue,
 } = useServerUrl();
 
+// Le backend actif (odoo/rest/mock) était jusqu'ici figé à la construction
+// de l'app (VITE_DATA_PROVIDER, voir .env.example) : rien dans l'app ne
+// permettait de le corriger sans reconstruire — exactement l'impasse que le
+// panneau « Configurer le serveur » comble déjà pour l'URL.
+const { providerKind, savingProviderKind, selectProviderKind } = useProviderKind();
+
 function toggleServerPanel() {
   serverPanelOpen.value = !serverPanelOpen.value;
   error.value = '';
+}
+
+async function changeProviderKind(event: CustomEvent) {
+  const kind = event.detail.value as ProviderKind;
+  await selectProviderKind(kind);
 }
 
 async function saveServerUrl() {
@@ -228,13 +241,23 @@ async function submit() {
 
         <p v-if="error" class="error">{{ error }}</p>
 
-        <template v-if="showServerSetting">
-          <button class="login-alt server-toggle" type="button" @click="toggleServerPanel">
-            <ion-icon :icon="serverOutline"></ion-icon>
-            {{ serverPanelOpen ? 'Fermer' : 'Configurer le serveur' }}
-          </button>
+        <button class="login-alt server-toggle" type="button" @click="toggleServerPanel">
+          <ion-icon :icon="serverOutline"></ion-icon>
+          {{ serverPanelOpen ? 'Fermer' : 'Configurer le serveur' }}
+        </button>
 
-          <div v-if="serverPanelOpen" class="server-url-field">
+        <div v-if="serverPanelOpen" class="server-url-field">
+          <ion-segment
+            :value="providerKind"
+            :disabled="savingProviderKind"
+            @ion-change="changeProviderKind"
+          >
+            <ion-segment-button v-for="kind in PROVIDER_KINDS" :key="kind" :value="kind">
+              <ion-label>{{ PROVIDER_KIND_LABELS[kind] }}</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+
+          <template v-if="showServerSetting">
             <ion-input
               v-model="serverUrlInput"
               type="url"
@@ -268,8 +291,8 @@ async function submit() {
                 Revenir à la valeur par défaut
               </ion-button>
             </div>
-          </div>
-        </template>
+          </template>
+        </div>
       </div>
     </ion-content>
   </ion-page>
@@ -324,6 +347,10 @@ async function submit() {
   --color: var(--text-primary);
   --padding-start: 14px;
   --padding-end: 14px;
+}
+
+.server-url-field ion-segment {
+  margin-bottom: 12px;
 }
 
 .server-url-sub {
