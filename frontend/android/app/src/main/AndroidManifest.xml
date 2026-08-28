@@ -49,4 +49,22 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
+    <!-- Sans ces deux permissions, le pont Capacitor demande bien
+         navigator.geolocation.getCurrentPosition() via
+         ActivityCompat.requestPermissions (BridgeWebChromeClient), mais
+         Android refuse silencieusement toute permission absente du
+         manifeste : la boîte de dialogue système ne s'affiche même pas, et
+         l'appel échoue à chaque fois. Deux dégradations muettes en
+         résultaient : services/geofence.ts ne pouvait jamais vérifier la
+         présence sur site (checkGeofence() reçoit null, ce qui ne bloque
+         jamais le pointage — mais ne le vérifie plus non plus), et
+         services/osrm.ts ne pouvait jamais faire partir la Tournée de la
+         position réelle du salarié. COARSE seule suffirait pour ces deux
+         usages (aucun n'exige une précision métrique) ; FINE est ajoutée
+         car l'API de géolocalisation du WebView ne distingue pas les deux
+         niveaux à la demande — c'est Android qui arbitre selon ce qui est
+         accordé. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>
