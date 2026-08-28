@@ -28,6 +28,12 @@
 	<string>Ocleaneo utilise Face ID pour vous reconnecter rapidement sans ressaisir votre mot de passe.</string>
 	<key>NFCReaderUsageDescription</key>
 	<string>Ocleaneo lit le badge NFC du chantier pour pointer votre arrivée et votre départ.</string>
+	<!-- Sans cette clé, appeler navigator.geolocation.getCurrentPosition()
+	     (services/geofence.ts, services/osrm.ts) est le schéma de plantage
+	     documenté par Apple pour une app WKWebView sans description d'usage :
+	     iOS termine l'app au lieu d'afficher l'invite système. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ocleaneo utilise votre position pour confirmer votre présence sur le chantier et calculer l'itinéraire entre vos sites du jour.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
