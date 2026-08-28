@@ -91,7 +91,7 @@ class MobilePointageController(http.Controller):
                 "location_city": order.location_id.city,
                 "location_latitude": order.location_id.partner_latitude or False,
                 "location_longitude": order.location_id.partner_longitude or False,
-                "nfc_tag_id": order.location_id.location_token or False,
+                "nfc_tag_id": order.location_id.nfc_tag_id or False,
                 "person_id": order.person_id.id,
                 "person_name": order.person_id.name,
                 "stage": order.stage_id.name,
