@@ -3,7 +3,23 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:?set to the Odoo instance API base URL}
+        # Ce fichier ne configurait jusqu'ici que VITE_API_URL, et son message
+        # d'erreur disait de la faire pointer vers « l'instance Odoo » — mais
+        # VITE_API_URL adresse RestProvider.ts, qui parle un contrat REST/JSON
+        # générique (voir README § Architecture backend-agnostique) et non le
+        # JSON-RPC natif que l'intégration Odoo réellement construite et
+        # testée expose (odoo/README.md, providers/OdooProvider.ts). La
+        # variable qui compte pour ce déploiement est VITE_ODOO_API_URL, avec
+        # VITE_DATA_PROVIDER=odoo pour sélectionner le bon plugin — sans ça
+        # RestProvider restait actif par défaut et appelait des chemins
+        # (POST /auth/login en JSON brut) que le backend Odoo ne sert pas.
+        VITE_DATA_PROVIDER: ${VITE_DATA_PROVIDER:-odoo}
+        VITE_ODOO_API_URL: ${VITE_ODOO_API_URL:?renseigner l'URL /api/mobile de l'instance Odoo — voir odoo/README.md}
+        # Conservée pour qui repasse VITE_DATA_PROVIDER=rest sur son propre
+        # backend REST (voir README § Intégration Odoo, chemin non encore
+        # implémenté côté instance de production) ; sans effet tant que
+        # VITE_DATA_PROVIDER reste sur odoo.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
     ports:
       - "8080:80"
     restart: unless-stopped
