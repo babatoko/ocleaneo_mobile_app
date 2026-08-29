@@ -45,6 +45,14 @@ export default [
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
 
+      // `no-undef` ignore les déclarations de types ambiants (celles d'un
+      // plugin, sans import explicite) — il signale par exemple
+      // `HTMLIonRefresherElement` (fourni par @ionic/core) comme non défini
+      // dans un simple cast `as`, alors que `vue-tsc` (l'étape typecheck,
+      // seule autorité fiable ici) le résout très bien. Recommandation
+      // officielle de typescript-eslint : laisser TypeScript vérifier ça.
+      'no-undef': 'off',
+
       // `any` explicite reste parfois nécessaire aux frontières (plugins
       // Capacitor sans types, réponses de payload dynamiques) ; le contrat
       // de types utile est sur le domaine métier, pas sur ces bords-là.

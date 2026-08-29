@@ -39,11 +39,17 @@ describe('providers/index — sélection du backend à l\'exécution', () => {
     store = {};
   });
 
-  it("VITE_DATA_PROVIDER n'étant pas positionné en test, retombe sur 'rest' — pas 'odoo'", () => {
-    // Documente exactement le piège que /login corrige maintenant : sans
-    // variable de build explicite, le provider par défaut est REST, jamais
-    // implémenté côté production (voir README § Intégration Odoo).
-    expect(DEFAULT_PROVIDER_KIND).toBe('rest');
+  it("VITE_DATA_PROVIDER n'étant pas positionné en test, retombe sur 'odoo' — le seul backend réellement implémenté", () => {
+    // 'rest' n'a jamais eu d'instance de production en face (voir README §
+    // Intégration Odoo) ; un build sans VITE_DATA_PROVIDER explicite doit
+    // donc retomber sur 'odoo', pas sur ce chemin mort.
+    expect(DEFAULT_PROVIDER_KIND).toBe('odoo');
+    expect(providers.provider).toBeInstanceOf(OdooProvider);
+  });
+
+  it("bascule vers rest si on lui demande explicitement, ce qui reste un choix valide", async () => {
+    await setProviderKind('rest');
+    expect(providerKind.value).toBe('rest');
     expect(providers.provider).toBeInstanceOf(RestProvider);
   });
 
