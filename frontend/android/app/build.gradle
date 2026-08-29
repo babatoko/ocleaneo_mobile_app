@@ -7,8 +7,13 @@ android {
         applicationId "com.ocleaneo.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // versionCode auto-incrémenté depuis le timestamp du build, versionName
+        // lisible (date+heure) pour identifier d'un coup la version installée
+        // sur un téléphone sans ouvrir Android Studio ni gradle.
+        def buildTime = System.currentTimeMillis()
+        def buildDate = new Date(buildTime).format('yyyy.MM.dd-HHmm', TimeZone.getTimeZone('Europe/Paris'))
+        versionCode = (int) (buildTime / 1000)
+        versionName = buildDate
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

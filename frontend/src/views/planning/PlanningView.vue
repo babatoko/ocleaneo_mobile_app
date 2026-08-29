@@ -16,6 +16,8 @@ import {
   IonLabel,
   IonList,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonSegment,
   IonSegmentButton,
 } from '@ionic/vue';
@@ -187,11 +189,22 @@ async function loadMonth() {
   await planning.loadMonth(monthAnchor.value);
 }
 
-function refresh() {
+async function refresh() {
   if (view.value === 'jour') loadDay();
   else if (view.value === 'semaine') loadWeek();
   else if (view.value === 'mois') loadMonth();
   else loadTournee();
+}
+
+// Pull-to-refresh : recharge la vue courante ET les pastilles du bandeau de
+// jours — sinon un ajout côté Odoo (un responsable qui pose un ordre pour
+// demain) n'apparaît qu'en quittant/rouvrant l'écran.
+async function refreshFromPull(event: CustomEvent) {
+  try {
+    await Promise.all([Promise.resolve(refresh()), Promise.resolve(loadStripCounts())]);
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete();
+  }
 }
 
 function onViewChange(e: CustomEvent<SegmentChangeEventDetail>) {
@@ -429,6 +442,12 @@ watch(view, (_v, prev) => {
   if (prev === 'tournee') destroyMap();
   refresh();
 });
+// Changer de jour dans le bandeau doit recharger la vue jour (et la tournée,
+// qui est un jour particulier aussi) — sinon on reste sur les vacations du
+// jour précédent.
+watch(selectedDate, () => {
+  if (view.value === 'jour' || view.value === 'tournee') refresh();
+});
 onMounted(async () => {
   if (!auth.employee) auth.fetchMe();
   // Les coordonnées servent aux liens Itinéraire avec guidage direct ; leur
@@ -443,6 +462,9 @@ onUnmounted(destroyMap);
 <template>
   <ion-page>
     <ion-content>
+      <ion-refresher slot="fixed" @ionRefresh="refreshFromPull">
+        <ion-refresher-content pulling-text="Tire pour rafraîchir" refreshing-spinner="crescent"></ion-refresher-content>
+      </ion-refresher>
   <div class="header">
     <div>
       <p class="hello">Bonjour</p>

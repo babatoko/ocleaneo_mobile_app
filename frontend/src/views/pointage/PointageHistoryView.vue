@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { IonAvatar, IonContent, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonPage } from '@ionic/vue';
+import { IonAvatar, IonContent, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonPage, IonRefresher, IonRefresherContent } from '@ionic/vue';
 import { logInOutline, logOutOutline, pauseOutline, playOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
@@ -63,12 +63,23 @@ function entryLabel(type: TimeEntryType): string {
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
+
+async function refreshFromPull(event: CustomEvent) {
+  try {
+    await load();
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete();
+  }
+}
 </script>
 
 <template>
   <ion-page>
     <AppHeader title="Historique des pointages" />
     <ion-content>
+      <ion-refresher slot="fixed" @ionRefresh="refreshFromPull">
+        <ion-refresher-content pulling-text="Tire pour rafraîchir" refreshing-spinner="crescent"></ion-refresher-content>
+      </ion-refresher>
       <DataState :loading="loading" :error="error" :empty="!byDay.length" @retry="load">
         <template #empty>Aucun pointage sur les 14 derniers jours.</template>
 

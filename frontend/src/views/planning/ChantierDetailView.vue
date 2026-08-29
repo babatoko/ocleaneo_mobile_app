@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonButton, IonCard, IonCardContent, IonContent, IonIcon, IonItem, IonLabel, IonPage } from '@ionic/vue';
+import { IonButton, IonCard, IonCardContent, IonContent, IonIcon, IonItem, IonLabel, IonPage, IonRefresher, IonRefresherContent } from '@ionic/vue';
 import { alertCircleOutline, chevronForwardOutline, clipboardOutline, cubeOutline, locationOutline, mapOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
@@ -124,12 +124,24 @@ async function load() {
 }
 
 onMounted(load);
+
+// Pull-to-refresh : recharge la fiche complète (chantier + aperçu stock).
+async function refreshFromPull(event: CustomEvent) {
+  try {
+    await load();
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete();
+  }
+}
 </script>
 
 <template>
   <ion-page>
     <AppHeader title="Détail du chantier" />
     <ion-content>
+      <ion-refresher slot="fixed" @ionRefresh="refreshFromPull">
+        <ion-refresher-content pulling-text="Tire pour rafraîchir" refreshing-spinner="crescent"></ion-refresher-content>
+      </ion-refresher>
       <DataState :loading="loading" :error="error" :empty="!shift" @retry="load">
         <template #empty>Vacation introuvable.</template>
 
