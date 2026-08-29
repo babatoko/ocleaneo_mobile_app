@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonContent, IonItem, IonLabel, IonList, IonNote, IonPage } from '@ionic/vue';
+import { IonContent, IonItem, IonLabel, IonList, IonNote, IonPage, IonRefresher, IonRefresherContent } from '@ionic/vue';
 import { provider } from '../../providers';
 import { ProviderNetworkError, UNSUPPORTED_MESSAGES } from '../../providers/DataProvider';
 import AppHeader from '../../components/AppHeader.vue';
@@ -36,12 +36,23 @@ async function load() {
 }
 
 onMounted(load);
+
+async function refreshFromPull(event: CustomEvent) {
+  try {
+    await load();
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete();
+  }
+}
 </script>
 
 <template>
   <ion-page>
     <AppHeader title="Historique des commandes" />
     <ion-content>
+      <ion-refresher slot="fixed" @ionRefresh="refreshFromPull">
+        <ion-refresher-content pulling-text="Tire pour rafraîchir" refreshing-spinner="crescent"></ion-refresher-content>
+      </ion-refresher>
       <DataState
         :loading="loading"
         :unavailable="unavailable"

@@ -32,17 +32,36 @@ export async function getSavedCredentials(): Promise<{ username: string; passwor
   return { username, password };
 }
 
-export async function saveCredentials(username: string, password: string): Promise<void> {
-  if (!isNative()) return;
+/**
+ * Sauvegarde username/password dans le Keystore Android protégé par
+ * biométrie (AccessControl.BIOMETRY_ANY). Le plugin EXIGE une authentification
+ * biométrique immédiate au moment de l'écriture : sans prompt préalable, il
+ * jette une erreur ("User not authenticated") qu'on avalait silencieusement,
+ * et la sauvegarde n'avait jamais lieu — d'où le retour systématique à
+ * l'écran mot de passe au prochain lancement, malgré l'acceptation de
+ * l'invite. On demande donc d'abord l'empreinte, puis on écrit ; si le
+ * salarié annule le prompt ou si le capteur échoue, on ne sauvegarde rien.
+ */
+export async function saveCredentials(username: string, password: string): Promise<boolean> {
+  if (!isNative()) return false;
   try {
+    await NativeBiometric.verifyIdentity({
+      reason: "Confirmez votre identité pour activer la connexion par empreinte",
+      title: "Enregistrer l'empreinte",
+      subtitle: "La prochaine fois, vous vous connecterez avec votre doigt.",
+      description: "",
+    });
     await NativeBiometric.setCredentials({
       server: SERVER,
       username,
       password,
       accessControl: AccessControl.BIOMETRY_ANY,
     });
+    return true;
   } catch {
-    // Le stockage biométrique est une commodité : une erreur ne doit pas bloquer la connexion.
+    // Le stockage biométrique est une commodité : une erreur ne doit pas
+    // bloquer la connexion. Retourner false pour que l'appelant sache.
+    return false;
   }
 }
 

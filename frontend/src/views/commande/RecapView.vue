@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { IonButton, IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage } from '@ionic/vue';
+import { IonButton, IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent } from '@ionic/vue';
 import { checkmarkCircleOutline, downloadOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
@@ -29,6 +29,14 @@ async function load() {
 
 onMounted(load);
 
+async function refreshFromPull(event: CustomEvent) {
+  try {
+    await load();
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete();
+  }
+}
+
 const pdfUrl = computed(() => provider.getOrderPdfUrl(props.id));
 
 function downloadPdf() {
@@ -40,6 +48,9 @@ function downloadPdf() {
   <ion-page>
     <AppHeader title="Commande confirmée" />
     <ion-content>
+      <ion-refresher slot="fixed" @ionRefresh="refreshFromPull">
+        <ion-refresher-content pulling-text="Tire pour rafraîchir" refreshing-spinner="crescent"></ion-refresher-content>
+      </ion-refresher>
       <DataState :loading="loading" :error="error" :empty="!order" :skeleton-count="2" @retry="load">
         <template #empty>Commande introuvable.</template>
         <div class="recap">

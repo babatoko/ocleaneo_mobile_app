@@ -26,7 +26,7 @@ function isProviderKind(value: string): value is ProviderKind {
 
 const PROVIDER_KIND_PREF_KEY = 'ocleaneo_data_provider';
 const envProviderKind = import.meta.env.VITE_DATA_PROVIDER || '';
-export const DEFAULT_PROVIDER_KIND: ProviderKind = isProviderKind(envProviderKind) ? envProviderKind : 'rest';
+export const DEFAULT_PROVIDER_KIND: ProviderKind = isProviderKind(envProviderKind) ? envProviderKind : 'odoo';
 
 /**
  * Réactif (contrairement à `provider` lui-même, une simple liaison ESM) :

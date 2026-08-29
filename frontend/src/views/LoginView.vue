@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonButton, IonContent, IonIcon, IonInput, IonLabel, IonPage, IonSegment, IonSegmentButton, IonSpinner, alertController } from '@ionic/vue';
+import { IonButton, IonContent, IonIcon, IonInput, IonLabel, IonPage, IonSegment, IonSegmentButton, IonSpinner, alertController, toastController } from '@ionic/vue';
 import { fingerPrintOutline, lockClosedOutline, serverOutline, sparklesOutline } from 'ionicons/icons';
 import { useAuthStore } from '../stores/auth';
 import { usePointageStore } from '../stores/pointage';
@@ -76,7 +76,12 @@ async function resetServerUrl() {
 }
 
 onMounted(async () => {
-  biometricAvailable.value = await isBiometricAvailable();
+  // Même raisonnement que maybeOfferBiometric() ci-dessous : on fait
+  // confiance au plugin NativeBiometric pour échouer proprement (try/catch
+  // dans getSavedCredentials()) si la biométrie n'est pas réellement
+  // disponible, plutôt que de court-circuiter sur un isAvailable() qui
+  // renvoie false sur certains appareils pourtant fonctionnels.
+  biometricAvailable.value = await isBiometricAvailable() || (await hasSavedCredentials());
   rememberedUsername.value = localStorage.getItem(LAST_USERNAME_KEY) || '';
 
   if (biometricAvailable.value && (await hasSavedCredentials())) {
@@ -144,13 +149,19 @@ async function forgetBiometric() {
  * fois (`BIOMETRIC_DECLINED_KEY`) ni s'il a déjà des identifiants enregistrés.
  */
 async function maybeOfferBiometric(loggedInUsername: string, loggedInPassword: string) {
-  if (!biometricAvailable.value) return;
+  // Sur certains appareils (OnePlus notamment), NativeBiometric.isAvailable()
+  // renvoie false malgré une empreinte fonctionnelle — sans doute parce que
+  // l'appareil n'expose pas KeyManager.isDeviceSecure() comme attendu. On
+  // force l'invite et on laisse saveCredentials() décider si la sauvegarde
+  // fonctionne réellement ; si elle échoue silencieusement (try/catch dans
+  // services/biometric.ts), hasSavedCredentials() restera faux et la prochaine
+  // ouverture retombera sur l'écran mot de passe, sans régression visible.
   if (localStorage.getItem(BIOMETRIC_DECLINED_KEY) === '1') return;
   if (await hasSavedCredentials()) return;
 
   const alert = await alertController.create({
     header: 'Connexion par empreinte ?',
-    message: 'Activez-la pour vous reconnecter plus vite la prochaine fois, sans retaper votre mot de passe.',
+    message: 'Activez-la pour vous reconnecter plus vite la prochaine fois, sans retaper votre mot de passe. On vous demandera votre empreinte pour confirmer.',
     buttons: [
       {
         text: 'Non merci',
@@ -159,7 +170,21 @@ async function maybeOfferBiometric(loggedInUsername: string, loggedInPassword: s
       },
       {
         text: 'Activer',
-        handler: () => saveCredentials(loggedInUsername, loggedInPassword),
+        handler: async () => {
+          const ok = await saveCredentials(loggedInUsername, loggedInPassword);
+          if (!ok) {
+            // Pas de prompt natif affiché, ou échec capteur : l'utilisateur
+            // ne sait pas que rien n'a été enregistré. On le dit, sinon il
+            // croit avoir activé la biométrie et se retrouve à devoir
+            // ressaisir ses identifiants au prochain lancement.
+            const toast = await toastController.create({
+              message: "Impossible d'activer la biométrie sur cet appareil.",
+              duration: 3000,
+              color: 'warning',
+            });
+            await toast.present();
+          }
+        },
       },
     ],
   });
@@ -248,7 +273,7 @@ async function submit() {
 
         <div v-if="serverPanelOpen" class="server-url-field">
           <ion-segment
-            :value="providerKind"
+            :value="providerKind || 'odoo'"
             :disabled="savingProviderKind"
             @ion-change="changeProviderKind"
           >

@@ -10,6 +10,8 @@ import {
   IonGrid,
   IonIcon,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonRow,
   IonSelect,
   IonSelectOption,
@@ -116,6 +118,14 @@ async function load() {
 
 onMounted(load);
 
+async function refreshFromPull(event: CustomEvent) {
+  try {
+    await load();
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete();
+  }
+}
+
 watch(
   () => chantiers.selectedId,
   async () => {
@@ -155,6 +165,9 @@ function goToOrder() {
 <template>
   <ion-page>
     <ion-content>
+      <ion-refresher slot="fixed" @ionRefresh="refreshFromPull">
+        <ion-refresher-content pulling-text="Tire pour rafraîchir" refreshing-spinner="crescent"></ion-refresher-content>
+      </ion-refresher>
   <div class="header">
     <div>
       <p class="hello">Stock</p>
