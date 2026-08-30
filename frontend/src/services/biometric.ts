@@ -34,23 +34,22 @@ export async function getSavedCredentials(): Promise<{ username: string; passwor
 
 /**
  * Sauvegarde username/password dans le Keystore Android protégé par
- * biométrie (AccessControl.BIOMETRY_ANY). Le plugin EXIGE une authentification
- * biométrique immédiate au moment de l'écriture : sans prompt préalable, il
- * jette une erreur ("User not authenticated") qu'on avalait silencieusement,
- * et la sauvegarde n'avait jamais lieu — d'où le retour systématique à
- * l'écran mot de passe au prochain lancement, malgré l'acceptation de
- * l'invite. On demande donc d'abord l'empreinte, puis on écrit ; si le
- * salarié annule le prompt ou si le capteur échoue, on ne sauvegarde rien.
+ * biométrie (AccessControl.BIOMETRY_ANY).
+ *
+ * Un seul appel biométrique : `setCredentials()` avec `accessControl` renseigné
+ * lance lui-même, côté natif, sa propre activité d'authentification liée à la
+ * clé Keystore créée pour ce stockage (voir AuthActivity.java du plugin,
+ * mode "setSecureCredentials") — il ne faut PAS demander une empreinte au
+ * préalable via `verifyIdentity()` : c'est une invite biométrique distincte,
+ * sans lien avec cette clé, qui ne fait qu'ajouter un deuxième prompt
+ * consécutif. Deux `BiometricPrompt` lancés coup sur coup dans deux
+ * activités Android séparées est fragile et a fait échouer l'activation sur
+ * au moins un appareil dont l'empreinte fonctionne pourtant normalement
+ * ailleurs (autres apps).
  */
 export async function saveCredentials(username: string, password: string): Promise<boolean> {
   if (!isNative()) return false;
   try {
-    await NativeBiometric.verifyIdentity({
-      reason: "Confirmez votre identité pour activer la connexion par empreinte",
-      title: "Enregistrer l'empreinte",
-      subtitle: "La prochaine fois, vous vous connecterez avec votre doigt.",
-      description: "",
-    });
     await NativeBiometric.setCredentials({
       server: SERVER,
       username,
