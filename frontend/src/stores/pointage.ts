@@ -11,6 +11,11 @@ import {
   clearClockedInNotification,
   scheduleDepartureReminder,
   cancelDepartureReminder,
+  schedulePauseReminder,
+  cancelPauseReminder,
+  scheduleEndOfShiftReminder,
+  cancelEndOfShiftReminder,
+  cancelLateReminder,
 } from '../services/notifications';
 import { hapticSuccess, hapticError, hapticTap } from '../services/haptics';
 import { checkGeofence, type GeofenceResult } from '../services/geofence';
@@ -329,9 +334,18 @@ export const usePointageStore = defineStore('pointage', {
           next: next ? { chantierName: next.chantier_name, startAt: next.start_at } : null,
         });
         await scheduleDepartureReminder({ chantierName: chantier.name, estimatedDeparture });
+        await scheduleEndOfShiftReminder({ chantierName: chantier.name, estimatedDeparture });
+        // L'arrivée est badguée : plus la peine d'alerter sur un retard pour
+        // cette vacation (programmé par syncShifts sans savoir, lui, si le
+        // salarié a déjà pointé).
+        if (shift) await cancelLateReminder(shift.id);
       } else {
         await clearClockedInNotification();
         await cancelDepartureReminder();
+        await cancelEndOfShiftReminder();
+        // Départ badgé pendant une pause (cas réel géré par computeWorkedHours) :
+        // le rappel de reprise n'a plus lieu d'être.
+        await cancelPauseReminder();
       }
     },
 
@@ -346,6 +360,9 @@ export const usePointageStore = defineStore('pointage', {
       try {
         const shift = this.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
         await this.postEntry('pause_start', { chantierId: lastEntry.chantier_id, shiftId: shift?.id });
+        const chantiers = useChantiersStore();
+        const chantierName = chantiers.list.find((c) => c.id === lastEntry.chantier_id)?.name;
+        if (chantierName) await schedulePauseReminder({ chantierName });
       } finally {
         this.pauseActionPending = false;
       }
@@ -360,6 +377,7 @@ export const usePointageStore = defineStore('pointage', {
       try {
         const shift = this.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
         await this.postEntry('pause_end', { chantierId: lastEntry.chantier_id, shiftId: shift?.id });
+        await cancelPauseReminder();
       } finally {
         this.pauseActionPending = false;
       }

@@ -1,6 +1,12 @@
 import { Preferences } from '@capacitor/preferences';
 import { Capacitor } from '@capacitor/core';
-import { scheduleShiftReminder, cancelShiftReminder, notifyPlanningChanged } from './notifications';
+import {
+  scheduleShiftReminder,
+  cancelShiftReminder,
+  scheduleLateReminder,
+  cancelLateReminder,
+  notifyPlanningChanged,
+} from './notifications';
 import type { Shift } from '../types/models';
 
 const SNAPSHOT_KEY = 'ocleaneo_planning_snapshot';
@@ -63,6 +69,12 @@ export async function syncShifts(shifts: Shift[]): Promise<void> {
 
     if (isNearTerm) await scheduleShiftReminder(s);
     else await cancelShiftReminder(s.id);
+
+    // Programmé sans savoir si le salarié a déjà badgé son arrivée pour
+    // cette vacation — c'est pointage.clockWithTag() qui annule ce rappel
+    // précisément dès qu'un pointage d'arrivée est enregistré.
+    if (isNearTerm) await scheduleLateReminder(s);
+    else await cancelLateReminder(s.id);
   }
 
   await writeSnapshot(snapshot);

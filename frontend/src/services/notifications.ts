@@ -168,9 +168,86 @@ export async function scheduleDepartureReminder({ chantierName, estimatedDepartu
   });
 }
 
+const END_HEADSUP_NOTIFICATION_ID = 1004;
+const END_HEADSUP_BEFORE_MIN = 10;
+
+/**
+ * Programme un signal {END_HEADSUP_BEFORE_MIN} min avant la fin estimée de
+ * la vacation en cours — à ne pas confondre avec scheduleDepartureReminder
+ * ci-dessus, qui alerte APRÈS la fin si le départ n'a pas été badgé. Celui-ci
+ * prévient AVANT, pour laisser le temps de finaliser l'intervention. Même
+ * cycle de vie que le rappel de départ : programmé à l'arrivée, annulé au
+ * départ (voir clockWithTag dans stores/pointage.ts).
+ */
+export async function scheduleEndOfShiftReminder({ chantierName, estimatedDeparture }: DepartureReminderParams): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!estimatedDeparture) return;
+  if (!(await areNotificationsEnabled())) return;
+  if (!(await ensurePermission())) return;
+
+  const at = new Date(new Date(estimatedDeparture).getTime() - END_HEADSUP_BEFORE_MIN * 60000);
+  if (at.getTime() <= Date.now()) return; // fin déjà trop proche ou dépassée : inutile
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: END_HEADSUP_NOTIFICATION_ID,
+        title: 'Fin de chantier bientôt',
+        body: `Fin prévue dans ${END_HEADSUP_BEFORE_MIN} min sur ${chantierName} — pensez à finaliser votre intervention.`,
+        channelId: CHANNEL_ID,
+        schedule: { at },
+      },
+    ],
+  });
+}
+
+export async function cancelEndOfShiftReminder(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: END_HEADSUP_NOTIFICATION_ID }] }).catch(() => {});
+}
+
 export async function cancelDepartureReminder(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.cancel({ notifications: [{ id: REMINDER_NOTIFICATION_ID }] }).catch(() => {});
+}
+
+const PAUSE_REMINDER_NOTIFICATION_ID = 1003;
+const PAUSE_REMINDER_DELAY_MIN = 30;
+
+interface PauseReminderParams {
+  chantierName: string;
+}
+
+/**
+ * Programme un rappel « pause toujours en cours ? » à envoyer si le salarié
+ * n'a pas badgé sa reprise {PAUSE_REMINDER_DELAY_MIN} minutes après le début
+ * de la pause. Symétrique de scheduleDepartureReminder ci-dessus. Annulé à
+ * la reprise (voir cancelPauseReminder) ou si le départ est badgé pendant la
+ * pause elle-même (cas réel géré par computeWorkedHours).
+ */
+export async function schedulePauseReminder({ chantierName }: PauseReminderParams): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!(await areNotificationsEnabled())) return;
+  if (!(await ensurePermission())) return;
+
+  const at = new Date(Date.now() + PAUSE_REMINDER_DELAY_MIN * 60000);
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: PAUSE_REMINDER_NOTIFICATION_ID,
+        title: 'Pause toujours en cours ?',
+        body: `Vous êtes en pause depuis plus de ${PAUSE_REMINDER_DELAY_MIN} min sur ${chantierName} — pensez à badger votre reprise.`,
+        channelId: CHANNEL_ID,
+        schedule: { at },
+      },
+    ],
+  });
+}
+
+export async function cancelPauseReminder(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: PAUSE_REMINDER_NOTIFICATION_ID }] }).catch(() => {});
 }
 
 /**
@@ -202,6 +279,45 @@ export async function scheduleShiftReminder(shift: Shift): Promise<void> {
 export async function cancelShiftReminder(shiftId: number | string): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.cancel({ notifications: [{ id: SHIFT_REMINDER_BASE_ID + Number(shiftId) }] }).catch(() => {});
+}
+
+// Plage dédiée, distincte de SHIFT_REMINDER_BASE_ID (200000+) pour qu'aucun
+// id de vacation réaliste ne fasse se recouvrir les deux rappels.
+const LATE_REMINDER_BASE_ID = 400000;
+const LATE_REMINDER_DELAY_MIN = 15;
+
+/**
+ * Programme une alerte de retard {LATE_REMINDER_DELAY_MIN} min après le
+ * début prévu d'une vacation. Appelée depuis syncShifts pour toute vacation
+ * proche, sans savoir si le salarié a déjà badgé son arrivée — c'est
+ * pointage.clockWithTag() qui annule ce rappel via cancelLateReminder() dès
+ * qu'un pointage d'arrivée est enregistré pour ce chantier, exactement comme
+ * cancelShiftReminder() est déjà annulé/reprogrammé à chaque synchro.
+ */
+export async function scheduleLateReminder(shift: Shift): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!(await areNotificationsEnabled())) return;
+  if (!(await ensurePermission())) return;
+
+  const at = new Date(new Date(shift.start_at).getTime() + LATE_REMINDER_DELAY_MIN * 60000);
+  if (at.getTime() <= Date.now()) return;
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: LATE_REMINDER_BASE_ID + Number(shift.id),
+        title: 'En retard sur un chantier ?',
+        body: `${shift.chantier_name} devait commencer à ${fmtTime(shift.start_at)} — pensez à badger votre arrivée.`,
+        channelId: PLANNING_CHANNEL_ID,
+        schedule: { at },
+      },
+    ],
+  });
+}
+
+export async function cancelLateReminder(shiftId: number | string): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: LATE_REMINDER_BASE_ID + Number(shiftId) }] }).catch(() => {});
 }
 
 /** Notification ponctuelle « ton planning a changé », un id différent à chaque appel. */
