@@ -17,6 +17,7 @@ import { checkGeofence, type GeofenceResult } from '../services/geofence';
 import { enqueue, queueLength, flushQueue, watchConnectivity } from '../services/offlineQueue';
 import { startOfWeekIso } from '../utils/week';
 import { todayIso } from '../utils/date';
+import { recordError } from '../services/errorLog';
 import type { Position, Shift, TimeEntry, TimeEntryType } from '../types/models';
 
 function newClientRef(): string {
@@ -270,6 +271,17 @@ export const usePointageStore = defineStore('pointage', {
         (c) => c.nfc_tag_id && c.nfc_tag_id.toLowerCase() === uid.toLowerCase()
       );
       if (!chantier) {
+        // "Badge non reconnu" ne dit jamais pourquoi le rapprochement échoue —
+        // le cas le plus probable est un format différent entre l'UID lu par
+        // le lecteur (hex majuscule concaténé, ex. "04A1B2C3" — voir
+        // @exxili/capacitor-nfc, byteArrayToHexString) et la valeur saisie
+        // manuellement dans nfc_tag_id côté Odoo (avec des ":" ou un ordre
+        // d'octets différent, par exemple). Consigné pour comparer les deux
+        // chaînes exactement plutôt que deviner un format à l'aveugle.
+        void recordError(
+          `UID scanné: "${uid}" — nfc_tag_id connus: ${JSON.stringify(chantiers.list.map((c) => c.nfc_tag_id))}`,
+          'pointage.clockWithTag: badge non reconnu',
+        );
         this.scanError = 'Badge non reconnu. Contactez votre responsable.';
         hapticError();
         return;
