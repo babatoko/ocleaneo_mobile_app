@@ -36,6 +36,14 @@ function normalizeNfcId(value: string): string {
   return value.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
 }
 
+// Reformate un hex brut ("041779C9780000") avec des ":" tous les 2 caractères
+// ("04:17:79:C9:78:00:00"), pour être directement comparable/copiable dans le
+// champ nfc_tag_id d'Odoo, qui est saisi sous cette forme.
+function formatNfcIdWithColons(value: string): string {
+  const hex = normalizeNfcId(value).toUpperCase();
+  return hex.replace(/(.{2})(?=.)/g, '$1:');
+}
+
 function getPosition(): Promise<Position | null> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
@@ -290,7 +298,7 @@ export const usePointageStore = defineStore('pointage', {
         // absent de la liste, ou un futur format qui échapperait encore à la
         // normalisation.
         void recordError(
-          `UID scanné (brut): "${uid}" (normalisé: "${scannedId}") — nfc_tag_id connus: ${JSON.stringify(chantiers.list.map((c) => c.nfc_tag_id))}`,
+          `UID scanné (brut): "${uid}" (format Odoo: "${formatNfcIdWithColons(uid)}") — nfc_tag_id connus: ${JSON.stringify(chantiers.list.map((c) => c.nfc_tag_id))}`,
           'pointage.clockWithTag: badge non reconnu',
         );
         this.scanError = 'Badge non reconnu. Contactez votre responsable.';
