@@ -153,6 +153,7 @@ interface OdooChantierOrder {
   location_city: string | false;
   location_latitude: number | false;
   location_longitude: number | false;
+  nfc_tag_id: string | false;
 }
 
 interface OdooChantiersResult {
@@ -241,6 +242,7 @@ function orderToChantier(order: OdooChantierOrder): Chantier {
     name: order.location_name || order.name,
     address: joinAddress([order.location_street, order.location_city]),
     is_active: 1,
+    nfc_tag_id: order.nfc_tag_id || null,
     latitude: order.location_latitude || null,
     longitude: order.location_longitude || null,
   };
