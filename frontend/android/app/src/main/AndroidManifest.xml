@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- allowBackup="false" : Android sauvegarde et restaure automatiquement
+         les préférences de l'app (SharedPreferences, donc @capacitor/preferences)
+         sur le compte Google du salarié, y compris à travers une désinstallation.
+         Repéré sur un « premier lancement après installation » qui ne l'était pas
+         vraiment : le provider actif (ocleaneo_data_provider) et l'URL du serveur
+         REST (ocleaneo_api_base_url — un reliquat d'avant l'existence du
+         sélecteur odoo/rest/démo) avaient été restaurés depuis une ancienne
+         installation, avec REST pointé sur l'instance Odoo réelle — un mélange
+         de contrats (REST/JSON générique vs JSON-RPC Odoo) qui fait échouer
+         toute connexion avec un message "Pas de connexion" trompeur. Pour un
+         outil interne lié à un seul backend, restaurer d'anciens réglages
+         locaux après une réinstallation n'est jamais souhaitable. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
