@@ -173,6 +173,45 @@ export async function cancelDepartureReminder(): Promise<void> {
   await LocalNotifications.cancel({ notifications: [{ id: REMINDER_NOTIFICATION_ID }] }).catch(() => {});
 }
 
+const PAUSE_REMINDER_NOTIFICATION_ID = 1003;
+const PAUSE_REMINDER_DELAY_MIN = 30;
+
+interface PauseReminderParams {
+  chantierName: string;
+}
+
+/**
+ * Programme un rappel « pause toujours en cours ? » à envoyer si le salarié
+ * n'a pas badgé sa reprise {PAUSE_REMINDER_DELAY_MIN} minutes après le début
+ * de la pause. Symétrique de scheduleDepartureReminder ci-dessus. Annulé à
+ * la reprise (voir cancelPauseReminder) ou si le départ est badgé pendant la
+ * pause elle-même (cas réel géré par computeWorkedHours).
+ */
+export async function schedulePauseReminder({ chantierName }: PauseReminderParams): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!(await areNotificationsEnabled())) return;
+  if (!(await ensurePermission())) return;
+
+  const at = new Date(Date.now() + PAUSE_REMINDER_DELAY_MIN * 60000);
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: PAUSE_REMINDER_NOTIFICATION_ID,
+        title: 'Pause toujours en cours ?',
+        body: `Vous êtes en pause depuis plus de ${PAUSE_REMINDER_DELAY_MIN} min sur ${chantierName} — pensez à badger votre reprise.`,
+        channelId: CHANNEL_ID,
+        schedule: { at },
+      },
+    ],
+  });
+}
+
+export async function cancelPauseReminder(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: PAUSE_REMINDER_NOTIFICATION_ID }] }).catch(() => {});
+}
+
 /**
  * Programme un rappel {SHIFT_REMINDER_BEFORE_MIN} min avant le début d'une
  * vacation. Un id dérivé de shift.id permet de ré-appeler cette fonction sans
