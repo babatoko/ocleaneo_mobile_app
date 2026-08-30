@@ -43,10 +43,23 @@ export async function getSavedCredentials(): Promise<{ username: string; passwor
  * mode "setSecureCredentials") — il ne faut PAS demander une empreinte au
  * préalable via `verifyIdentity()` : c'est une invite biométrique distincte,
  * sans lien avec cette clé, qui ne fait qu'ajouter un deuxième prompt
- * consécutif. Deux `BiometricPrompt` lancés coup sur coup dans deux
- * activités Android séparées est fragile et a fait échouer l'activation sur
- * au moins un appareil dont l'empreinte fonctionne pourtant normalement
- * ailleurs (autres apps).
+ * consécutif.
+ *
+ * `authValidityDuration` évite un vrai bug d'appareil confirmé sur le
+ * terrain (journal d'erreur : "Failed to encrypt credentials: null", une
+ * NullPointerException) : sans lui, le chiffrement est lié à l'objet
+ * `Cipher` que le `BiometricPrompt` est censé renvoyer après succès —
+ * exactement le round-trip que l'implémentation biométrique propriétaire
+ * de certains appareils (constructeurs avec leur propre interface
+ * d'empreinte plutôt que le dialogue système standard) ne respecte pas :
+ * le `Cipher` revient `null` malgré une empreinte acceptée. Une valeur non
+ * nulle bascule le plugin sur un mode différent (voir AuthActivity.java,
+ * "validity-window mode") : la clé Keystore reste utilisable sans nouvelle
+ * empreinte pendant cette fenêtre, donc le chiffrement s'exécute directement
+ * après le succès du prompt, sans dépendre de ce retour. Une fenêtre courte
+ * (secondes) n'affaiblit pas la protection en pratique : l'écriture se fait
+ * immédiatement après le prompt, la fenêtre est close bien avant qu'elle ne
+ * puisse être exploitée pour un accès ultérieur non biométrique.
  */
 export async function saveCredentials(username: string, password: string): Promise<boolean> {
   if (!isNative()) return false;
@@ -56,6 +69,7 @@ export async function saveCredentials(username: string, password: string): Promi
       username,
       password,
       accessControl: AccessControl.BIOMETRY_ANY,
+      authValidityDuration: 10,
     });
     return true;
   } catch (e) {
