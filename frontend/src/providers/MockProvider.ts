@@ -105,6 +105,12 @@ function shiftsFixture(): Shift[] {
       end_at: `${today}T16:30:00`,
       status: 'confirmed',
       note: 'Digicode 4471B — sonner à l\'accueil si besoin.',
+      instructions: 'Ne pas utiliser de produit à javel sur le sol en marbre du hall. Sortir les poubelles avant 17h (collecte le mardi).',
+      activities: [
+        { id: 1, name: 'Aspirer les parties communes', required: true, completed: false },
+        { id: 2, name: 'Nettoyer les vitres du hall', required: true, completed: false },
+        { id: 3, name: 'Sortir les poubelles', required: false, completed: false },
+      ],
     },
     {
       id: 3,

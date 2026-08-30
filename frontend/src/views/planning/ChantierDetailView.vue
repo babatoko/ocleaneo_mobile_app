@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonButton, IonCard, IonCardContent, IonContent, IonIcon, IonItem, IonLabel, IonPage, IonRefresher, IonRefresherContent } from '@ionic/vue';
-import { alertCircleOutline, chevronForwardOutline, clipboardOutline, cubeOutline, locationOutline, mapOutline } from 'ionicons/icons';
+import { IonButton, IonCard, IonCardContent, IonCheckbox, IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent } from '@ionic/vue';
+import { alertCircleOutline, checkmarkDoneOutline, chevronForwardOutline, clipboardOutline, cubeOutline, listOutline, locationOutline, mapOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
 import { useChantiersStore } from '../../stores/chantiers';
@@ -170,6 +170,30 @@ async function refreshFromPull(event: CustomEvent) {
           <ion-label class="ion-text-wrap">{{ shift!.note }}</ion-label>
         </ion-item>
 
+        <div v-if="shift!.instructions" class="detail-block">
+          <p class="section-title">
+            <ion-icon :icon="listOutline"></ion-icon> Instructions
+          </p>
+          <ion-card class="instructions-card">
+            <ion-card-content class="ion-text-wrap">{{ shift!.instructions }}</ion-card-content>
+          </ion-card>
+        </div>
+
+        <div v-if="shift!.activities && shift!.activities.length" class="detail-block">
+          <p class="section-title">
+            <ion-icon :icon="checkmarkDoneOutline"></ion-icon> Activités
+          </p>
+          <ion-list class="activities-list" lines="full">
+            <ion-item v-for="activity in shift!.activities" :key="activity.id">
+              <ion-checkbox slot="start" :checked="activity.completed" disabled></ion-checkbox>
+              <ion-label class="ion-text-wrap" :class="{ 'activity-done': activity.completed }">
+                {{ activity.name }}
+                <span v-if="activity.required" class="activity-required">obligatoire</span>
+              </ion-label>
+            </ion-item>
+          </ion-list>
+        </div>
+
         <div v-if="stockPreview.length" class="detail-block">
           <div class="block-head">
             <p class="section-title" style="padding: 0; margin: 14px 0 6px">Stock du site</p>
@@ -307,5 +331,39 @@ async function refreshFromPull(event: CustomEvent) {
 
 .slevel.out {
   color: var(--danger);
+}
+
+.section-title ion-icon {
+  font-size: 14px;
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+
+.instructions-card {
+  margin: 0 18px;
+  --background: var(--surface-1);
+  border-radius: 14px;
+  box-shadow: none;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.activities-list {
+  margin: 0 4px;
+  background: transparent;
+}
+
+.activity-done {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.activity-required {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--warn-text);
+  text-transform: uppercase;
 }
 </style>

@@ -23,6 +23,15 @@ export interface Chantier {
 
 export type ShiftStatus = 'confirmed' | 'cancelled' | string;
 
+/** Une tâche de la checklist d'un chantier (fsm.activity côté Odoo) —
+ *  affichage seul pour l'instant, pas encore de coche depuis le mobile. */
+export interface ShiftActivity {
+  id: number;
+  name: string;
+  required: boolean;
+  completed: boolean;
+}
+
 export interface Shift {
   id: number;
   employee_id: number;
@@ -33,6 +42,9 @@ export interface Shift {
   end_at: string;
   status: ShiftStatus;
   note?: string | null;
+  /** Consignes libres pour cette vacation (fsm.order.todo côté Odoo). */
+  instructions?: string | null;
+  activities?: ShiftActivity[];
 }
 
 export type TimeEntryType = 'in' | 'out' | 'pause_start' | 'pause_end';
