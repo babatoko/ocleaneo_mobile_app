@@ -25,6 +25,17 @@ function newClientRef(): string {
   return `cr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// Le lecteur NFC (@exxili/capacitor-nfc) renvoie un hex concaténé sans
+// séparateur ("041779C9780000"), mais rien ne garantit que le badge a été
+// saisi manuellement dans Odoo sous cette même forme — confirmé sur le
+// terrain : "04:17:79:C9:78:00:00" ne matchait jamais l'UID scanné avant
+// cette normalisation, alors qu'il s'agissait bien du même badge. Ne garder
+// que les caractères hexadécimaux élimine ":", "-", espaces et autres
+// séparateurs quel que soit celui utilisé à la saisie.
+function normalizeNfcId(value: string): string {
+  return value.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+}
+
 function getPosition(): Promise<Position | null> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
@@ -267,19 +278,19 @@ export const usePointageStore = defineStore('pointage', {
       this.scanError = '';
       const chantiers = useChantiersStore();
       if (!chantiers.list.length) await chantiers.fetchMine();
+      const scannedId = normalizeNfcId(uid);
       const chantier = chantiers.list.find(
-        (c) => c.nfc_tag_id && c.nfc_tag_id.toLowerCase() === uid.toLowerCase()
+        (c) => c.nfc_tag_id && normalizeNfcId(c.nfc_tag_id) === scannedId
       );
       if (!chantier) {
-        // "Badge non reconnu" ne dit jamais pourquoi le rapprochement échoue —
-        // le cas le plus probable est un format différent entre l'UID lu par
-        // le lecteur (hex majuscule concaténé, ex. "04A1B2C3" — voir
-        // @exxili/capacitor-nfc, byteArrayToHexString) et la valeur saisie
-        // manuellement dans nfc_tag_id côté Odoo (avec des ":" ou un ordre
-        // d'octets différent, par exemple). Consigné pour comparer les deux
-        // chaînes exactement plutôt que deviner un format à l'aveugle.
+        // Confirmé sur le terrain (journal d'erreurs) : le badge scanné était
+        // en réalité connu, mais sous une forme différente côté Odoo
+        // ("04:17:79:C9:78:00:00" vs "041779C9780000" côté lecteur) — d'où
+        // normalizeNfcId() ci-dessus. Ce log reste utile pour un vrai badge
+        // absent de la liste, ou un futur format qui échapperait encore à la
+        // normalisation.
         void recordError(
-          `UID scanné: "${uid}" — nfc_tag_id connus: ${JSON.stringify(chantiers.list.map((c) => c.nfc_tag_id))}`,
+          `UID scanné (brut): "${uid}" (normalisé: "${scannedId}") — nfc_tag_id connus: ${JSON.stringify(chantiers.list.map((c) => c.nfc_tag_id))}`,
           'pointage.clockWithTag: badge non reconnu',
         );
         this.scanError = 'Badge non reconnu. Contactez votre responsable.';
