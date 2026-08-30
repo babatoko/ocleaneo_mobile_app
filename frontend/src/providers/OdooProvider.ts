@@ -11,6 +11,7 @@ import type {
   LoginResult,
   PointageStatus,
   Shift,
+  ShiftActivity,
   TimeEntry,
   TimeEntryType,
   TodayTimeEntries,
@@ -165,6 +166,13 @@ interface OdooPlanningLocation {
   city: string | false;
 }
 
+interface OdooPlanningActivity {
+  id: number;
+  name: string;
+  required: boolean;
+  completed: boolean;
+}
+
 interface OdooPlanningOrder {
   id: number;
   name: string;
@@ -174,6 +182,8 @@ interface OdooPlanningOrder {
   date_start: string | false;
   date_end: string | false;
   location: OdooPlanningLocation;
+  instructions: string | false;
+  activities: OdooPlanningActivity[];
 }
 
 interface OdooPlanningResult {
@@ -258,6 +268,17 @@ function planningOrderToShift(order: OdooPlanningOrder): Shift {
     // /chantiers/aujourdhui excluent déjà les commandes fermées
     // (stage_id.is_closed), donc tout ce qui est renvoyé est actif.
     status: 'confirmed',
+    instructions: order.instructions || null,
+    activities: order.activities.map(activityToShiftActivity),
+  };
+}
+
+function activityToShiftActivity(activity: OdooPlanningActivity): ShiftActivity {
+  return {
+    id: activity.id,
+    name: activity.name,
+    required: activity.required,
+    completed: activity.completed,
   };
 }
 

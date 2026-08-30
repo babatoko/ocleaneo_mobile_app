@@ -150,6 +150,17 @@ class MobilePlanningController(http.Controller):
                 "person_id": order.person_id.id if order.person_id else False,
                 "person_name": order.person_id.name if order.person_id else False,
                 "company_id": order.company_id.id if order.company_id else False,
+                # order.todo (module fieldservice) : instructions libres pour
+                # cette commande, saisies à la planification ou reprises du
+                # modèle. order_activity_ids (module fieldservice_activity) :
+                # checklist de tâches, chacune avec son état required/completed.
+                "instructions": order.todo or False,
+                "activities": [{
+                    "id": activity.id,
+                    "name": activity.name,
+                    "required": activity.required,
+                    "completed": activity.completed,
+                } for activity in order.order_activity_ids],
             })
 
         return {

@@ -4,13 +4,16 @@
 {
     "name": "Ocleaneo Mobile API Planning",
     "summary": "REST/JSON planning endpoints for the employee mobile app.",
-    "version": "14.0.1.0.6",
+    "version": "14.0.1.0.7",
     "license": "AGPL-3",
     "author": "Ocleaneo",
     "category": "API",
     "website": "https://www.entretien-maconnais.fr",
     "depends": [
         "ocleaneo_mobile_api",
+        # fsm.order.order_activity_ids (fsm.activity) — la checklist
+        # d'activités renvoyée par /planning.
+        "fieldservice_activity",
     ],
     "data": [
         "security/ir.model.access.csv",
