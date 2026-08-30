@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { AccessControl, NativeBiometric } from '@capgo/capacitor-native-biometric';
+import { recordError } from './errorLog';
 
 const SERVER = 'ocleaneo-mobile';
 
@@ -57,9 +58,18 @@ export async function saveCredentials(username: string, password: string): Promi
       accessControl: AccessControl.BIOMETRY_ANY,
     });
     return true;
-  } catch {
+  } catch (e) {
     // Le stockage biométrique est une commodité : une erreur ne doit pas
     // bloquer la connexion. Retourner false pour que l'appelant sache.
+    //
+    // Cette erreur était jusqu'ici avalée sans trace : le toast montré à
+    // l'utilisateur ("Impossible d'activer...") ne dit que l'échec, jamais
+    // pourquoi — côté natif, AuthActivity (mode setSecureCredentials)
+    // rejette avec un errorCode/errorDetails précis qu'on perdait
+    // totalement. Consigné dans le journal local (services/errorLog.ts,
+    // déjà partageable depuis le profil) pour diagnostiquer sur preuve un
+    // éventuel prochain échec, plutôt que sur une nouvelle hypothèse.
+    void recordError(e, 'biometric.saveCredentials');
     return false;
   }
 }
