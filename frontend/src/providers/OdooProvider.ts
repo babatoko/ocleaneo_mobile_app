@@ -269,7 +269,13 @@ function planningOrderToShift(order: OdooPlanningOrder): Shift {
     // (stage_id.is_closed), donc tout ce qui est renvoyé est actif.
     status: 'confirmed',
     instructions: order.instructions || null,
-    activities: order.activities.map(activityToShiftActivity),
+    // `order.activities` doit toujours être un tableau (voir le contrôleur
+    // Python), mais un déploiement backend en retard sur ce commit — code
+    // pas encore mis à jour — renverrait une réponse sans cette clé du
+    // tout. `?? []` évite qu'un `undefined.map()` fasse alors échouer TOUT
+    // /planning (donc Jour/Semaine, pas seulement le détail) au lieu de se
+    // dégrader en simple absence d'activités affichées.
+    activities: (order.activities ?? []).map(activityToShiftActivity),
   };
 }
 

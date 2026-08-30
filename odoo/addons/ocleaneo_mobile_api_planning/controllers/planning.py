@@ -1,9 +1,12 @@
 # Copyright 2026 Ocleaneo
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
+import logging
+import re
+
 from odoo import http
 from odoo.http import request
-import logging
+from odoo.tools.mail import html2plaintext
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     MOBILE_CORS_ORIGIN,
@@ -20,6 +23,22 @@ from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import (
 )
 
 _logger = logging.getLogger(__name__)
+
+# order.todo (fieldservice) est un fields.Text — censé être du texte brut —
+# mais certaines commandes y stockent en réalité du HTML (vraisemblablement
+# copié depuis fsm.template.instructions ou saisi via un widget enrichi côté
+# formulaire Odoo, alors que ce champ reste un Text ordinaire). Le mobile
+# affichait ce contenu tel quel : les balises apparaissaient littéralement à
+# l'écran ("<p>...</p>") au lieu d'un texte lisible. Ne repérer que du texte
+# qui RESSEMBLE à du HTML avant de le convertir laisse inchangé le cas normal
+# (texte brut sans balises, la grande majorité des commandes).
+_HTML_TAG_RE = re.compile(r"<[a-zA-Z/][^>]*>")
+
+
+def _plain_instructions(text):
+    if not text or not _HTML_TAG_RE.search(text):
+        return text
+    return html2plaintext(text)
 
 
 class MobilePlanningController(http.Controller):
@@ -154,7 +173,7 @@ class MobilePlanningController(http.Controller):
                 # cette commande, saisies à la planification ou reprises du
                 # modèle. order_activity_ids (module fieldservice_activity) :
                 # checklist de tâches, chacune avec son état required/completed.
-                "instructions": order.todo or False,
+                "instructions": _plain_instructions(order.todo) or False,
                 "activities": [{
                     "id": activity.id,
                     "name": activity.name,
