@@ -13,6 +13,9 @@ import {
   cancelDepartureReminder,
   schedulePauseReminder,
   cancelPauseReminder,
+  scheduleEndOfShiftReminder,
+  cancelEndOfShiftReminder,
+  cancelLateReminder,
 } from '../services/notifications';
 import { hapticSuccess, hapticError, hapticTap } from '../services/haptics';
 import { checkGeofence, type GeofenceResult } from '../services/geofence';
@@ -331,9 +334,15 @@ export const usePointageStore = defineStore('pointage', {
           next: next ? { chantierName: next.chantier_name, startAt: next.start_at } : null,
         });
         await scheduleDepartureReminder({ chantierName: chantier.name, estimatedDeparture });
+        await scheduleEndOfShiftReminder({ chantierName: chantier.name, estimatedDeparture });
+        // L'arrivée est badguée : plus la peine d'alerter sur un retard pour
+        // cette vacation (programmé par syncShifts sans savoir, lui, si le
+        // salarié a déjà pointé).
+        if (shift) await cancelLateReminder(shift.id);
       } else {
         await clearClockedInNotification();
         await cancelDepartureReminder();
+        await cancelEndOfShiftReminder();
         // Départ badgé pendant une pause (cas réel géré par computeWorkedHours) :
         // le rappel de reprise n'a plus lieu d'être.
         await cancelPauseReminder();
