@@ -26,12 +26,25 @@ vi.mock('@capacitor/preferences', () => ({
   },
 }));
 
-const { recordError, recentErrors, errorCount, clearErrorLog, formatErrorLog, installErrorHandlers } =
-  await import('../errorLog');
+const {
+  recordError,
+  recentErrors,
+  errorCount,
+  clearErrorLog,
+  formatErrorLog,
+  installErrorHandlers,
+  isTraceModeEnabled,
+  setTraceModeEnabled,
+  recordTrace,
+} = await import('../errorLog');
 
-beforeEach(() => {
+beforeEach(async () => {
   store = {};
   failNextSet = false;
+  // Le cache module de isTraceModeEnabled survit d'un test à l'autre (il
+  // n'est pas réinitialisé avec `store`) — le remettre à faux explicitement
+  // évite qu'un test active le mode traçage pour les suivants.
+  await setTraceModeEnabled(false);
 });
 
 describe('journal d’erreurs', () => {
@@ -57,11 +70,11 @@ describe('journal d’erreurs', () => {
 
   it('garde les erreurs les plus récentes, pas les premières', async () => {
     // Quand une app part en vrille, c'est la dernière erreur qui explique.
-    for (let i = 0; i < 35; i += 1) await recordError(new Error(`e${i}`), 'boucle');
+    for (let i = 0; i < 155; i += 1) await recordError(new Error(`e${i}`), 'boucle');
 
     const entries = await recentErrors();
-    expect(entries).toHaveLength(30);
-    expect(entries[entries.length - 1].message).toBe('e34');
+    expect(entries).toHaveLength(150);
+    expect(entries[entries.length - 1].message).toBe('e154');
     expect(entries[0].message).toBe('e5');
   });
 
@@ -143,5 +156,34 @@ describe('branchement des gestionnaires globaux', () => {
     // empêcherait l'application de démarrer.
     expect(() => installErrorHandlers({ config: {} })).not.toThrow();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('mode traçage', () => {
+  it('est désactivé par défaut', async () => {
+    expect(await isTraceModeEnabled()).toBe(false);
+  });
+
+  it('mémorise l’état activé/désactivé', async () => {
+    await setTraceModeEnabled(true);
+    expect(await isTraceModeEnabled()).toBe(true);
+
+    await setTraceModeEnabled(false);
+    expect(await isTraceModeEnabled()).toBe(false);
+  });
+
+  it("n'écrit rien tant que le mode n'est pas activé", async () => {
+    await recordTrace('[trace] /mobile/planning', 'OK (HTTP 200)');
+    expect(await errorCount()).toBe(0);
+  });
+
+  it('journalise chaque appel une fois activé, sans exposer d’identifiants', async () => {
+    await setTraceModeEnabled(true);
+    await recordTrace('[trace] /mobile/login', 'OK (HTTP 200)');
+
+    const [entry] = await recentErrors();
+    expect(entry.context).toBe('[trace] /mobile/login');
+    expect(entry.message).toBe('OK (HTTP 200)');
+    expect(entry.message).not.toMatch(/motdepasse|password/i);
   });
 });

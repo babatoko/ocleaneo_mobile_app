@@ -19,9 +19,12 @@ import { Preferences } from '@capacitor/preferences';
 
 const LOG_KEY = 'ocleaneo_error_log';
 
-/** Assez pour reconstituer un enchaînement, trop peu pour peser sur le
- *  stockage d'un téléphone bas de gamme — ce que beaucoup d'agents ont. */
-const MAX_ENTRIES = 30;
+/** Relevé plus haut que les 30 d'origine pour laisser de la place au mode
+ *  traçage (recordTrace ci-dessous, un événement par appel serveur) sans
+ *  que quelques minutes de reproduction n'évincent les erreurs qui
+ *  précédaient — le journal partagé reste correctement daté d'une seule
+ *  incident, pas de plusieurs bouts épars. */
+const MAX_ENTRIES = 150;
 
 export interface LoggedError {
   at: string;
@@ -71,6 +74,36 @@ function describe(error: unknown): { message: string; stack?: string } {
   } catch {
     return { message: String(error) };
   }
+}
+
+const TRACE_MODE_KEY = 'ocleaneo_trace_mode_enabled';
+let traceModeCache: boolean | null = null;
+
+/** Préférence utilisateur (Profil) — désactivé par défaut : un mode
+ *  traçage permanent journaliserait chaque appel serveur en continu, pour
+ *  un usage réel seulement le temps de reproduire un incident signalé. */
+export async function isTraceModeEnabled(): Promise<boolean> {
+  if (traceModeCache !== null) return traceModeCache;
+  const { value } = await Preferences.get({ key: TRACE_MODE_KEY });
+  traceModeCache = value === 'true';
+  return traceModeCache;
+}
+
+export async function setTraceModeEnabled(enabled: boolean): Promise<void> {
+  traceModeCache = enabled;
+  await Preferences.set({ key: TRACE_MODE_KEY, value: String(enabled) });
+}
+
+/**
+ * Journalise un événement même hors échec — n'écrit rien tant que le mode
+ * traçage n'est pas activé. Pensé pour chaque appel serveur (voir
+ * OdooProvider.callMobile) : méthode/chemin et succès ou code d'erreur,
+ * jamais les identifiants ou le corps de la requête — un salarié qui
+ * transmet ce journal ne doit jamais y exposer son mot de passe.
+ */
+export async function recordTrace(context: string, message: string): Promise<void> {
+  if (!(await isTraceModeEnabled())) return;
+  await recordError(message, context);
 }
 
 export async function recordError(error: unknown, context: string): Promise<void> {

@@ -27,7 +27,7 @@ import {
 } from '../services/biometric';
 import { areNotificationsEnabled, setNotificationsEnabled } from '../services/notifications';
 import { failedCount, queueLength } from '../services/offlineQueue';
-import { clearErrorLog, errorCount, formatErrorLog } from '../services/errorLog';
+import { clearErrorLog, errorCount, formatErrorLog, isTraceModeEnabled, setTraceModeEnabled } from '../services/errorLog';
 import { Share } from '@capacitor/share';
 
 const auth = useAuthStore();
@@ -39,6 +39,7 @@ const notificationsEnabled = ref(true);
 const pendingCount = ref(0);
 const failedPointages = ref(0);
 const errorsLogged = ref(0);
+const traceModeEnabled = ref(false);
 const loading = ref(true);
 
 const {
@@ -73,6 +74,7 @@ onMounted(async () => {
     pendingCount.value = await queueLength();
     failedPointages.value = await failedCount();
     errorsLogged.value = await errorCount();
+    traceModeEnabled.value = await isTraceModeEnabled();
   } finally {
     loading.value = false;
   }
@@ -99,6 +101,15 @@ async function toggleNotifications() {
   const next = !notificationsEnabled.value;
   notificationsEnabled.value = next;
   await setNotificationsEnabled(next);
+}
+
+/** Journalise chaque appel serveur (méthode/chemin/résultat, jamais les
+ *  identifiants) — désactivé par défaut, à activer seulement le temps de
+ *  reproduire un incident signalé par un agent. */
+async function toggleTraceMode() {
+  const next = !traceModeEnabled.value;
+  traceModeEnabled.value = next;
+  await setTraceModeEnabled(next);
 }
 
 async function disableBiometric() {
@@ -199,36 +210,52 @@ async function changeProviderKind(event: CustomEvent) {
           </ion-item>
         </ion-list>
 
-        <!-- Même principe que les pointages refusés : rien à afficher tant
-             qu'il n'y a rien à signaler. Un plantage était jusqu'ici invisible
-             de bout en bout ; le transmettre depuis ici est aujourd'hui le
-             seul chemin pour qu'il soit corrigé. -->
-        <template v-if="errorsLogged">
-          <p class="section-title">Diagnostic</p>
-          <ion-list class="detail-block settings-list" lines="full">
-            <ion-item class="settings-row">
-              <ion-label class="ion-text-wrap">
-                <p class="srow-label">Incidents enregistrés</p>
-                <p class="srow-sub">
-                  Anomalies techniques relevées sur cet appareil. Rien n'est
-                  envoyé automatiquement — transmettez-les pour qu'elles soient
-                  corrigées.
-                </p>
-              </ion-label>
-              <ion-note slot="end" class="srow-value">{{ errorsLogged }}</ion-note>
-            </ion-item>
-          </ion-list>
-          <div class="detail-block" style="padding: 0 18px;">
-            <div class="server-url-actions">
-              <ion-button class="server-url-save" expand="block" @click="shareErrorLog">
-                Transmettre le diagnostic
-              </ion-button>
-              <ion-button class="server-url-reset" expand="block" fill="clear" @click="forgetErrorLog">
-                Effacer
-              </ion-button>
-            </div>
+        <p class="section-title">Diagnostic</p>
+        <ion-list class="detail-block settings-list" lines="full">
+          <ion-item class="settings-row">
+            <ion-label class="ion-text-wrap">
+              <p class="srow-label">Mode traçage</p>
+              <p class="srow-sub">
+                Journalise chaque appel au serveur (jamais les identifiants) —
+                à activer seulement le temps de reproduire un incident, à la
+                demande de votre responsable.
+              </p>
+            </ion-label>
+            <ion-toggle
+              slot="end"
+              class="app-toggle"
+              :checked="traceModeEnabled"
+              aria-label="Mode traçage"
+              @ion-change="toggleTraceMode"
+            ></ion-toggle>
+          </ion-item>
+
+          <!-- Même principe que les pointages refusés : rien à afficher tant
+               qu'il n'y a rien à signaler. Un plantage était jusqu'ici invisible
+               de bout en bout ; le transmettre depuis ici est aujourd'hui le
+               seul chemin pour qu'il soit corrigé. -->
+          <ion-item v-if="errorsLogged" class="settings-row">
+            <ion-label class="ion-text-wrap">
+              <p class="srow-label">Incidents enregistrés</p>
+              <p class="srow-sub">
+                Anomalies techniques relevées sur cet appareil. Rien n'est
+                envoyé automatiquement — transmettez-les pour qu'elles soient
+                corrigées.
+              </p>
+            </ion-label>
+            <ion-note slot="end" class="srow-value">{{ errorsLogged }}</ion-note>
+          </ion-item>
+        </ion-list>
+        <div v-if="errorsLogged" class="detail-block" style="padding: 0 18px;">
+          <div class="server-url-actions">
+            <ion-button class="server-url-save" expand="block" @click="shareErrorLog">
+              Transmettre le diagnostic
+            </ion-button>
+            <ion-button class="server-url-reset" expand="block" fill="clear" @click="forgetErrorLog">
+              Effacer
+            </ion-button>
           </div>
-        </template>
+        </div>
 
         <p class="section-title">Serveur</p>
         <div class="detail-block" style="padding: 0 18px;">
