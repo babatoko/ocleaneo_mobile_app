@@ -16,6 +16,7 @@ import {
   isBiometricAvailable,
   saveCredentials,
 } from '../services/biometric';
+import { recordError } from '../services/errorLog';
 
 const LAST_USERNAME_KEY = 'ocleaneo_last_username';
 const BIOMETRIC_DECLINED_KEY = 'ocleaneo_biometric_declined';
@@ -41,6 +42,7 @@ const route = useRoute();
 const serverPanelOpen = ref(false);
 const {
   defaultServerUrl,
+  currentServerUrl,
   serverUrlInput,
   serverUrlError,
   savingServerUrl,
@@ -122,9 +124,15 @@ async function tryBiometric() {
   } catch (e) {
     // Le réseau peut tomber après une empreinte pourtant valide : ne pas
     // laisser croire que le capteur a échoué.
-    error.value = e instanceof ProviderNetworkError
-      ? loginErrorMessage(e)
-      : "Authentification par empreinte annulée ou impossible.";
+    if (e instanceof ProviderNetworkError) {
+      error.value = loginErrorMessage(e);
+      void recordError(
+        `URL serveur : "${currentServerUrl.value ?? defaultServerUrl.value}" — ${e.message}`,
+        'LoginView.tryBiometric: échec de connexion',
+      );
+    } else {
+      error.value = "Authentification par empreinte annulée ou impossible.";
+    }
   } finally {
     loading.value = false;
   }
@@ -201,6 +209,14 @@ async function submit() {
     await afterLogin(username.value);
   } catch (e) {
     error.value = loginErrorMessage(e);
+    // Ce catch avale l'erreur (elle ne devient jamais un rejet non
+    // rattrapé), donc installErrorHandlers() ne la voit jamais — sans ce
+    // log explicite, un échec de connexion ne laisse aucune trace
+    // exploitable au-delà du message générique affiché à l'écran.
+    void recordError(
+      `URL serveur : "${currentServerUrl.value ?? defaultServerUrl.value}" — ${e instanceof Error ? e.message : String(e)}`,
+      'LoginView.submit: échec de connexion',
+    );
   } finally {
     loading.value = false;
   }
