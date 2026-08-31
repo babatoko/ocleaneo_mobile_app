@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { clearToken } from '../services/tokenStore';
+import { recordTrace } from '../services/errorLog';
 import { DEFAULT_ODOO_BASE_URL, ODOO_API_VERSION, getOdooBaseUrl, initOdooBaseUrl, odooClient, setOdooBaseUrl } from './odooClient';
 import { DataProvider, ProviderError, ProviderNetworkError } from './DataProvider';
 import type { ProviderFeature } from './DataProvider';
@@ -386,12 +387,15 @@ async function callMobile<T>(path: string, params: Record<string, unknown> = {})
       params,
     });
   } catch (e) {
-    throw normalizeTransportError(e);
+    const err = normalizeTransportError(e);
+    void recordTrace(`[trace] ${path}`, `échec transport — ${err.message}`);
+    throw err;
   }
 
   const body = httpResponse.data;
   if ('error' in body) {
     const message = body.error.data?.message || body.error.message || 'Erreur serveur Odoo.';
+    void recordTrace(`[trace] ${path}`, `erreur JSON-RPC ${body.error.code} — ${message}`);
     throw new ProviderError(message, body.error.code);
   }
 
@@ -400,8 +404,10 @@ async function callMobile<T>(path: string, params: Record<string, unknown> = {})
     // Contrairement à restClient.ts (RestProvider), un token invalide
     // n'est jamais un 401 HTTP ici — voir la docstring de classe.
     if (result.code === 401) void clearToken();
+    void recordTrace(`[trace] ${path}`, `erreur ${result.code} — ${result.error}`);
     throw new ProviderError(result.error, result.code);
   }
+  void recordTrace(`[trace] ${path}`, `OK (HTTP ${httpResponse.status})`);
   return result as T;
 }
 
