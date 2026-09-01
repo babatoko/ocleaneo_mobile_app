@@ -118,9 +118,11 @@ function shiftsFixture(): Shift[] {
       chantier_id: 4,
       chantier_name: chantiers[3].name,
       chantier_address: chantiers[3].address,
-      start_at: `${today}T12:00:00`,
-      end_at: `${today}T13:00:00`,
-      status: 'confirmed',
+      start_at: `${today}T06:00:00`,
+      end_at: `${today}T07:00:00`,
+      // Terminée : un départ badgé plus tôt ce matin a déjà clôturé le WO
+      // (voir ocleaneo#11/#12) — sert d'exemple pour le rendu grisé/"terminé".
+      status: 'done',
       note: null,
     },
     // Lundi

@@ -304,7 +304,19 @@ function badgeColor(status: string): string {
   if (status === 'confirmed') return 'success';
   if (status === 'modified' || status === 'pending') return 'warning';
   if (status === 'cancelled') return 'danger';
+  // Teinte de l'app (var(--accent), voir --ion-color-primary), distincte du
+  // vert "confirmé" — pour ne pas laisser croire qu'une vacation terminée
+  // est encore à venir.
+  if (status === 'done') return 'primary';
   return 'medium';
+}
+
+function statusLabel(status: string): string {
+  if (status === 'confirmed') return 'confirmé';
+  if (status === 'modified') return 'modifié';
+  if (status === 'done') return 'terminé';
+  if (status === 'cancelled') return 'annulé';
+  return status;
 }
 
 function timeRange(shift: Shift): string {
@@ -392,7 +404,10 @@ async function loadTournee() {
       tripError.value = planning.error;
       return;
     }
-    const dayShifts = planning.dayShifts;
+    // Une vacation déjà terminée ou annulée n'a plus sa place dans une
+    // tournée à venir — s'y rendre n'a pas de sens, et l'y inclure fausserait
+    // aussi bien l'itinéraire optimisé que missingCoords ci-dessous.
+    const dayShifts = planning.dayShifts.filter((s) => s.status !== 'done' && s.status !== 'cancelled');
 
     const withCoords: Required<Pick<TrippablePoint, 'id' | 'name' | 'address' | 'latitude' | 'longitude' | 'shiftDurationSeconds' | 'startAt'>>[] = [];
     for (const s of dayShifts) {
@@ -610,9 +625,7 @@ onUnmounted(destroyMap);
           <ion-card-header>
             <div class="top">
               <span class="time">{{ timeRange(s) }}</span>
-              <ion-badge :color="badgeColor(s.status)">{{
-                s.status === 'confirmed' ? 'confirmé' : s.status === 'modified' ? 'modifié' : s.status
-              }}</ion-badge>
+              <ion-badge :color="badgeColor(s.status)">{{ statusLabel(s.status) }}</ion-badge>
             </div>
             <ion-card-title>{{ s.chantier_name }}</ion-card-title>
             <ion-card-subtitle><ion-icon :icon="locationOutline"></ion-icon> {{ s.chantier_address || s.chantier_name }}</ion-card-subtitle>
@@ -788,6 +801,22 @@ onUnmounted(destroyMap);
 
 .shift-card.confirmed {
   border-inline-start-color: var(--accent);
+}
+
+/* Terminée/annulée : pas d'opacity sur la carte entière — elle plafonnerait
+   aussi l'alpha du badge de statut, qui doit au contraire rester net. Le
+   grisé vient donc élément par élément (titre, heure, adresse, actions). */
+.shift-card.done ion-card-title,
+.shift-card.done .time {
+  color: var(--text-secondary);
+}
+
+.shift-card.done ion-card-subtitle {
+  color: var(--text-muted);
+}
+
+.shift-card.done .card-actions ion-button {
+  --color: var(--text-muted);
 }
 
 .shift-card .card-main {
