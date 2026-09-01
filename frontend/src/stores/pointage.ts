@@ -347,6 +347,15 @@ export const usePointageStore = defineStore('pointage', {
         // le rappel de reprise n'a plus lieu d'être.
         await cancelPauseReminder();
       }
+
+      if (type === 'out') {
+        // Un départ clôture désormais le workorder côté serveur (voir
+        // ocleaneo#11) — /chantiers/aujourdhui ne le renverra plus. Sans ce
+        // rafraîchissement, la liste locale garde ce chantier affiché comme
+        // actif jusqu'à la prochaine relance de l'app : un salarié pourrait
+        // re-badger sur un chantier déjà clôturé sans que rien ne le signale.
+        await chantiers.fetchMine();
+      }
     },
 
     // Pause / reprise : action manuelle (le badge du chantier ne peut pas à
