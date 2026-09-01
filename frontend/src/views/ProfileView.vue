@@ -28,6 +28,7 @@ import {
 import { areNotificationsEnabled, setNotificationsEnabled } from '../services/notifications';
 import { failedCount, queueLength } from '../services/offlineQueue';
 import { clearErrorLog, errorCount, isTraceModeEnabled, setTraceModeEnabled, shareErrorLog } from '../services/errorLog';
+import { getAppVersion } from '../services/appInfo';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -39,6 +40,7 @@ const pendingCount = ref(0);
 const failedPointages = ref(0);
 const errorsLogged = ref(0);
 const traceModeEnabled = ref(false);
+const appVersion = ref('');
 const loading = ref(true);
 
 const {
@@ -74,6 +76,7 @@ onMounted(async () => {
     failedPointages.value = await failedCount();
     errorsLogged.value = await errorCount();
     traceModeEnabled.value = await isTraceModeEnabled();
+    appVersion.value = await getAppVersion();
   } finally {
     loading.value = false;
   }
@@ -302,6 +305,8 @@ async function changeProviderKind(event: CustomEvent) {
             <ion-label>Déconnexion</ion-label>
           </ion-item>
         </ion-list>
+
+        <p v-if="appVersion" class="app-version">v{{ appVersion }}</p>
       </template>
     </ion-content>
   </ion-page>
@@ -400,6 +405,13 @@ async function changeProviderKind(event: CustomEvent) {
 
 .menu-item ion-icon {
   color: var(--danger);
+}
+
+.app-version {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 10px;
+  margin: 20px 0 0;
 }
 
 .server-url-field {

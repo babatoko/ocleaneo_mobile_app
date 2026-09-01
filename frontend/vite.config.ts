@@ -2,8 +2,28 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Même format que android/app/build.gradle (versionName), pour que la
+// version affichée en PWA/navigateur (services/appInfo.ts) reste comparable
+// à celle de l'APK plutôt que de basculer sur un format différent.
+function buildDateStamp(): string {
+  const fmt = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]));
+  return `${parts.year}.${parts.month}.${parts.day}-${parts.hour}${parts.minute}`;
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_BUILD_DATE__: JSON.stringify(buildDateStamp()),
+  },
   plugins: [
     vue(),
     VitePWA({
