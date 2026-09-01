@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonButton, IonContent, IonIcon, IonInput, IonLabel, IonPage, IonSegment, IonSegmentButton, IonSpinner, alertController, toastController } from '@ionic/vue';
-import { fingerPrintOutline, lockClosedOutline, serverOutline, sparklesOutline } from 'ionicons/icons';
+import { bugOutline, fingerPrintOutline, lockClosedOutline, serverOutline, sparklesOutline } from 'ionicons/icons';
 import { useAuthStore } from '../stores/auth';
 import { usePointageStore } from '../stores/pointage';
 import { useServerUrl } from '../composables/useServerUrl';
@@ -16,7 +16,7 @@ import {
   isBiometricAvailable,
   saveCredentials,
 } from '../services/biometric';
-import { recordError } from '../services/errorLog';
+import { errorCount, recordError, shareErrorLog } from '../services/errorLog';
 
 const LAST_USERNAME_KEY = 'ocleaneo_last_username';
 const BIOMETRIC_DECLINED_KEY = 'ocleaneo_biometric_declined';
@@ -28,6 +28,10 @@ const rememberedUsername = ref('');
 const error = ref('');
 const loading = ref(false);
 const biometricAvailable = ref(false);
+// Sur cet écran précisément : Profil (seul endroit où le journal était
+// transmissible jusqu'ici) est une route protégée — hors d'atteinte pile
+// quand la connexion échoue et qu'on en aurait le plus besoin.
+const errorsLogged = ref(0);
 
 const auth = useAuthStore();
 const pointage = usePointageStore();
@@ -85,6 +89,7 @@ onMounted(async () => {
   // renvoie false sur certains appareils pourtant fonctionnels.
   biometricAvailable.value = await isBiometricAvailable() || (await hasSavedCredentials());
   rememberedUsername.value = localStorage.getItem(LAST_USERNAME_KEY) || '';
+  errorsLogged.value = await errorCount();
 
   if (biometricAvailable.value && (await hasSavedCredentials())) {
     mode.value = 'biometric';
@@ -130,6 +135,7 @@ async function tryBiometric() {
         `URL serveur : "${currentServerUrl.value ?? defaultServerUrl.value}" — ${e.message}`,
         'LoginView.tryBiometric: échec de connexion',
       );
+      errorsLogged.value += 1;
     } else {
       error.value = "Authentification par empreinte annulée ou impossible.";
     }
@@ -217,6 +223,7 @@ async function submit() {
       `URL serveur : "${currentServerUrl.value ?? defaultServerUrl.value}" — ${e instanceof Error ? e.message : String(e)}`,
       'LoginView.submit: échec de connexion',
     );
+    errorsLogged.value += 1;
   } finally {
     loading.value = false;
   }
@@ -285,6 +292,14 @@ async function submit() {
         <button class="login-alt server-toggle" type="button" @click="toggleServerPanel">
           <ion-icon :icon="serverOutline"></ion-icon>
           {{ serverPanelOpen ? 'Fermer' : 'Configurer le serveur' }}
+        </button>
+
+        <!-- Visible seulement s'il y a quelque chose à transmettre : le cas
+             qui compte ici est un salarié qui n'arrive plus du tout à se
+             connecter, donc qui ne peut pas atteindre Profil pour le faire. -->
+        <button v-if="errorsLogged" class="login-alt server-toggle" type="button" @click="shareErrorLog">
+          <ion-icon :icon="bugOutline"></ion-icon>
+          Transmettre le diagnostic
         </button>
 
         <div v-if="serverPanelOpen" class="server-url-field">
