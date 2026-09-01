@@ -1,4 +1,5 @@
 import { Preferences } from '@capacitor/preferences';
+import { Share } from '@capacitor/share';
 
 /**
  * Journal local des erreurs non rattrapées.
@@ -13,8 +14,10 @@ import { Preferences } from '@capacitor/preferences';
  * Brancher un service tiers (Sentry ou autre) enverrait des traces hors de
  * l'entreprise et engage une décision qui n'est pas technique — c'est à
  * Ocleaneo de la prendre, pas à ce module de la préempter. Le journal rend le
- * défaut *observable* ; le salarié peut le transmettre depuis son profil, et
- * l'envoi automatique reste une évolution possible par-dessus.
+ * défaut *observable* ; le salarié peut le transmettre depuis son profil ou,
+ * pour l'échec le plus critique — ne plus pouvoir se connecter du tout —
+ * directement depuis l'écran de connexion (voir shareErrorLog ci-dessous),
+ * et l'envoi automatique reste une évolution possible par-dessus.
  */
 
 const LOG_KEY = 'ocleaneo_error_log';
@@ -148,6 +151,22 @@ export async function formatErrorLog(): Promise<string> {
   return entries
     .map((e) => `[${e.at}] ${e.context}\n${e.message}${e.stack ? `\n${e.stack}` : ''}`)
     .join('\n\n');
+}
+
+/**
+ * Transmet le journal (partage natif, ou annulation silencieuse si
+ * indisponible/refusée). Partagée entre ProfileView (salarié déjà connecté)
+ * et LoginView (salarié qui ne parvient plus à se connecter du tout — le
+ * seul cas où Profil, route protégée, est justement hors d'atteinte).
+ */
+export async function shareErrorLog(): Promise<void> {
+  const text = await formatErrorLog();
+  try {
+    await Share.share({ title: "Journal d'erreurs Ocleaneo", text });
+  } catch {
+    // Partage annulé, ou indisponible en navigateur : sans conséquence, le
+    // journal reste sur l'appareil.
+  }
 }
 
 /**

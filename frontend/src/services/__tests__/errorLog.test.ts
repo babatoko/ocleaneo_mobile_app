@@ -26,6 +26,11 @@ vi.mock('@capacitor/preferences', () => ({
   },
 }));
 
+const shareMock = vi.fn(async () => {});
+vi.mock('@capacitor/share', () => ({
+  Share: { share: (...args: unknown[]) => shareMock(...args) },
+}));
+
 const {
   recordError,
   recentErrors,
@@ -36,11 +41,13 @@ const {
   isTraceModeEnabled,
   setTraceModeEnabled,
   recordTrace,
+  shareErrorLog,
 } = await import('../errorLog');
 
 beforeEach(async () => {
   store = {};
   failNextSet = false;
+  shareMock.mockClear();
   // Le cache module de isTraceModeEnabled survit d'un test à l'autre (il
   // n'est pas réinitialisé avec `store`) — le remettre à faux explicitement
   // évite qu'un test active le mode traçage pour les suivants.
@@ -107,6 +114,21 @@ describe('journal d’erreurs', () => {
     await clearErrorLog();
 
     expect(await errorCount()).toBe(0);
+  });
+
+  it('transmet le texte formaté via le partage natif', async () => {
+    await recordError(new Error('pas de connexion'), 'LoginView.submit');
+
+    await shareErrorLog();
+
+    expect(shareMock).toHaveBeenCalledTimes(1);
+    const [{ text }] = shareMock.mock.calls[0] as [{ text: string }];
+    expect(text).toContain('pas de connexion');
+  });
+
+  it('un partage annulé ou indisponible ne lève jamais', async () => {
+    shareMock.mockRejectedValueOnce(new Error('annulé'));
+    await expect(shareErrorLog()).resolves.toBeUndefined();
   });
 });
 

@@ -27,8 +27,7 @@ import {
 } from '../services/biometric';
 import { areNotificationsEnabled, setNotificationsEnabled } from '../services/notifications';
 import { failedCount, queueLength } from '../services/offlineQueue';
-import { clearErrorLog, errorCount, formatErrorLog, isTraceModeEnabled, setTraceModeEnabled } from '../services/errorLog';
-import { Share } from '@capacitor/share';
+import { clearErrorLog, errorCount, isTraceModeEnabled, setTraceModeEnabled, shareErrorLog } from '../services/errorLog';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -79,18 +78,6 @@ onMounted(async () => {
     loading.value = false;
   }
 });
-
-/** Transmettre le journal est le seul moyen, aujourd'hui, de faire remonter
- *  un plantage : rien n'est envoyé automatiquement (voir services/errorLog.ts). */
-async function shareErrorLog() {
-  const text = await formatErrorLog();
-  try {
-    await Share.share({ title: 'Journal d\'erreurs Ocleaneo', text });
-  } catch {
-    // Partage annulé, ou indisponible en navigateur : sans conséquence, le
-    // journal reste sur l'appareil.
-  }
-}
 
 async function forgetErrorLog() {
   await clearErrorLog();
