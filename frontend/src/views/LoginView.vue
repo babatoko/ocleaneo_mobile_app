@@ -17,6 +17,7 @@ import {
   saveCredentials,
 } from '../services/biometric';
 import { errorCount, recordError, shareErrorLog } from '../services/errorLog';
+import { getAppVersion } from '../services/appInfo';
 
 const LAST_USERNAME_KEY = 'ocleaneo_last_username';
 const BIOMETRIC_DECLINED_KEY = 'ocleaneo_biometric_declined';
@@ -32,6 +33,7 @@ const biometricAvailable = ref(false);
 // transmissible jusqu'ici) est une route protégée — hors d'atteinte pile
 // quand la connexion échoue et qu'on en aurait le plus besoin.
 const errorsLogged = ref(0);
+const appVersion = ref('');
 
 const auth = useAuthStore();
 const pointage = usePointageStore();
@@ -90,6 +92,7 @@ onMounted(async () => {
   biometricAvailable.value = await isBiometricAvailable() || (await hasSavedCredentials());
   rememberedUsername.value = localStorage.getItem(LAST_USERNAME_KEY) || '';
   errorsLogged.value = await errorCount();
+  appVersion.value = await getAppVersion();
 
   if (biometricAvailable.value && (await hasSavedCredentials())) {
     mode.value = 'biometric';
@@ -349,6 +352,8 @@ async function submit() {
             </div>
           </template>
         </div>
+
+        <p v-if="appVersion" class="app-version">v{{ appVersion }}</p>
       </div>
     </ion-content>
   </ion-page>
@@ -385,6 +390,12 @@ async function submit() {
   color: var(--danger);
   font-size: 13px;
   margin-top: 16px;
+}
+
+.app-version {
+  color: var(--text-secondary);
+  font-size: 10px;
+  margin-top: 28px;
 }
 
 .server-toggle {
