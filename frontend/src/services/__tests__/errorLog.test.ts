@@ -26,9 +26,9 @@ vi.mock('@capacitor/preferences', () => ({
   },
 }));
 
-const shareMock = vi.fn(async () => {});
+const shareMock = vi.fn(async (_opts: { title: string; text: string }) => {});
 vi.mock('@capacitor/share', () => ({
-  Share: { share: (...args: unknown[]) => shareMock(...args) },
+  Share: { share: (opts: { title: string; text: string }) => shareMock(opts) },
 }));
 
 const {
@@ -122,7 +122,7 @@ describe('journal d’erreurs', () => {
     await shareErrorLog();
 
     expect(shareMock).toHaveBeenCalledTimes(1);
-    const [{ text }] = shareMock.mock.calls[0] as [{ text: string }];
+    const [{ text }] = shareMock.mock.calls[0];
     expect(text).toContain('pas de connexion');
   });
 
