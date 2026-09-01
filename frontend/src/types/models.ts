@@ -21,7 +21,7 @@ export interface Chantier {
   longitude?: number | null;
 }
 
-export type ShiftStatus = 'confirmed' | 'cancelled' | string;
+export type ShiftStatus = 'confirmed' | 'done' | 'cancelled' | string;
 
 /** Une tâche de la checklist d'un chantier (fsm.activity côté Odoo) —
  *  affichage seul pour l'instant, pas encore de coche depuis le mobile. */

@@ -13,6 +13,7 @@ import type {
   PointageStatus,
   Shift,
   ShiftActivity,
+  ShiftStatus,
   TimeEntry,
   TimeEntryType,
   TodayTimeEntries,
@@ -186,6 +187,11 @@ interface OdooPlanningOrder {
   location: OdooPlanningLocation;
   instructions: string | false;
   activities: OdooPlanningActivity[];
+  /** 'confirmed' | 'done' | 'cancelled' — voir ocleaneo#12. Absent sur un
+   *  backend pas encore mis à jour sur ce commit : à défaut, la commande
+   *  était forcément active (l'ancien /planning excluait déjà tout ce qui
+   *  était clôturé), d'où le repli 'confirmed' dans planningOrderToShift(). */
+  status?: ShiftStatus;
 }
 
 interface OdooPlanningResult {
@@ -267,10 +273,7 @@ function planningOrderToShift(order: OdooPlanningOrder): Shift {
     chantier_address: joinAddress([loc.street, loc.city]),
     start_at: startAt,
     end_at: endAtWithFallback(order, startAt),
-    // Le backend ne distingue pas "confirmed"/"cancelled" : /planning et
-    // /chantiers/aujourdhui excluent déjà les commandes fermées
-    // (stage_id.is_closed), donc tout ce qui est renvoyé est actif.
-    status: 'confirmed',
+    status: order.status || 'confirmed',
     instructions: order.instructions || null,
     // `order.activities` doit toujours être un tableau (voir le contrôleur
     // Python), mais un déploiement backend en retard sur ce commit — code
