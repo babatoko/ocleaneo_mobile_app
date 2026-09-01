@@ -21,7 +21,6 @@ import {
   IonSegment,
   IonSegmentButton,
 } from '@ionic/vue';
-import type { SegmentChangeEventDetail } from '@ionic/core';
 import {
   alertCircleOutline,
   calendarOutline,
@@ -182,7 +181,6 @@ function shiftMonth(delta: number) {
   const d = new Date(monthAnchor.value + 'T00:00:00');
   d.setMonth(d.getMonth() + delta, 1);
   monthAnchor.value = toIso(d);
-  loadMonth();
 }
 
 async function loadMonth() {
@@ -211,12 +209,17 @@ async function refreshFromPull(event: CustomEvent) {
 // semaine courante / mois courant), quelle que soit la date affichée avant
 // le tap — contrairement au zoom par pincement (zoomIn/zoomOut) qui doit
 // lui préserver la position temporelle.
-function onViewChange(e: CustomEvent<SegmentChangeEventDetail>) {
-  const next = e.detail.value as PlanningTab | undefined;
-  if (!next) return;
-  view.value = next;
-  if (next === 'jour' || next === 'semaine') selectedDate.value = todayIsoValue;
-  else if (next === 'mois') monthAnchor.value = todayIsoValue;
+//
+// Lié en @click sur chaque ion-segment-button, pas en @ion-change sur
+// ion-segment : ionChange ne se déclenche que quand la valeur du segment
+// change réellement. Retaper l'onglet déjà actif après avoir glissé vers
+// une autre période (même view, mais selectedDate/monthAnchor ont dérivé)
+// ne change pas cette valeur — ionChange resterait alors muet, et le
+// retour à aujourd'hui ne se ferait jamais.
+function selectTab(tab: PlanningTab) {
+  view.value = tab;
+  if (tab === 'jour' || tab === 'semaine') selectedDate.value = todayIsoValue;
+  else if (tab === 'mois') monthAnchor.value = todayIsoValue;
 }
 
 // --- Navigation gestuelle (glisser / pincer) -------------------------------
@@ -549,6 +552,13 @@ watch(selectedDate, () => {
   if (view.value === 'jour' || view.value === 'tournee') refresh();
   else if (view.value === 'semaine') loadWeek();
 });
+// Même besoin que selectedDate ci-dessus, pour la vue Mois : shiftMonth()
+// (boutons ‹ ›, glissement) et selectTab() (reset "aujourd'hui" en retapant
+// l'onglet Mois déjà actif) changent tous deux monthAnchor sans passer par
+// `view`, qui ne bougerait pas puisqu'on reste sur Mois.
+watch(monthAnchor, () => {
+  if (view.value === 'mois') loadMonth();
+});
 onMounted(async () => {
   if (!auth.employee) auth.fetchMe();
   // Les coordonnées servent aux liens Itinéraire avec guidage direct ; leur
@@ -579,11 +589,11 @@ onUnmounted(destroyMap);
     <div class="avatar">{{ initials }}</div>
   </div>
 
-  <ion-segment class="view-toggle four" :value="view" @ion-change="onViewChange">
-    <ion-segment-button value="jour"><ion-label>Jour</ion-label></ion-segment-button>
-    <ion-segment-button value="semaine"><ion-label>Semaine</ion-label></ion-segment-button>
-    <ion-segment-button value="mois"><ion-label>Mois</ion-label></ion-segment-button>
-    <ion-segment-button value="tournee"><ion-label>Tournée</ion-label></ion-segment-button>
+  <ion-segment class="view-toggle four" :value="view">
+    <ion-segment-button value="jour" @click="selectTab('jour')"><ion-label>Jour</ion-label></ion-segment-button>
+    <ion-segment-button value="semaine" @click="selectTab('semaine')"><ion-label>Semaine</ion-label></ion-segment-button>
+    <ion-segment-button value="mois" @click="selectTab('mois')"><ion-label>Mois</ion-label></ion-segment-button>
+    <ion-segment-button value="tournee" @click="selectTab('tournee')"><ion-label>Tournée</ion-label></ion-segment-button>
   </ion-segment>
 
   <p v-if="exportError" class="export-error"><ion-icon :icon="alertCircleOutline"></ion-icon> {{ exportError }}</p>
