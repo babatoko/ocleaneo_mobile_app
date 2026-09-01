@@ -415,5 +415,16 @@ function normalizeTransportError(e: unknown): Error {
   if (axios.isAxiosError(e) && e.response) {
     return new ProviderError(e.message || 'Erreur serveur.', e.response.status);
   }
-  return new ProviderNetworkError();
+  // Sans réponse HTTP, seul le détail bas niveau d'axios (code + message —
+  // DNS introuvable, certificat invalide, timeout, connexion refusée...)
+  // distingue une panne d'une autre. Sans lui, ProviderNetworkError() retombe
+  // sur son message générique et deux pannes très différentes produisent la
+  // même ligne dans le journal (services/errorLog.ts) — exactement ce qui a
+  // empêché de diagnostiquer le premier signalement de ce défaut.
+  const detail = axios.isAxiosError(e)
+    ? [e.code, e.message].filter(Boolean).join(' — ')
+    : e instanceof Error
+      ? e.message
+      : undefined;
+  return new ProviderNetworkError(detail ? `Connexion impossible. (${detail})` : undefined);
 }
