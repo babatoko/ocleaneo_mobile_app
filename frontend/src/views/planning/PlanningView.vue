@@ -207,9 +207,92 @@ async function refreshFromPull(event: CustomEvent) {
   }
 }
 
+// Taper un onglet revient toujours à la période courante (aujourd'hui /
+// semaine courante / mois courant), quelle que soit la date affichée avant
+// le tap — contrairement au zoom par pincement (zoomIn/zoomOut) qui doit
+// lui préserver la position temporelle.
 function onViewChange(e: CustomEvent<SegmentChangeEventDetail>) {
   const next = e.detail.value as PlanningTab | undefined;
-  if (next) view.value = next;
+  if (!next) return;
+  view.value = next;
+  if (next === 'jour' || next === 'semaine') selectedDate.value = todayIsoValue;
+  else if (next === 'mois') monthAnchor.value = todayIsoValue;
+}
+
+// --- Navigation gestuelle (glisser / pincer) -------------------------------
+// Glisser le bord droit vers la gauche avance dans le temps, glisser le bord
+// gauche vers la droite recule — mappé sur goPeriod(1)/(-1). Le pincement à
+// deux doigts change de granularité (zoomOut : Jour → Semaine → Mois, en
+// resserrant ; zoomIn : l'inverse, en écartant), sans toucher à la date
+// affichée — seul un tap d'onglet (onViewChange) doit recentrer sur
+// aujourd'hui.
+const ZOOM_LEVELS: PlanningTab[] = ['jour', 'semaine', 'mois'];
+const SWIPE_PX = 46;
+const PINCH_PX = 34;
+
+function goPeriod(dir: 1 | -1) {
+  if (view.value === 'jour') selectedDate.value = addDaysIso(selectedDate.value, dir);
+  else if (view.value === 'semaine') selectedDate.value = addDaysIso(selectedDate.value, dir * 7);
+  else if (view.value === 'mois') shiftMonth(dir);
+}
+
+function zoomOut() {
+  const i = ZOOM_LEVELS.indexOf(view.value);
+  if (i >= 0 && i < ZOOM_LEVELS.length - 1) view.value = ZOOM_LEVELS[i + 1];
+}
+
+function zoomIn() {
+  const i = ZOOM_LEVELS.indexOf(view.value);
+  if (i > 0) view.value = ZOOM_LEVELS[i - 1];
+}
+
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartDist = 0;
+let gestureHandled = false;
+
+function touchDistance(touches: TouchList): number {
+  return Math.hypot(
+    touches[0].clientX - touches[1].clientX,
+    touches[0].clientY - touches[1].clientY
+  );
+}
+
+function onTouchStart(e: TouchEvent) {
+  gestureHandled = false;
+  if (e.touches.length === 2) {
+    touchStartDist = touchDistance(e.touches);
+  } else if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartDist = 0;
+  }
+}
+
+// Tournée n'est pas concernée par la spec de navigation gestuelle (pas de
+// notion de "période précédente/suivante" pour un itinéraire du jour).
+function onTouchMove(e: TouchEvent) {
+  if (gestureHandled || view.value === 'tournee') return;
+  if (e.touches.length === 2 && touchStartDist) {
+    const delta = touchDistance(e.touches) - touchStartDist;
+    if (Math.abs(delta) > PINCH_PX) {
+      gestureHandled = true;
+      if (delta < 0) zoomOut();
+      else zoomIn();
+    }
+  } else if (e.touches.length === 1) {
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      gestureHandled = true;
+      goPeriod(dx < 0 ? 1 : -1);
+    }
+  }
+}
+
+function onTouchEnd() {
+  touchStartDist = 0;
+  gestureHandled = false;
 }
 
 function pickDay(date: Date) {
@@ -442,11 +525,14 @@ watch(view, (_v, prev) => {
   if (prev === 'tournee') destroyMap();
   refresh();
 });
-// Changer de jour dans le bandeau doit recharger la vue jour (et la tournée,
-// qui est un jour particulier aussi) — sinon on reste sur les vacations du
-// jour précédent.
+// Changer de jour dans le bandeau (ou par glissement) doit recharger la vue
+// jour (et la tournée, qui est un jour particulier aussi) — sinon on reste
+// sur les vacations du jour précédent. La vue semaine n'avait jusqu'ici
+// aucune façon de changer de semaine ; le glissement en ajoute une, donc
+// elle doit maintenant réagir aux changements de selectedDate aussi.
 watch(selectedDate, () => {
   if (view.value === 'jour' || view.value === 'tournee') refresh();
+  else if (view.value === 'semaine') loadWeek();
 });
 onMounted(async () => {
   if (!auth.employee) auth.fetchMe();
@@ -461,7 +547,12 @@ onUnmounted(destroyMap);
 
 <template>
   <ion-page>
-    <ion-content>
+    <ion-content
+      @touchstart="onTouchStart"
+      @touchmove="onTouchMove"
+      @touchend="onTouchEnd"
+      @touchcancel="onTouchEnd"
+    >
       <ion-refresher slot="fixed" @ionRefresh="refreshFromPull">
         <ion-refresher-content pulling-text="Tire pour rafraîchir" refreshing-spinner="crescent"></ion-refresher-content>
       </ion-refresher>
