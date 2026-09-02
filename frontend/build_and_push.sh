@@ -30,4 +30,4 @@ echo "Push Telegram..."
 HERMES_BIN="$(command -v hermes || echo "$HOME/.local/bin/hermes")"
 "$HERMES_BIN" send -t telegram:$CHAT_ID "ocleaneo-mobile $VERSION (code $VCODE)
 
-MEDIA:/tmp/$NEW_NAME" "${@:-}"
+MEDIA:/tmp/$NEW_NAME"
