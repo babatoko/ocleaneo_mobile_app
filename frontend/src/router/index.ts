@@ -28,6 +28,7 @@ const routes = [
   { path: '/inventaire', name: 'inventaire', component: () => import('../views/inventaire/InventaireView.vue') },
   { path: '/historique', name: 'historique', component: () => import('../views/historique/HistoriqueView.vue') },
   { path: '/profil', name: 'profil', component: () => import('../views/ProfileView.vue') },
+  { path: '/aide', name: 'aide', component: () => import('../views/AideView.vue') },
 ];
 
 const router = createRouter({

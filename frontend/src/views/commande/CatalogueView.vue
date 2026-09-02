@@ -24,6 +24,7 @@ import { useChantiersStore } from '../../stores/chantiers';
 import { iconForProduct } from '../../utils/productIcons';
 import DataState from '../../components/DataState.vue';
 import QuantityStepper from '../../components/QuantityStepper.vue';
+import HelpButton from '../../components/HelpButton.vue';
 import type { Packaging, Product } from '../../types/models';
 
 type StockStatus = 'ok' | 'low' | 'out' | null;
@@ -172,6 +173,9 @@ function goToOrder() {
     <div>
       <p class="hello">Stock</p>
       <p class="name sub-name">Produits sur site</p>
+    </div>
+    <div class="header-actions">
+      <HelpButton />
     </div>
   </div>
 
