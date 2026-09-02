@@ -2,15 +2,19 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Shift } from '../../types/models';
 
 /**
- * Deux comportements verrouillés ici :
+ * Comportements verrouillés ici :
  *
- * 1. @capacitor/share rejette avec exactement "Share canceled" quand l'agent
- *    ferme la feuille de partage sans choisir d'application — le .ics est
- *    déjà écrit à ce stade. Avant correctif, ce message technique en
- *    anglais remontait tel quel jusqu'à l'écran (PlanningView.vue), comme si
- *    l'export avait échoué. Un vrai échec de partage (tout autre message)
+ * 1. exportShiftsToCalendar() retourne un résultat exploitable par l'appelant
+ *    ('shared' | 'cancelled' | undefined) plutôt que de décider seul, en
+ *    silence, quoi faire d'un partage réussi ou annulé — avant ce correctif,
+ *    un partage réussi ne donnait aucun retour du tout à l'écran.
+ * 2. La détection d'annulation ne dépend plus d'une correspondance exacte
+ *    avec "Share canceled" : @capacitor/share (iOS) et notre plugin natif
+ *    Android (CalendarSharePlugin.java, calqué sur le même mécanisme) sont
+ *    traités par le même code, tolérant sur la formulation exacte du
+ *    message. Un vrai échec de partage (message ne contenant pas "cancel")
  *    doit continuer de remonter.
- * 2. Sur Android, la feuille de partage de @capacitor/share ne proposait
+ * 3. Sur Android, la feuille de partage de @capacitor/share ne proposait
  *    aucune application Calendrier : le type MIME est deviné depuis
  *    l'extension via MimeTypeMap, qui ne connaît pas ".ics" et retombe sur
  *    "*\/*", sous lequel les applications Calendrier ne s'annoncent pas. Un
@@ -70,8 +74,8 @@ beforeEach(() => {
 });
 
 describe('exportShiftsToCalendar', () => {
-  it('écrit le .ics puis ouvre la feuille de partage (iOS)', async () => {
-    await exportShiftsToCalendar([shift(1)], 'planning-semaine.ics');
+  it('écrit le .ics, ouvre la feuille de partage et signale un partage réussi (iOS)', async () => {
+    await expect(exportShiftsToCalendar([shift(1)], 'planning-semaine.ics')).resolves.toBe('shared');
 
     expect(writeFile).toHaveBeenCalledTimes(1);
     expect(share).toHaveBeenCalledWith({ title: 'Planning Ocleaneo', url: 'file:///cache/ocleaneo-planning.ics' });
@@ -81,16 +85,29 @@ describe('exportShiftsToCalendar', () => {
   it('passe par le plugin natif CalendarShare sur Android, avec le type MIME calendrier posé explicitement', async () => {
     platform = 'android';
 
-    await exportShiftsToCalendar([shift(1)], 'planning-semaine.ics');
+    await expect(exportShiftsToCalendar([shift(1)], 'planning-semaine.ics')).resolves.toBe('shared');
 
     expect(shareIcs).toHaveBeenCalledWith({ path: 'file:///cache/ocleaneo-planning.ics', title: 'Planning Ocleaneo' });
     expect(share).not.toHaveBeenCalled();
   });
 
-  it("n'échoue pas quand l'agent ferme la feuille de partage sans partager", async () => {
+  it("signale une annulation (sans échec) quand l'agent ferme la feuille de partage sans partager (iOS)", async () => {
     share.mockRejectedValueOnce(new Error('Share canceled'));
 
-    await expect(exportShiftsToCalendar([shift(1)])).resolves.toBeUndefined();
+    await expect(exportShiftsToCalendar([shift(1)])).resolves.toBe('cancelled');
+  });
+
+  it("signale une annulation (sans échec) quand l'agent ferme la feuille de partage sans partager (Android)", async () => {
+    platform = 'android';
+    shareIcs.mockRejectedValueOnce(new Error('Share canceled'));
+
+    await expect(exportShiftsToCalendar([shift(1)])).resolves.toBe('cancelled');
+  });
+
+  it('reconnaît une annulation même si la casse ou la formulation exacte diffère légèrement', async () => {
+    share.mockRejectedValueOnce(new Error('User Cancelled the share sheet'));
+
+    await expect(exportShiftsToCalendar([shift(1)])).resolves.toBe('cancelled');
   });
 
   it('laisse remonter un vrai échec de partage', async () => {
@@ -109,7 +126,7 @@ describe('exportShiftsToCalendar', () => {
   });
 
   it('ne fait rien pour une liste vide (pas de partage sans contenu)', async () => {
-    await exportShiftsToCalendar([]);
+    await expect(exportShiftsToCalendar([])).resolves.toBeUndefined();
 
     expect(writeFile).not.toHaveBeenCalled();
     expect(share).not.toHaveBeenCalled();

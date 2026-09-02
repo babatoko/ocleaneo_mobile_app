@@ -24,6 +24,7 @@ import {
 import {
   alertCircleOutline,
   calendarOutline,
+  checkmarkCircleOutline,
   chevronBackOutline,
   chevronForwardOutline,
   locationOutline,
@@ -62,6 +63,16 @@ let exportErrorTimeout: ReturnType<typeof setTimeout> | undefined;
 watch(exportError, (msg) => {
   clearTimeout(exportErrorTimeout);
   if (msg) exportErrorTimeout = setTimeout(() => (exportError.value = ''), 6000);
+});
+const exportSuccess = ref('');
+// Avant ce correctif, un partage réussi ne donnait strictement aucun retour
+// visible à l'écran — l'agent n'avait aucun moyen de savoir si le geste
+// avait fonctionné sans rouvrir son agenda pour vérifier. Même mécanisme
+// d'auto-effacement que exportError ci-dessus.
+let exportSuccessTimeout: ReturnType<typeof setTimeout> | undefined;
+watch(exportSuccess, (msg) => {
+  clearTimeout(exportSuccessTimeout);
+  if (msg) exportSuccessTimeout = setTimeout(() => (exportSuccess.value = ''), 6000);
 });
 const todayIsoValue = todayIso();
 
@@ -351,8 +362,14 @@ function itineraryHref(shift: Shift): string {
 
 async function exportToCalendar(shiftsToExport: Shift[], filename: string) {
   exportError.value = '';
+  exportSuccess.value = '';
   try {
-    await exportShiftsToCalendar(shiftsToExport, filename);
+    const outcome = await exportShiftsToCalendar(shiftsToExport, filename);
+    if (outcome === 'shared') {
+      exportSuccess.value = shiftsToExport.length > 1 ? 'Vacations ajoutées à votre agenda.' : 'Vacation ajoutée à votre agenda.';
+    }
+    // outcome === 'cancelled' : l'agent a refermé la feuille de partage sans
+    // rien choisir, ce n'est pas une erreur — pas de bannière du tout.
   } catch (e) {
     exportError.value = (e instanceof Error && e.message) || "Export impossible.";
   }
@@ -597,6 +614,7 @@ onMounted(async () => {
 onUnmounted(() => {
   destroyMap();
   clearTimeout(exportErrorTimeout);
+  clearTimeout(exportSuccessTimeout);
 });
 </script>
 
@@ -630,6 +648,7 @@ onUnmounted(() => {
   </ion-segment>
 
   <p v-if="exportError" class="export-error"><ion-icon :icon="alertCircleOutline"></ion-icon> {{ exportError }}</p>
+  <p v-if="exportSuccess" class="export-success"><ion-icon :icon="checkmarkCircleOutline"></ion-icon> {{ exportSuccess }}</p>
 
   <div v-if="view === 'jour'">
     <div class="days">
@@ -837,6 +856,15 @@ onUnmounted(() => {
   margin: 0 18px 8px;
   font-size: 12px;
   color: var(--danger);
+}
+
+.export-success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 18px 8px;
+  font-size: 12px;
+  color: var(--success-text);
 }
 
 /* Carte de vacation (vue Jour) : le résumé est un vrai <button> (focusable,

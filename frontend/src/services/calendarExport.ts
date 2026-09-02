@@ -35,6 +35,8 @@ function buildIcs(shifts: Shift[]): string {
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ocleaneo//Planning//FR', ...events, 'END:VCALENDAR'].join('\r\n');
 }
 
+export type CalendarExportOutcome = 'shared' | 'cancelled';
+
 /**
  * Génère un .ics pour une ou plusieurs vacations et ouvre la feuille de
  * partage native pour que le salarié l'ajoute à son agenda personnel
@@ -43,12 +45,21 @@ function buildIcs(shifts: Shift[]): string {
  * complet au calendrier », intrusive pour ce que ça apporte ici. Le fichier
  * .ics standard, partagé via la feuille système, fait le même travail sans
  * cette permission.
+ *
+ * Retourne 'shared' quand l'agent a effectivement choisi une application,
+ * 'cancelled' quand il a refermé la feuille sans rien choisir (le .ics est
+ * déjà écrit dans les deux cas — refermer la feuille n'est pas un échec).
+ * L'appelant décide quoi afficher pour chaque cas ; ce module ne décide pas
+ * seul de rester silencieux sur un partage réussi.
  */
-export async function exportShiftsToCalendar(shifts: Shift[], filename = 'ocleaneo-planning.ics'): Promise<void> {
+export async function exportShiftsToCalendar(
+  shifts: Shift[],
+  filename = 'ocleaneo-planning.ics',
+): Promise<CalendarExportOutcome | undefined> {
   if (!Capacitor.isNativePlatform()) {
     throw new Error("L'export calendrier n'est disponible que dans l'app installée sur le téléphone.");
   }
-  if (!shifts.length) return;
+  if (!shifts.length) return undefined;
 
   const ics = buildIcs(shifts);
   await Filesystem.writeFile({
@@ -65,24 +76,25 @@ export async function exportShiftsToCalendar(shifts: Shift[], filename = 'oclean
   // Calendrier ne s'annonce dans la feuille de partage : l'agent n'a alors
   // aucun moyen d'ajouter le planning à son agenda en un geste. Un petit
   // plugin natif (CalendarSharePlugin.java) pose "text/calendar"
-  // explicitement, sans deviner. Sur iOS, l'UTI de ".ics" est déjà reconnue
-  // nativement (Calendrier apparaît normalement) — pas besoin de ce
-  // contournement.
-  if (Capacitor.getPlatform() === 'android') {
-    await CalendarShare.shareIcs({ path: uri, title: 'Planning Ocleaneo' });
-    return;
-  }
+  // explicitement, sans deviner, et reproduit désormais le même mécanisme de
+  // résultat d'activité que @capacitor/share (résout en cas de partage réel,
+  // rejette avec "Share canceled" sinon) — les deux plateformes peuvent donc
+  // être traitées avec le même code ci-dessous.
+  const shareCall =
+    Capacitor.getPlatform() === 'android'
+      ? () => CalendarShare.shareIcs({ path: uri, title: 'Planning Ocleaneo' })
+      : () => Share.share({ title: 'Planning Ocleaneo', url: uri });
 
   try {
-    await Share.share({ title: 'Planning Ocleaneo', url: uri });
+    await shareCall();
+    return 'shared';
   } catch (e) {
-    // @capacitor/share rejette avec exactement ce message (iOS ici — le cas
-    // Android passe par CalendarShare ci-dessus) quand le salarié ferme la
-    // feuille de partage sans choisir d'application. Le .ics est déjà écrit
-    // à ce stade : ce n'est pas un échec de l'export, juste un choix de ne
-    // pas le partager tout de suite — pas la peine de le signaler comme une
-    // erreur (message technique en anglais, en plus).
-    if (e instanceof Error && e.message === 'Share canceled') return;
+    // Le message exact ("Share canceled") vient de @capacitor/share et de
+    // notre plugin natif calqué dessus — on reste tolérant sur la casse/la
+    // formulation exacte plutôt que de dépendre d'une correspondance
+    // caractère pour caractère qui casserait silencieusement si l'un des
+    // deux devait un jour reformuler son message.
+    if (e instanceof Error && /cancel/i.test(e.message)) return 'cancelled';
     throw e;
   }
 }
