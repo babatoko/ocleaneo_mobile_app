@@ -15,6 +15,10 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Doit précéder super.onCreate() — c'est là que le Bridge construit
+        // sa liste de plugins (voir la doc Capacitor sur les plugins natifs
+        // maison, par opposition à ceux embarqués comme node_modules).
+        registerPlugin(NfcStatusPlugin.class);
         super.onCreate(savedInstanceState);
         WebSettings settings = getBridge().getWebView().getSettings();
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);

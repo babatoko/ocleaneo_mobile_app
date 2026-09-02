@@ -118,3 +118,22 @@ describe('clockWithTag — rafraîchissement de la liste des chantiers', () => {
     expect(fetchChantiers).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('clockWithTag — position GPS indisponible', () => {
+  it("avertit sans bloquer le pointage quand la position n'a pas pu être obtenue", async () => {
+    // navigator sans geolocation (stub du fichier) : getPosition() retombe
+    // toujours sur null ici, exactement le cas GPS désactivé/refusé/hors
+    // service sur un vrai téléphone.
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(createTimeEntry).toHaveBeenCalledTimes(1);
+    expect(pointage.lastMessage).toEqual({
+      type: 'warn',
+      text: 'Position non disponible — vérifiez que la localisation est activée. Pointage tout de même enregistré.',
+    });
+  });
+});
