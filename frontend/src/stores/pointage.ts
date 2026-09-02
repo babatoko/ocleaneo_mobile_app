@@ -269,10 +269,15 @@ export const usePointageStore = defineStore('pointage', {
       try {
         await provider.createTimeEntry(payload);
         await this.loadSafe();
-        this.lastMessage =
-          geo && !geo.withinRange
-            ? { type: 'warn', text: `Position à ~${geo.distanceMeters} m du chantier — pointage tout de même enregistré.` }
-            : null;
+        // Même logique dans les deux cas — avertir sans jamais bloquer, voir
+        // GEOFENCE_TOLERANCE_M (geofence.ts) — mais deux causes distinctes :
+        // position introuvable (GPS désactivé/refusé/hors service) contre
+        // position connue mais trop loin du chantier.
+        this.lastMessage = !position
+          ? { type: 'warn', text: 'Position non disponible — vérifiez que la localisation est activée. Pointage tout de même enregistré.' }
+          : geo && !geo.withinRange
+          ? { type: 'warn', text: `Position à ~${geo.distanceMeters} m du chantier — pointage tout de même enregistré.` }
+          : null;
       } catch (e) {
         if (!(e instanceof ProviderNetworkError)) throw e;
         await enqueue(payload);

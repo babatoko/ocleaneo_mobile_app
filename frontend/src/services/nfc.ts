@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { NFC } from '@exxili/capacitor-nfc';
 
 export async function isNfcSupported(): Promise<boolean> {
@@ -9,6 +9,40 @@ export async function isNfcSupported(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * @exxili/capacitor-nfc (isSupported ci-dessus) sait dire si l'appareil
+ * POSSÈDE une puce NFC, mais pas si le NFC est ACTIVÉ dans les réglages —
+ * la seule information qui distingue, côté écran Pointage, "aucun badge
+ * présenté" de "NFC éteint, rien ne sera jamais lu". Aucun plugin tiers ne
+ * l'expose : NfcStatus est un petit plugin natif maison
+ * (android/app/.../NfcStatusPlugin.java), Android uniquement — iOS n'a pas
+ * d'équivalent d'un NFC système désactivable (Core NFC est disponible dès
+ * lors que l'appareil le supporte).
+ */
+interface NfcStatusPlugin {
+  isEnabled(): Promise<{ supported: boolean; enabled: boolean }>;
+  openSettings(): Promise<void>;
+}
+
+const NfcStatus = registerPlugin<NfcStatusPlugin>('NfcStatus');
+
+/** `null` : impossible à déterminer sur cette plateforme (iOS, web). */
+export async function isNfcEnabled(): Promise<boolean | null> {
+  if (Capacitor.getPlatform() !== 'android') return null;
+  try {
+    const { enabled } = await NfcStatus.isEnabled();
+    return enabled;
+  } catch {
+    return null;
+  }
+}
+
+/** Ouvre l'écran de réglages NFC d'Android. No-op silencieux ailleurs. */
+export async function openNfcSettings(): Promise<void> {
+  if (Capacitor.getPlatform() !== 'android') return;
+  await NfcStatus.openSettings().catch(() => {});
 }
 
 /**

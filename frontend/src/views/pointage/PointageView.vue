@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import {
   IonAvatar,
   IonBadge,
@@ -36,7 +37,7 @@ import {
 } from 'ionicons/icons';
 import { usePointageStore } from '../../stores/pointage';
 import { useChantiersStore } from '../../stores/chantiers';
-import { isNfcSupported, startIosNfcSession, cancelIosNfcSession } from '../../services/nfc';
+import { isNfcSupported, isNfcEnabled, openNfcSettings, startIosNfcSession, cancelIosNfcSession } from '../../services/nfc';
 import type { TimeEntry, TimeEntryType } from '../../types/models';
 
 interface PlannedDepartureEntry {
@@ -55,6 +56,9 @@ const pointage = usePointageStore();
 const chantiers = useChantiersStore();
 const now = ref(new Date());
 const nfcSupported = ref<boolean | null>(null); // null = vérification en cours
+// null = non applicable sur cette plateforme (iOS/web, voir services/nfc.ts)
+// ou vérification en cours.
+const nfcEnabled = ref<boolean | null>(null);
 const isIos = Capacitor.getPlatform() === 'ios';
 const justSucceeded = ref(false);
 
@@ -62,9 +66,23 @@ let clockInterval: ReturnType<typeof setInterval> | undefined;
 let scanTimeout: ReturnType<typeof setTimeout> | undefined;
 let messageTimeout: ReturnType<typeof setTimeout> | undefined;
 let initialLoadDone = false;
+let removeResumeListener: (() => void) | undefined;
+
+// Un badge présenté NFC éteint ne déclenche jamais rien côté Android (lecture
+// passive, voir services/nfc.ts) — sans ce contrôle, ça serait indiscernable
+// pour le salarié d'un badge simplement mal positionné.
+async function checkNfcEnabled() {
+  nfcEnabled.value = await isNfcEnabled();
+}
 
 onMounted(async () => {
   nfcSupported.value = await isNfcSupported();
+  await checkNfcEnabled();
+  // Revérifie au retour sur l'app : le salarié a pu activer le NFC depuis les
+  // réglages système (bouton "Activer" ci-dessous) puis revenir.
+  App.addListener('resume', checkNfcEnabled).then((handle) => {
+    removeResumeListener = () => handle.remove();
+  });
   pointage.initGlobalListener(router);
   try {
     // chantiers.fetchMine() et loadSafe() ne couvrent que la coupure réseau
@@ -91,6 +109,7 @@ onUnmounted(() => {
   clearInterval(clockInterval);
   clearTimeout(scanTimeout);
   clearTimeout(messageTimeout);
+  removeResumeListener?.();
 });
 
 watch(
@@ -235,6 +254,15 @@ function fmtTime(iso: string | Date | null | undefined): string {
     <ion-label class="ion-text-wrap">Vacation dépassée de {{ fmtOverdue(overdueMinutes) }} — n'oubliez pas de badger votre départ.</ion-label>
   </ion-item>
 
+  <!-- Android uniquement (nfcEnabled reste null ailleurs, voir services/nfc.ts) :
+       un badge présenté NFC éteint ne déclenche jamais rien, sans ce bandeau
+       ce serait indiscernable d'un badge mal positionné. -->
+  <ion-item v-if="nfcSupported && nfcEnabled === false" class="soft-banner warn" lines="none">
+    <ion-icon slot="start" :icon="warningOutline"></ion-icon>
+    <ion-label class="ion-text-wrap">NFC désactivé — aucun badge ne pourra être lu tant qu'il n'est pas réactivé.</ion-label>
+    <ion-button slot="end" fill="clear" size="small" @click="openNfcSettings">Activer</ion-button>
+  </ion-item>
+
   <div class="clock-wrap">
     <button
       class="nfc-circle"
@@ -246,6 +274,7 @@ function fmtTime(iso: string | Date | null | undefined): string {
       <ion-spinner v-else-if="pointage.scanning" name="crescent"></ion-spinner>
       <ion-icon v-else :icon="radioOutline"></ion-icon>
       <p v-if="nfcSupported === false">NFC non disponible sur cet appareil</p>
+      <p v-else-if="nfcEnabled === false">NFC désactivé</p>
       <p v-else-if="pointage.scanning">Lecture en cours…</p>
       <p v-else>Approchez le badge du chantier</p>
     </button>
