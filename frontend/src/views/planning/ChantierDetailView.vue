@@ -47,11 +47,14 @@ function timeRange(s: Shift): string {
   return `${fmt(s.start_at)} - ${fmt(s.end_at)}`;
 }
 
+// Coordonnées portées par le shift lui-même (Shift.latitude/longitude,
+// déjà renvoyées par /planning) — pas besoin de les recouper avec
+// chantiers.list (/chantiers/aujourdhui), qui ne couvre qu'un
+// sous-ensemble plafonné des commandes ouvertes du salarié.
 function itineraryHref(s: Shift): string {
-  const chantier = chantiers.list.find((c) => c.id === s.chantier_id);
   return turnByTurnHref({
-    latitude: chantier?.latitude,
-    longitude: chantier?.longitude,
+    latitude: s.latitude,
+    longitude: s.longitude,
     address: s.chantier_address || s.chantier_name,
   });
 }
@@ -102,7 +105,6 @@ async function load() {
   loading.value = true;
   error.value = '';
   try {
-    await chantiers.fetchMine(); // pour le lien Itinéraire avec guidage direct (coordonnées)
     if (planning.selectedShift && String(planning.selectedShift.id) === props.id) {
       shift.value = planning.selectedShift;
     } else {

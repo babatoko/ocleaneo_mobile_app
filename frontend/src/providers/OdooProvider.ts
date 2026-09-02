@@ -167,6 +167,8 @@ interface OdooPlanningLocation {
   name: string | false;
   street: string | false;
   city: string | false;
+  latitude: number | false;
+  longitude: number | false;
 }
 
 interface OdooPlanningActivity {
@@ -282,6 +284,8 @@ function planningOrderToShift(order: OdooPlanningOrder): Shift {
     // /planning (donc Jour/Semaine, pas seulement le détail) au lieu de se
     // dégrader en simple absence d'activités affichées.
     activities: (order.activities ?? []).map(activityToShiftActivity),
+    latitude: loc.latitude || null,
+    longitude: loc.longitude || null,
   };
 }
 

@@ -33,7 +33,6 @@ import {
   timeOutline,
 } from 'ionicons/icons';
 import { useAuthStore } from '../../stores/auth';
-import { useChantiersStore } from '../../stores/chantiers';
 import { usePlanningStore } from '../../stores/planning';
 import { getCurrentPosition, getOptimizedTrip, type TripPoint } from '../../services/osrm';
 import { turnByTurnHref } from '../../services/navigation';
@@ -49,7 +48,6 @@ type PlanningTab = 'jour' | 'semaine' | 'mois' | 'tournee';
 
 const router = useRouter();
 const auth = useAuthStore();
-const chantiers = useChantiersStore();
 const planning = usePlanningStore();
 const view = ref<PlanningTab>('jour');
 const selectedDate = ref(todayIso());
@@ -330,12 +328,13 @@ function timeRange(shift: Shift): string {
 }
 
 // Coordonnées du chantier si connues (guidage direct) — sinon repli sur
-// l'adresse texte (simple recherche, pas de guidage).
+// l'adresse texte (simple recherche, pas de guidage). Déjà portées par le
+// shift lui-même (voir Shift.latitude/longitude) : pas besoin de les
+// recouper avec une autre liste.
 function itineraryHref(shift: Shift): string {
-  const chantier = chantiers.list.find((c) => c.id === shift.chantier_id);
   return turnByTurnHref({
-    latitude: chantier?.latitude,
-    longitude: chantier?.longitude,
+    latitude: shift.latitude,
+    longitude: shift.longitude,
     address: shift.chantier_address || shift.chantier_name,
   });
 }
@@ -412,7 +411,6 @@ async function loadTournee() {
   missingCoords.value = [];
   tripLoading.value = true;
   try {
-    await chantiers.fetchMine();
     await planning.loadDay(selectedDate.value);
     // loadDay ne lève plus : c'est le store qui porte l'erreur, il faut donc
     // la relayer ici plutôt que de calculer une tournée sur une liste vide.
@@ -425,18 +423,26 @@ async function loadTournee() {
     // aussi bien l'itinéraire optimisé que missingCoords ci-dessous.
     const dayShifts = planning.dayShifts.filter((s) => s.status !== 'done' && s.status !== 'cancelled');
 
+    // Les coordonnées viennent du shift lui-même (Shift.latitude/longitude,
+    // déjà renvoyées par /planning) — PAS de la liste chantiers.list
+    // (/chantiers/aujourdhui), qui ne couvre qu'un sous-ensemble des
+    // commandes ouvertes du salarié, plafonné et classé en priorisant celles
+    // d'aujourd'hui. Une Tournée consultée pour un autre jour (ou un salarié
+    // avec beaucoup de commandes ouvertes) pouvait n'y trouver aucun de ses
+    // chantiers, et affichait "coordonnées GPS manquantes" pour des chantiers
+    // qui en ont pourtant bien dans Odoo — voir le contrôleur Python
+    // (chantiers_aujourdhui) qui documente cette même limite côté serveur.
     const withCoords: Required<Pick<TrippablePoint, 'id' | 'name' | 'address' | 'latitude' | 'longitude' | 'shiftDurationSeconds' | 'startAt' | 'shiftId'>>[] = [];
     for (const s of dayShifts) {
-      const chantier = chantiers.list.find((c) => c.id === s.chantier_id);
       // `!= null` : 0 est une coordonnée réelle (équateur/méridien), pas une
       // valeur "manquante" — même correction que checkGeofence().
-      if (chantier?.latitude != null && chantier?.longitude != null) {
+      if (s.latitude != null && s.longitude != null) {
         withCoords.push({
           id: s.chantier_id,
           name: s.chantier_name,
           address: s.chantier_address,
-          latitude: chantier.latitude,
-          longitude: chantier.longitude,
+          latitude: s.latitude,
+          longitude: s.longitude,
           shiftDurationSeconds:
             (new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 1000,
           startAt: s.start_at,
@@ -575,9 +581,6 @@ watch(monthAnchor, () => {
 });
 onMounted(async () => {
   if (!auth.employee) auth.fetchMe();
-  // Les coordonnées servent aux liens Itinéraire avec guidage direct ; leur
-  // absence ne doit pas empêcher l'affichage du planning lui-même.
-  await chantiers.fetchMine().catch(() => {});
   loadStripCounts();
   refresh();
 });
