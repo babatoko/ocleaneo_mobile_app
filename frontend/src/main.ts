@@ -8,6 +8,7 @@ import { ensureNotificationChannel } from './services/notifications';
 import { initProvider } from './providers';
 import { installErrorHandlers } from './services/errorLog';
 import { loadToken } from './services/tokenStore';
+import { setupServiceWorker } from './services/pwaUpdate';
 
 // Ionic apporte les mécanismes (transitions de page, geste de retour iOS,
 // clavier/scroll adaptatifs, safe-area) — le style visuel Ocleaneo reste
@@ -22,6 +23,10 @@ const app = createApp(App);
 // Posé avant tout le reste : une erreur pendant l'initialisation est
 // exactement celle qu'on ne veut pas perdre, et c'est la plus probable.
 installErrorHandlers(app);
+// Non attendu : purge un service worker/cache d'une version précédente en
+// tâche de fond (natif) ou enregistre celui de la PWA (web) — rien d'autre
+// n'a besoin d'attendre ça pour démarrer.
+void setupServiceWorker();
 app.use(IonicVue, { mode: 'ios' }); // un seul look, cohérent sur les deux plateformes — pas de rendu Material/Cupertino qui diverge de l'identité Ocleaneo
 const pinia = createPinia();
 app.use(pinia);

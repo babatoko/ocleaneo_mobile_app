@@ -28,6 +28,12 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Le plugin injecte par défaut son propre script d'enregistrement dans
+      // index.html, sans savoir si l'App tourne dans un navigateur ou dans
+      // la coquille native — désactivé ici pour que ce soit
+      // services/pwaUpdate.ts qui décide, plateforme par plateforme (voir
+      // son commentaire pour pourquoi c'est important sur natif).
+      injectRegister: false,
       // Sans icônes 192/512, Chrome refuse de proposer l'installation (le
       // critère "manifeste valide" échoue silencieusement) — la PWA restait
       // accessible par navigateur mais jamais installable sur écran d'accueil,
