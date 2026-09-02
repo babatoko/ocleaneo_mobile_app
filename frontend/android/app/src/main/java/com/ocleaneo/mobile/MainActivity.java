@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         // sa liste de plugins (voir la doc Capacitor sur les plugins natifs
         // maison, par opposition à ceux embarqués comme node_modules).
         registerPlugin(NfcStatusPlugin.class);
+        registerPlugin(CalendarSharePlugin.class);
         super.onCreate(savedInstanceState);
         WebSettings settings = getBridge().getWebView().getSettings();
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);

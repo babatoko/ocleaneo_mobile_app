@@ -2,21 +2,34 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Shift } from '../../types/models';
 
 /**
- * @capacitor/share rejette avec exactement "Share canceled" (Android) quand
- * l'agent ferme la feuille de partage sans choisir d'application — le .ics
- * est déjà écrit à ce stade. Avant ce correctif, ce message technique en
- * anglais remontait tel quel jusqu'à l'écran (PlanningView.vue), comme si
- * l'export avait échoué. Ces tests verrouillent qu'il est désormais avalé,
- * et qu'un vrai échec de partage (tout autre message) continue de remonter.
+ * Deux comportements verrouillés ici :
+ *
+ * 1. @capacitor/share rejette avec exactement "Share canceled" quand l'agent
+ *    ferme la feuille de partage sans choisir d'application — le .ics est
+ *    déjà écrit à ce stade. Avant correctif, ce message technique en
+ *    anglais remontait tel quel jusqu'à l'écran (PlanningView.vue), comme si
+ *    l'export avait échoué. Un vrai échec de partage (tout autre message)
+ *    doit continuer de remonter.
+ * 2. Sur Android, la feuille de partage de @capacitor/share ne proposait
+ *    aucune application Calendrier : le type MIME est deviné depuis
+ *    l'extension via MimeTypeMap, qui ne connaît pas ".ics" et retombe sur
+ *    "*\/*", sous lequel les applications Calendrier ne s'annoncent pas. Un
+ *    plugin natif dédié (CalendarSharePlugin.java) prend le relais sur cette
+ *    plateforme avec "text/calendar" posé explicitement — iOS, où l'UTI de
+ *    ".ics" est déjà reconnue nativement, continue de passer par
+ *    @capacitor/share sans changement.
  */
 
 let native = true;
+let platform = 'ios';
 const writeFile = vi.fn(async (_opts: { path: string; data: string; directory: string; encoding: string }) => {});
 const getUri = vi.fn(async (_opts: { path: string; directory: string }) => ({ uri: 'file:///cache/ocleaneo-planning.ics' }));
 const share = vi.fn(async (_opts: { title: string; url: string }) => {});
+const shareIcs = vi.fn(async (_opts: { path: string; title: string }) => {});
 
 vi.mock('@capacitor/core', () => ({
-  Capacitor: { isNativePlatform: () => native },
+  Capacitor: { isNativePlatform: () => native, getPlatform: () => platform },
+  registerPlugin: () => ({ shareIcs: (opts: { path: string; title: string }) => shareIcs(opts) }),
 }));
 
 vi.mock('@capacitor/filesystem', () => ({
@@ -49,17 +62,29 @@ function shift(id: number): Shift {
 
 beforeEach(() => {
   native = true;
+  platform = 'ios';
   writeFile.mockClear();
   getUri.mockClear();
   share.mockReset().mockResolvedValue(undefined);
+  shareIcs.mockReset().mockResolvedValue(undefined);
 });
 
 describe('exportShiftsToCalendar', () => {
-  it('écrit le .ics puis ouvre la feuille de partage', async () => {
+  it('écrit le .ics puis ouvre la feuille de partage (iOS)', async () => {
     await exportShiftsToCalendar([shift(1)], 'planning-semaine.ics');
 
     expect(writeFile).toHaveBeenCalledTimes(1);
     expect(share).toHaveBeenCalledWith({ title: 'Planning Ocleaneo', url: 'file:///cache/ocleaneo-planning.ics' });
+    expect(shareIcs).not.toHaveBeenCalled();
+  });
+
+  it('passe par le plugin natif CalendarShare sur Android, avec le type MIME calendrier posé explicitement', async () => {
+    platform = 'android';
+
+    await exportShiftsToCalendar([shift(1)], 'planning-semaine.ics');
+
+    expect(shareIcs).toHaveBeenCalledWith({ path: 'file:///cache/ocleaneo-planning.ics', title: 'Planning Ocleaneo' });
+    expect(share).not.toHaveBeenCalled();
   });
 
   it("n'échoue pas quand l'agent ferme la feuille de partage sans partager", async () => {
