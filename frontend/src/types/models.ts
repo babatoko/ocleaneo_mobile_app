@@ -45,6 +45,10 @@ export interface Shift {
   /** Consignes libres pour cette vacation (fsm.order.todo côté Odoo). */
   instructions?: string | null;
   activities?: ShiftActivity[];
+  /** Coordonnées du chantier, déjà renvoyées par /planning (fsm.location) —
+   *  pas besoin de recouper avec un autre appel pour le guidage. */
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export type TimeEntryType = 'in' | 'out' | 'pause_start' | 'pause_end';
