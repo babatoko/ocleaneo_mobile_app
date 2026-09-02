@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { IonBackButton, IonButtons, IonHeader, IonTitle, IonToolbar } from '@ionic/vue';
+import { useRoute } from 'vue-router';
+import HelpButton from './HelpButton.vue';
 
 defineProps({
   title: { type: String, required: true },
 });
+
+// Le centre d'aide lui-même utilise aussi AppHeader (pour son bouton retour) :
+// s'y afficher un lien vers soi-même n'apporte rien.
+const route = useRoute();
 </script>
 
 <template>
@@ -13,6 +19,9 @@ defineProps({
         <ion-back-button default-href="/planning" text=""></ion-back-button>
       </ion-buttons>
       <ion-title>{{ title }}</ion-title>
+      <ion-buttons v-if="route.path !== '/aide'" slot="end">
+        <HelpButton />
+      </ion-buttons>
     </ion-toolbar>
   </ion-header>
 </template>

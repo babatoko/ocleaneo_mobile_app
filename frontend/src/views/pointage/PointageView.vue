@@ -38,6 +38,7 @@ import {
 import { usePointageStore } from '../../stores/pointage';
 import { useChantiersStore } from '../../stores/chantiers';
 import { isNfcSupported, isNfcEnabled, openNfcSettings, startIosNfcSession, cancelIosNfcSession } from '../../services/nfc';
+import HelpButton from '../../components/HelpButton.vue';
 import type { TimeEntry, TimeEntryType } from '../../types/models';
 
 interface PlannedDepartureEntry {
@@ -233,10 +234,13 @@ function fmtTime(iso: string | Date | null | undefined): string {
       <p class="hello">Pointage</p>
       <p class="name sub-name">{{ now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
     </div>
-    <ion-chip class="status-pill" :class="pointage.status">
-      <ion-icon :icon="statusIcon"></ion-icon>
-      <span>{{ statusText }}</span>
-    </ion-chip>
+    <div class="header-actions">
+      <HelpButton />
+      <ion-chip class="status-pill" :class="pointage.status">
+        <ion-icon :icon="statusIcon"></ion-icon>
+        <span>{{ statusText }}</span>
+      </ion-chip>
+    </div>
   </div>
 
   <ion-item v-if="pointage.offlineQueueCount > 0" class="offline-banner" lines="none">

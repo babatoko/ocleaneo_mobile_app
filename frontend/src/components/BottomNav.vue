@@ -23,7 +23,18 @@ const items = [
   -->
   <ion-tab-bar class="bottom-nav" aria-label="Navigation principale">
     <RouterLink v-for="item in items" :key="item.to" :to="item.to" custom v-slot="{ isActive, href, navigate }">
-      <a :href="href" class="nav-item" :class="{ 'router-link-active': isActive }" role="tab" :aria-selected="isActive" @click="navigate">
+      <!-- data-route (indépendant du href résolu par le routeur) : point
+           d'ancrage stable pour OnboardingTour.vue, qui doit retrouver cet
+           élément par onglet sans dépendre d'un éventuel base path. -->
+      <a
+        :href="href"
+        :data-route="item.to"
+        class="nav-item"
+        :class="{ 'router-link-active': isActive }"
+        role="tab"
+        :aria-selected="isActive"
+        @click="navigate"
+      >
         <ion-icon :icon="item.icon" aria-hidden="true"></ion-icon>
         <span class="lbl">{{ item.label }}</span>
       </a>

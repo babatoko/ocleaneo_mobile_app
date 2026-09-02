@@ -288,6 +288,16 @@ input[type='number'] {
   flex-shrink: 0;
 }
 
+/* Regroupe le bouton d'aide discret avec le contenu déjà posé à droite d'un
+   .header (avatar, statut de pointage...) sans casser son space-between :
+   celui-ci ne doit voir que deux enfants, jamais trois. */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 /* ion-segment remplace l'ancien toggle maison : même look (pilule grise,
    option active sur fond clair), mais le focus clavier, les indicateurs
    ARIA (role="tablist"/"tab") et l'animation du curseur viennent d'Ionic. */

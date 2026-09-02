@@ -42,6 +42,7 @@ import { startOfWeekIso, startOfMonthIso, endOfMonthIso } from '../../utils/week
 import { toLocalIso, todayIso, addDaysIso } from '../../utils/date';
 import { provider } from '../../providers';
 import DataState from '../../components/DataState.vue';
+import HelpButton from '../../components/HelpButton.vue';
 import type { Shift } from '../../types/models';
 
 type PlanningTab = 'jour' | 'semaine' | 'mois' | 'tournee';
@@ -599,7 +600,10 @@ onUnmounted(destroyMap);
       <p class="hello">Bonjour</p>
       <p class="name">{{ auth.employee?.name || '' }}</p>
     </div>
-    <div class="avatar">{{ initials }}</div>
+    <div class="header-actions">
+      <HelpButton />
+      <div class="avatar">{{ initials }}</div>
+    </div>
   </div>
 
   <ion-segment class="view-toggle four" :value="view">

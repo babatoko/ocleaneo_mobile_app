@@ -16,6 +16,7 @@ import {
   IonToggle,
 } from '@ionic/vue';
 import { logOutOutline } from 'ionicons/icons';
+import HelpButton from '../components/HelpButton.vue';
 import { useAuthStore } from '../stores/auth';
 import { useServerUrl } from '../composables/useServerUrl';
 import { PROVIDER_KIND_LABELS, PROVIDER_KINDS, useProviderKind } from '../composables/useProviderKind';
@@ -136,6 +137,7 @@ async function changeProviderKind(event: CustomEvent) {
   <ion-page>
     <ion-content>
       <div class="profile-header">
+        <HelpButton class="profile-help" />
         <div class="profile-avatar">{{ initials || '?' }}</div>
         <p class="profile-name">{{ auth.employee?.name || 'Salarié' }}</p>
       </div>
@@ -314,10 +316,17 @@ async function changeProviderKind(event: CustomEvent) {
 
 <style scoped>
 .profile-header {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 24px 16px 16px;
+}
+
+.profile-help {
+  position: absolute;
+  top: 16px;
+  right: 16px;
 }
 
 .profile-avatar {
