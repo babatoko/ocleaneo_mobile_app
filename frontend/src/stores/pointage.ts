@@ -403,7 +403,7 @@ export const usePointageStore = defineStore('pointage', {
 
       NFC.onRead((data) => {
         const uid = data.string()?.tagInfo?.uid;
-        if (uid) this.handleTagRead(uid, router);
+        if (uid) this.handleTagRead(uid.replace(/:/g, '').trim(), router);
       });
       NFC.onError((err) => {
         this.scanError = err.error || 'Erreur de lecture NFC.';

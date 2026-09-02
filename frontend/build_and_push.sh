@@ -25,6 +25,9 @@ cp "$APK_DIR/app-debug.apk" "/tmp/$NEW_NAME"
 
 echo "Built: $NEW_NAME (code $VCODE)"
 echo "Push Telegram..."
-hermes send -t telegram:$CHAT_ID "ocleaneo-mobile $VERSION (code $VCODE)
+# hermes n'est pas toujours dans le PATH d'un shell non-interactif (cron,
+# CI, background) — on le résout explicitement.
+HERMES_BIN="$(command -v hermes || echo "$HOME/.local/bin/hermes")"
+"$HERMES_BIN" send -t telegram:$CHAT_ID "ocleaneo-mobile $VERSION (code $VCODE)
 
 MEDIA:/tmp/$NEW_NAME" "${@:-}"
