@@ -353,12 +353,24 @@ function openDetail(shift: Shift) {
   router.push({ name: 'planning-chantier', params: { id: shift.id }, query: { date: selectedDate.value } });
 }
 
+// L'arrêt de tournée porte l'id de la vacation (shiftId, voir loadTournee())
+// séparément de son `id` de point OSRM (le chantier_id) — on retrouve la
+// vacation complète dans dayShifts pour réutiliser openDetail() tel quel.
+function openTripStopDetail(stop: TripStopWithSchedule) {
+  const shift = planning.dayShifts.find((s) => s.id === stop.shiftId);
+  if (shift) openDetail(shift);
+}
+
 // --- Tournée : itinéraire optimisé (OSRM) -------------------------------
 
 interface TrippablePoint extends TripPoint {
   address?: string;
   shiftDurationSeconds?: number;
   startAt?: string;
+  // `id` ci-dessous porte le chantier_id (identité du point pour OSRM/la
+  // carte, voir plus bas) — distinct de l'id de la vacation elle-même,
+  // nécessaire pour ouvrir son détail (openTripStopDetail ci-dessous).
+  shiftId?: number;
 }
 
 interface TripStopWithSchedule extends TrippablePoint {
@@ -412,7 +424,7 @@ async function loadTournee() {
     // aussi bien l'itinéraire optimisé que missingCoords ci-dessous.
     const dayShifts = planning.dayShifts.filter((s) => s.status !== 'done' && s.status !== 'cancelled');
 
-    const withCoords: Required<Pick<TrippablePoint, 'id' | 'name' | 'address' | 'latitude' | 'longitude' | 'shiftDurationSeconds' | 'startAt'>>[] = [];
+    const withCoords: Required<Pick<TrippablePoint, 'id' | 'name' | 'address' | 'latitude' | 'longitude' | 'shiftDurationSeconds' | 'startAt' | 'shiftId'>>[] = [];
     for (const s of dayShifts) {
       const chantier = chantiers.list.find((c) => c.id === s.chantier_id);
       // `!= null` : 0 est une coordonnée réelle (équateur/méridien), pas une
@@ -427,6 +439,7 @@ async function loadTournee() {
           shiftDurationSeconds:
             (new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 1000,
           startAt: s.start_at,
+          shiftId: s.id,
         });
       } else {
         missingCoords.value.push(s.chantier_name);
@@ -757,7 +770,16 @@ onUnmounted(destroyMap);
       </ion-button>
 
       <ion-list class="stop-list">
-        <ion-item v-for="(s, i) in tripStops" :key="s.id" class="stop-row" lines="full">
+        <ion-item
+          v-for="(s, i) in tripStops"
+          :key="s.id"
+          class="stop-row"
+          lines="full"
+          button
+          detail
+          :aria-label="`Détail de la vacation ${s.name}`"
+          @click="openTripStopDetail(s)"
+        >
           <ion-badge slot="start" class="stop-num">{{ i + 1 }}</ion-badge>
           <ion-label>
             <div class="stop-top">
