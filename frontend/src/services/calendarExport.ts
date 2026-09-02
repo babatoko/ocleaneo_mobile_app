@@ -51,5 +51,15 @@ export async function exportShiftsToCalendar(shifts: Shift[], filename = 'oclean
     encoding: Encoding.UTF8,
   });
   const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
-  await Share.share({ title: 'Planning Ocleaneo', url: uri });
+  try {
+    await Share.share({ title: 'Planning Ocleaneo', url: uri });
+  } catch (e) {
+    // @capacitor/share rejette avec exactement ce message (Android) quand le
+    // salarié ferme la feuille de partage sans choisir d'application — le
+    // .ics est déjà écrit à ce stade, ce n'est pas un échec de l'export, juste
+    // un choix de ne pas le partager tout de suite. Le signaler comme une
+    // erreur (message technique en anglais, en plus) n'aiderait personne.
+    if (e instanceof Error && e.message === 'Share canceled') return;
+    throw e;
+  }
 }

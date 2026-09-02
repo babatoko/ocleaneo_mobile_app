@@ -53,6 +53,16 @@ const view = ref<PlanningTab>('jour');
 const selectedDate = ref(todayIso());
 const monthAnchor = ref(todayIso());
 const exportError = ref('');
+// Sans ça, un vrai échec d'export (pas une simple annulation du partage,
+// désormais silencieuse — voir services/calendarExport.ts) restait affiché
+// indéfiniment : rien dans l'écran ne l'effaçait, pas même un tire-pour-
+// rafraîchir ou un changement d'onglet, tant que l'agent ne relançait pas
+// un export. Même délai que les bannières de PointageView.vue.
+let exportErrorTimeout: ReturnType<typeof setTimeout> | undefined;
+watch(exportError, (msg) => {
+  clearTimeout(exportErrorTimeout);
+  if (msg) exportErrorTimeout = setTimeout(() => (exportError.value = ''), 6000);
+});
 const todayIsoValue = todayIso();
 
 const toIso = toLocalIso;
@@ -584,7 +594,10 @@ onMounted(async () => {
   loadStripCounts();
   refresh();
 });
-onUnmounted(destroyMap);
+onUnmounted(() => {
+  destroyMap();
+  clearTimeout(exportErrorTimeout);
+});
 </script>
 
 <template>
