@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { IonAvatar, IonContent, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonPage, IonRefresher, IonRefresherContent } from '@ionic/vue';
-import { logInOutline, logOutOutline, pauseOutline, playOutline } from 'ionicons/icons';
+import { IonBadge, IonContent, IonIcon, IonPage, IonRefresher, IonRefresherContent } from '@ionic/vue';
+import { arrowBackOutline, arrowForwardOutline, pauseOutline, playOutline, timeOutline } from 'ionicons/icons';
 import { provider } from '../../providers';
 import { ProviderNetworkError } from '../../providers/DataProvider';
 import { todayIso, addDaysIso } from '../../utils/date';
+import { groupIntoShifts, fmtDuration, fmtPause } from '../../utils/shifts';
 import AppHeader from '../../components/AppHeader.vue';
 import DataState from '../../components/DataState.vue';
 import type { TimeEntry, TimeEntryType } from '../../types/models';
@@ -39,18 +40,21 @@ const byDay = computed(() => {
   }
   return Object.entries(groups)
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([day, dayEntries]) => ({
-      day,
-      label: new Date(day + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }),
-      entries: dayEntries.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()),
-    }));
+    .map(([day, dayEntries]) => {
+      const sorted = dayEntries.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
+      return {
+        day,
+        label: new Date(day + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }),
+        shifts: groupIntoShifts(sorted),
+      };
+    });
 });
 
 function entryIcon(type: TimeEntryType): string {
-  if (type === 'in') return logInOutline;
+  if (type === 'in') return arrowBackOutline;
   if (type === 'pause_start') return pauseOutline;
   if (type === 'pause_end') return playOutline;
-  return logOutOutline;
+  return arrowForwardOutline;
 }
 
 function entryLabel(type: TimeEntryType): string {
@@ -83,31 +87,159 @@ async function refreshFromPull(event: CustomEvent) {
       <DataState :loading="loading" :error="error" :empty="!byDay.length" @retry="load">
         <template #empty>Aucun pointage sur les 14 derniers jours.</template>
 
-        <ion-list v-for="d in byDay" :key="d.day" class="history" lines="none">
-          <ion-list-header class="day-title"><ion-label>{{ d.label }}</ion-label></ion-list-header>
-          <ion-item v-for="e in d.entries" :key="e.id" class="hist-row">
-            <ion-avatar slot="start" class="hist-icon" :class="e.type" aria-hidden="true">
-              <ion-icon :icon="entryIcon(e.type)"></ion-icon>
-            </ion-avatar>
-            <ion-label>
-              <p class="lbl">{{ entryLabel(e.type) }}</p>
-              <p class="sub">{{ e.chantier_name }}</p>
-            </ion-label>
-            <ion-note slot="end" class="hist-time">{{ fmtTime(e.recorded_at) }}</ion-note>
-          </ion-item>
-        </ion-list>
+        <div class="history">
+          <template v-for="d in byDay" :key="d.day">
+            <p class="day-title">{{ d.label }}</p>
+
+            <div class="shift-card" v-for="s in d.shifts" :key="s.id">
+              <div class="shift-head">
+                <div>
+                  <p class="shift-name">{{ s.chantierName }}</p>
+                  <p class="shift-range">{{ s.endAt ? `${fmtTime(s.startAt)} – ${fmtTime(s.endAt)}` : `Arrivée ${fmtTime(s.startAt)}` }}</p>
+                </div>
+                <ion-badge class="duration-pill" :class="{ live: !s.endAt }">{{ fmtDuration(s.workedSeconds) }}</ion-badge>
+              </div>
+              <p v-if="s.pauseSeconds > 0" class="pause-note">
+                <ion-icon :icon="timeOutline"></ion-icon>
+                Dont {{ fmtPause(s.pauseSeconds) }} de pause décomptées
+              </p>
+              <div class="shift-entries">
+                <div class="entry-row" v-for="e in s.entries" :key="e.id">
+                  <span class="entry-icon" :class="{ in: e.type === 'in' }">
+                    <ion-icon :icon="entryIcon(e.type)"></ion-icon>
+                  </span>
+                  <span class="entry-label">{{ entryLabel(e.type) }}</span>
+                  <span class="entry-time">{{ fmtTime(e.recorded_at) }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
       </DataState>
     </ion-content>
   </ion-page>
 </template>
 
 <style scoped>
+.history {
+  padding: 8px 18px 24px;
+}
+
 .day-title {
-  --color: var(--text-muted);
   font-size: 12px;
+  color: var(--text-muted);
   text-transform: capitalize;
-  min-height: 0;
-  margin: 0 0 4px;
+  margin: 18px 0 8px;
+}
+
+.day-title:first-child {
+  margin-top: 4px;
+}
+
+.shift-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.shift-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 10px;
+}
+
+.shift-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.shift-range {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.duration-pill {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  --background: var(--surface-1);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+}
+
+.duration-pill.live {
+  --background: var(--success-bg);
+  color: var(--success-text);
+  border-color: transparent;
+}
+
+.pause-note {
+  padding: 0 14px 10px;
+  margin: -2px 0 0;
+  font-size: 11px;
+  color: var(--warn-text);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pause-note ion-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.shift-entries {
+  border-top: 0.5px solid var(--border);
+  padding: 2px 14px;
+}
+
+.entry-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+
+.entry-row + .entry-row {
+  border-top: 0.5px solid var(--border);
+}
+
+.entry-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.entry-icon.in {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.entry-label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.entry-time {
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .empty {
