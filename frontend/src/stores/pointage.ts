@@ -191,8 +191,14 @@ export const usePointageStore = defineStore('pointage', {
       };
     },
 
+    // Une vacation terminée compte toujours pour le prévu (voir
+    // /planning, qui la garde désormais dans la réponse au lieu de la
+    // faire disparaître) — seule une vacation annulée n'a jamais eu lieu
+    // et ne doit pas gonfler le "prévu" de la semaine.
     weekPlannedHours: (state): number =>
-      state.weekShifts.reduce((sum, s) => sum + (new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 3600000, 0),
+      state.weekShifts
+        .filter((s) => s.status !== 'cancelled')
+        .reduce((sum, s) => sum + (new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 3600000, 0),
     weekWorkedHours: (state): number => computeWorkedHours(state.weekEntries, new Date(state.tick)),
     weekOvertimeHours(): number {
       return Math.max(0, (this.weekWorkedHours as number) - (this.weekPlannedHours as number));
