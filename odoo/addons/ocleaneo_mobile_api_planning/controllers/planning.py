@@ -41,6 +41,21 @@ def _plain_instructions(text):
     return html2plaintext(text)
 
 
+def _order_status(order, cancelled_stage):
+    """'confirmed' / 'done' / 'cancelled' — jamais déduit du seul nom du
+    stage (voir ocleaneo#10 : un `search([("name", "ilike", ...)])`
+    similaire ne matchait que le libellé anglais et se taisait sur une
+    instance traduite). "Completed" et "Cancelled" ont tous deux
+    is_closed=True (fieldservice/data/fsm_stage.xml) : is_closed seul ne
+    distingue pas une vacation terminée d'une vacation annulée.
+    """
+    if cancelled_stage and order.stage_id == cancelled_stage:
+        return "cancelled"
+    if order.stage_id and order.stage_id.is_closed:
+        return "done"
+    return "confirmed"
+
+
 class MobilePlanningController(http.Controller):
 
     @http.route(mobile_routes("planning"), type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
@@ -103,10 +118,14 @@ class MobilePlanningController(http.Controller):
         ], limit=1)
         default_view = config.default_view if config else "day"
 
-        # Domain: orders assigned to the worker, not closed, scheduled on target date
+        # Domain: orders assigned to the worker, scheduled on target date —
+        # y compris les commandes déjà clôturées (is_closed) : un départ
+        # badgé ferme désormais le WO (ocleaneo#11), donc les exclure ici
+        # ferait disparaître la vacation du jour même de l'app au lieu de
+        # l'afficher terminée. Voir _order_status() pour distinguer
+        # terminé/annulé côté client (is_closed seul ne le permet pas).
         domain = [
             ("person_id", "=", person.id),
-            ("stage_id.is_closed", "!=", True),
             ("company_id", "in", user.company_ids.ids or [user.company_id.id]),
             ("scheduled_date_start", "<=", date_end),
             "|",
@@ -126,6 +145,7 @@ class MobilePlanningController(http.Controller):
             _logger.warning(
                 "planning: %s dépassé pour l'utilisateur %s sur %s..%s",
                 MAX_RECORDS, user.login, range_start, range_end)
+        cancelled_stage = env.ref("fieldservice.fsm_stage_cancelled", raise_if_not_found=False)
         result = []
         for order in orders:
             loc = order.location_id
@@ -143,6 +163,7 @@ class MobilePlanningController(http.Controller):
                 "stage": order.stage_id.name if order.stage_id else False,
                 "stage_id": order.stage_id.id if order.stage_id else False,
                 "is_closed": order.stage_id.is_closed if order.stage_id else False,
+                "status": _order_status(order, cancelled_stage),
                 "scheduled_date_start": order.scheduled_date_start.isoformat() if order.scheduled_date_start else False,
                 "scheduled_date_end": order.scheduled_date_end.isoformat() if order.scheduled_date_end else False,
                 "date_start": order.date_start.isoformat() if order.date_start else False,

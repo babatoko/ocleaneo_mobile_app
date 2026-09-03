@@ -61,6 +61,8 @@ const { useChantiersStore } = await import('../chantiers');
 const fetchChantiers = vi.mocked(provider.fetchChantiers);
 const createTimeEntry = vi.mocked(provider.createTimeEntry);
 const fetchTodayTimeEntries = vi.mocked(provider.fetchTodayTimeEntries);
+const fetchShifts = vi.mocked(provider.fetchShifts);
+const fetchTimeEntries = vi.mocked(provider.fetchTimeEntries);
 
 const CHANTIER = {
   id: 42,
@@ -74,6 +76,8 @@ beforeEach(() => {
   setActivePinia(createPinia());
   fetchChantiers.mockReset();
   fetchTodayTimeEntries.mockReset().mockResolvedValue({ entries: [], status: 'out' });
+  fetchShifts.mockReset().mockResolvedValue([]);
+  fetchTimeEntries.mockReset().mockResolvedValue([]);
   createTimeEntry.mockReset().mockResolvedValue({
     id: 1,
     type: 'in',
@@ -135,5 +139,42 @@ describe('clockWithTag — position GPS indisponible', () => {
       type: 'warn',
       text: 'Position non disponible — vérifiez que la localisation est activée. Pointage tout de même enregistré.',
     });
+  });
+});
+
+describe('weekPlannedHours', () => {
+  // Depuis que /planning garde les commandes clôturées au lieu de les faire
+  // disparaître (voir odoo/addons/ocleaneo_mobile_api_planning), une
+  // vacation TERMINÉE reste dans weekShifts et doit continuer à compter pour
+  // le "prévu" de la semaine — sans quoi le total rétrécirait à mesure que
+  // l'agent badge ses départs, faussant la comparaison avec les heures
+  // travaillées (weekOvertimeHours). Seule une vacation ANNULÉE, qui n'a
+  // jamais eu lieu, ne doit pas gonfler ce total.
+  function shift(id: number, status: 'confirmed' | 'done' | 'cancelled', hours: number) {
+    const start = new Date('2026-09-07T08:00:00.000Z');
+    const end = new Date(start.getTime() + hours * 3600000);
+    return {
+      id,
+      employee_id: 1,
+      chantier_id: id,
+      chantier_name: `Chantier ${id}`,
+      chantier_address: '',
+      start_at: start.toISOString(),
+      end_at: end.toISOString(),
+      status,
+    };
+  }
+
+  it('compte les vacations confirmées et terminées, pas les annulées', async () => {
+    fetchShifts.mockResolvedValue([
+      shift(1, 'confirmed', 3),
+      shift(2, 'done', 2),
+      shift(3, 'cancelled', 4),
+    ]);
+    const pointage = usePointageStore();
+
+    await pointage.loadWeekSummary();
+
+    expect(pointage.weekPlannedHours).toBe(5);
   });
 });

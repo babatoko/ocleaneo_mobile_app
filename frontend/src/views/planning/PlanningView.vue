@@ -768,10 +768,10 @@ onUnmounted(() => {
           </button>
           <ion-badge slot="end" color="medium">{{ (planning.weekShiftsByDay[toIso(d)] || []).length }}</ion-badge>
         </ion-item>
-        <ion-item v-for="s in planning.weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift" lines="none">
+        <ion-item v-for="s in planning.weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift" :class="s.status" lines="none">
           <button type="button" class="ws-info" @click="openDetail(s)">
             {{ timeRange(s) }} · {{ s.chantier_name }}
-            <ion-badge v-if="s.status === 'modified'" color="warning" class="ws-badge">modifié</ion-badge>
+            <ion-badge v-if="s.status !== 'confirmed'" :color="badgeColor(s.status)" class="ws-badge">{{ statusLabel(s.status) }}</ion-badge>
           </button>
           <ion-button
             slot="end"
@@ -1060,6 +1060,14 @@ onUnmounted(() => {
   font: inherit;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* Même logique que .shift-card.done (vue Jour) : une vacation terminée ou
+   annulée reste lisible, juste plus discrète — pas d'opacity sur toute la
+   ligne, qui plafonnerait aussi l'alpha du badge de statut. */
+.week-shift.done .ws-info,
+.week-shift.cancelled .ws-info {
+  color: var(--text-muted);
 }
 
 .ws-badge {
