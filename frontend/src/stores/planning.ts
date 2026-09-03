@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { Preferences } from '@capacitor/preferences';
 import { provider } from '../providers';
-import { ProviderNetworkError } from '../providers/DataProvider';
+import { ProviderError, ProviderNetworkError } from '../providers/DataProvider';
 import { syncShifts } from '../services/planningSync';
 import { startOfMonthIso, endOfMonthIso } from '../utils/week';
 import type { Shift } from '../types/models';
@@ -53,6 +53,13 @@ export const usePlanningStore = defineStore('planning', {
 
     errorMessage(e: unknown): string {
       if (e instanceof ProviderNetworkError) return 'Pas de connexion — le planning n\'a pas pu être chargé.';
+      // Le backend renvoie un message technique en anglais ("unauthorized")
+      // pour un jeton expiré/révoqué — ne jamais le montrer tel quel, même
+      // brièvement le temps que la reconnexion automatique (main.ts,
+      // services/sessionEvents.ts) ramène l'agent à l'écran de connexion.
+      if (e instanceof ProviderError && (e.status === 401 || e.status === 403)) {
+        return 'Session expirée — reconnexion en cours…';
+      }
       return e instanceof Error ? e.message || 'Planning indisponible.' : 'Planning indisponible.';
     },
 

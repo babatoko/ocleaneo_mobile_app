@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { RouteLocationNormalized } from 'vue-router';
 import { ProviderNetworkError } from '../../providers/DataProvider';
-import { resolveNavigation, type AuthGate } from '../guard';
+import { resolveNavigation, sessionExpiredNavigation, type AuthGate } from '../guard';
 
 /**
  * La garde de navigation est l'endroit où le défaut le plus grave de ce projet
@@ -125,5 +125,38 @@ describe('jeton expiré ou révoqué', () => {
       query: { redirect: '/planning' },
     });
     expect(auth.logout).toHaveBeenCalled();
+  });
+});
+
+describe('sessionExpiredNavigation — jeton rejeté en cours de session (pas à la navigation)', () => {
+  // Même régression que ci-dessus ("jeton expiré ou révoqué"), atteinte par
+  // un autre chemin : un appel de données (planning, pointage…) échoue avec
+  // un 401 alors que l'employé est déjà chargé en mémoire, donc
+  // resolveNavigation ne rappelle jamais fetchMe() (son propre filet ne
+  // s'exécute que quand `employee` est vide) et ne peut pas rattraper le cas.
+
+  it('déconnecte et renvoie vers la connexion', () => {
+    auth = gate({ isAuthenticated: true, employee: { id: 7 } });
+
+    const result = sessionExpiredNavigation(auth, route('/planning'));
+
+    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ name: 'login', query: { redirect: '/planning' } });
+  });
+
+  it('ne fait rien si déjà déconnecté (pas de double logout)', () => {
+    auth = gate({ isAuthenticated: false });
+
+    expect(sessionExpiredNavigation(auth, route('/planning'))).toBeNull();
+    expect(auth.logout).not.toHaveBeenCalled();
+  });
+
+  it('ne redirige pas si déjà sur l’écran de connexion', () => {
+    auth = gate({ isAuthenticated: true });
+
+    const result = sessionExpiredNavigation(auth, route('/login', { public: true }));
+
+    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(result).toBeNull();
   });
 });

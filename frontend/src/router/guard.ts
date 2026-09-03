@@ -58,3 +58,32 @@ export async function resolveNavigation(
   }
   return true;
 }
+
+/**
+ * Réaction à un jeton rejeté (401) en cours de session — cas distinct de
+ * `resolveNavigation` ci-dessus, qui ne s'exécute qu'à la navigation. Un
+ * appel de données (planning, pointage…) peut échouer avec un jeton
+ * expiré/révoqué sans qu'aucune navigation n'ait lieu : l'employé restait
+ * alors chargé en mémoire (`auth.employee` déjà rempli), `isAuthenticated`
+ * restait vrai, et rien ne redéclenchait jamais le rattrapage ci-dessus —
+ * exactement la même régression que "jeton expiré ou révoqué" plus haut,
+ * atteinte par un autre chemin. Voir services/sessionEvents.ts (détection,
+ * côté providers) et main.ts (câblage).
+ *
+ * Renvoie la navigation à effectuer, ou `null` si rien à faire (déjà
+ * déconnecté, ou déjà sur /login) — le côté effectif (`router.push`) reste
+ * dans main.ts, hors de portée des tests unitaires au même titre que
+ * `router/index.ts` pour `resolveNavigation`.
+ */
+export function sessionExpiredNavigation(
+  auth: Pick<AuthGate, 'isAuthenticated' | 'logout'>,
+  current: RouteLocationNormalized,
+): Navigation | null {
+  if (!auth.isAuthenticated) return null;
+  auth.logout();
+  // Même critère que resolveNavigation ci-dessus (meta.public, pas le nom de
+  // la route) : l'écran de connexion est déjà atteignable, y compris avec un
+  // jeton invalide en mémoire — inutile de le rediriger vers lui-même.
+  if (current.meta.public) return null;
+  return toLogin(current);
+}
