@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { clearToken, currentToken } from '../services/tokenStore';
+import { emitSessionExpired } from '../services/sessionEvents';
 import { Preferences } from '@capacitor/preferences';
 
 // Client HTTP interne au RestProvider : rien en dehors de providers/RestProvider.js
@@ -47,6 +48,9 @@ restClient.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       void clearToken();
+      // Voir OdooProvider.ts / services/sessionEvents.ts : sans ce signal,
+      // seul le dépôt de jeton était vidé, jamais le store d'authentification.
+      emitSessionExpired();
     }
     return Promise.reject(error);
   }

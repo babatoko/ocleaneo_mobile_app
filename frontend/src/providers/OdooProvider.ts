@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { clearToken } from '../services/tokenStore';
 import { recordTrace } from '../services/errorLog';
+import { emitSessionExpired } from '../services/sessionEvents';
 import { DEFAULT_ODOO_BASE_URL, ODOO_API_VERSION, getOdooBaseUrl, initOdooBaseUrl, odooClient, setOdooBaseUrl } from './odooClient';
 import { DataProvider, ProviderError, ProviderNetworkError } from './DataProvider';
 import type { ProviderFeature } from './DataProvider';
@@ -410,7 +411,13 @@ async function callMobile<T>(path: string, params: Record<string, unknown> = {})
   if (isMobileErrorResult(result)) {
     // Contrairement à restClient.ts (RestProvider), un token invalide
     // n'est jamais un 401 HTTP ici — voir la docstring de classe.
-    if (result.code === 401) void clearToken();
+    if (result.code === 401) {
+      void clearToken();
+      // Sans ceci, seul le dépôt de jeton était vidé : le store d'authentification
+      // (déjà chargé, employé compris) restait persuadé d'être connecté et
+      // l'agent bloquait sur son écran — voir services/sessionEvents.ts.
+      emitSessionExpired();
+    }
     void recordTrace(`[trace] ${path}`, `erreur ${result.code} — ${result.error}`);
     throw new ProviderError(result.error, result.code);
   }
