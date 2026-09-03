@@ -38,7 +38,17 @@ async function disableServiceWorker(): Promise<void> {
     // Node, où `window` n'existe pas).
     if ('caches' in globalThis) {
       const keys = await globalThis.caches.keys();
-      await Promise.all(keys.map((k) => globalThis.caches.delete(k)));
+      // Uniquement les caches Workbox ("workbox-precache-...", etc.) — ceux
+      // qu'un ancien APK aurait laissés. Cette fonction tourne à CHAQUE
+      // démarrage natif (main.ts), pas une seule fois : un filtre trop large
+      // (tout `caches.keys()`, comme avant) viderait aussi bien tout autre
+      // cache applicatif créé depuis — ocleaneo-map-tiles (tileCache.ts),
+      // dont tout l'intérêt est justement de survivre d'un lancement à
+      // l'autre — à chaque relance de l'App, avant même d'avoir pu servir
+      // une seule fois hors ligne.
+      await Promise.all(
+        keys.filter((k) => k.startsWith('workbox-')).map((k) => globalThis.caches.delete(k)),
+      );
     }
   } catch {
     // Au pire, l'ancien service worker reste actif une fois de plus — pas

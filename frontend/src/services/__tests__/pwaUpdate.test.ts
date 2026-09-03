@@ -75,6 +75,24 @@ describe('setupServiceWorker', () => {
     expect(deleteCache).toHaveBeenCalledWith('workbox-runtime');
   });
 
+  it("épargne les caches applicatifs (ex. ocleaneo-map-tiles) — cette purge tourne à chaque démarrage, pas une seule fois", async () => {
+    // Régression : cette purge supprimait TOUT caches.keys() sans filtre,
+    // donc aussi le cache des tuiles de carte hors ligne de la Tournée
+    // (services/tileCache.ts) — vidé à chaque relance de l'App native avant
+    // même d'avoir pu servir une seule fois hors ligne.
+    native = true;
+    const deleteCache = vi.fn(async () => true);
+    vi.stubGlobal('caches', {
+      keys: async () => ['workbox-precache-v2', 'ocleaneo-map-tiles'],
+      delete: deleteCache,
+    });
+
+    await setupServiceWorker();
+
+    expect(deleteCache).toHaveBeenCalledWith('workbox-precache-v2');
+    expect(deleteCache).not.toHaveBeenCalledWith('ocleaneo-map-tiles');
+  });
+
   it("ne fait pas échouer le démarrage si la purge lève une erreur", async () => {
     native = true;
     vi.stubGlobal('navigator', {
