@@ -123,3 +123,55 @@ describe('loadDay — repli sur le cache glissant des 15 jours', () => {
     expect(planning.dayShifts).toEqual([]);
   });
 });
+
+// Point 4 de l'audit pointage↔planning : un départ badgé clôture la
+// commande FSM côté serveur (ocleaneo#11), mais rien n'invalidait jusqu'ici
+// les caches hors ligne du planning — une vacation terminée pouvait
+// réapparaître "à faire" dans une vue Planning retombée sur un cache pris
+// avant ce départ. markShiftDone() (appelé par pointage.ts sur un départ)
+// patche ces caches en place.
+describe('markShiftDone', () => {
+  it('marque la vacation "done" dans le cache glissant (prefetchUpcoming)', async () => {
+    fetchShifts.mockResolvedValue([shift(1, `${dayInWindow}T08:00:00.000Z`), shift(2, `${dayInWindow}T08:00:00.000Z`)]);
+    const planning = usePlanningStore();
+    await planning.prefetchUpcoming();
+
+    await planning.markShiftDone(1);
+
+    const cache = JSON.parse(store.get('ocleaneo_shifts_upcoming')!);
+    expect(cache.data.find((s: Shift) => s.id === 1).status).toBe('done');
+    // La vacation 2 n'est pas concernée par ce départ.
+    expect(cache.data.find((s: Shift) => s.id === 2).status).toBe('confirmed');
+  });
+
+  it("marque la vacation \"done\" dans le cache exact du jour (loadDay)", async () => {
+    fetchShifts.mockResolvedValueOnce([shift(1, `${todayIso()}T08:00:00.000Z`)]);
+    const planning = usePlanningStore();
+    await planning.loadDay(todayIso());
+
+    await planning.markShiftDone(1);
+
+    const cached = JSON.parse(store.get(`ocleaneo_shifts_${todayIso()}_${todayIso()}`)!);
+    expect(cached[0].status).toBe('done');
+    // Reflété aussi immédiatement dans l'état en mémoire.
+    expect(planning.dayShifts[0].status).toBe('done');
+  });
+
+  it('ne réécrit jamais une vacation annulée en "done"', async () => {
+    const cancelled: Shift = { ...shift(1, `${dayInWindow}T08:00:00.000Z`), status: 'cancelled' };
+    fetchShifts.mockResolvedValue([cancelled]);
+    const planning = usePlanningStore();
+    await planning.prefetchUpcoming();
+
+    await planning.markShiftDone(1);
+
+    const cache = JSON.parse(store.get('ocleaneo_shifts_upcoming')!);
+    expect(cache.data[0].status).toBe('cancelled');
+  });
+
+  it("n'échoue jamais si aucun cache n'existe encore", async () => {
+    const planning = usePlanningStore();
+
+    await expect(planning.markShiftDone(1)).resolves.toBeUndefined();
+  });
+});

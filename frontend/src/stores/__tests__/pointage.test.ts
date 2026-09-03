@@ -57,6 +57,7 @@ vi.mock('../../services/errorLog', () => ({
 const { provider } = await import('../../providers');
 const { usePointageStore } = await import('../pointage');
 const { useChantiersStore } = await import('../chantiers');
+const { usePlanningStore } = await import('../planning');
 
 const fetchChantiers = vi.mocked(provider.fetchChantiers);
 const createTimeEntry = vi.mocked(provider.createTimeEntry);
@@ -120,6 +121,31 @@ describe('clockWithTag — rafraîchissement de la liste des chantiers', () => {
     await pointage.clockWithTag('041779C9780000');
 
     expect(fetchChantiers).toHaveBeenCalledTimes(1);
+  });
+
+  it("marque la vacation \"done\" côté planning sur un départ (point 4 de l'audit)", async () => {
+    // Sans ça, le cache hors ligne du planning (glissant ou du jour) garde
+    // cette vacation "à faire" jusqu'au prochain fetch réussi — voir
+    // planning.ts:markShiftDone().
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+    const planning = usePlanningStore();
+    const markShiftDone = vi.spyOn(planning, 'markShiftDone').mockResolvedValue();
+    fetchTodayTimeEntries.mockResolvedValue({
+      entries: [{ id: 'e1', type: 'in', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString() }],
+      status: 'in',
+    });
+    createTimeEntry.mockResolvedValue({
+      id: 2,
+      type: 'out',
+      chantier_id: CHANTIER.id,
+      recorded_at: new Date().toISOString(),
+    });
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(markShiftDone).toHaveBeenCalledWith(CHANTIER.id);
   });
 });
 

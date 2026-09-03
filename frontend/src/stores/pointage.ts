@@ -6,6 +6,7 @@ import { provider } from '../providers';
 import { ProviderNetworkError } from '../providers/DataProvider';
 import { useAuthStore } from './auth';
 import { useChantiersStore } from './chantiers';
+import { usePlanningStore } from './planning';
 import {
   showClockedInNotification,
   clearClockedInNotification,
@@ -395,6 +396,10 @@ export const usePointageStore = defineStore('pointage', {
         // actif jusqu'à la prochaine relance de l'app : un salarié pourrait
         // re-badger sur un chantier déjà clôturé sans que rien ne le signale.
         await chantiers.fetchMine();
+        // Même raisonnement côté planning : sans ça, le cache hors ligne
+        // (glissant ou du jour) garde cette vacation "à faire" jusqu'au
+        // prochain fetch réussi (voir markShiftDone()).
+        await usePlanningStore().markShiftDone(site.id);
       }
     },
 
