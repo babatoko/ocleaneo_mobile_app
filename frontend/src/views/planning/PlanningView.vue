@@ -27,6 +27,7 @@ import {
   checkmarkCircleOutline,
   chevronBackOutline,
   chevronForwardOutline,
+  cloudOfflineOutline,
   locationOutline,
   mapOutline,
   navigateOutline,
@@ -35,9 +36,11 @@ import {
 } from 'ionicons/icons';
 import { useAuthStore } from '../../stores/auth';
 import { usePlanningStore } from '../../stores/planning';
-import { getCurrentPosition, getOptimizedTrip, type TripPoint } from '../../services/osrm';
+import { getCurrentPosition, getOptimizedTrip, type OptimizedTrip, type TripPoint } from '../../services/osrm';
+import { cacheTrip, readCachedTrip } from '../../services/tripCache';
 import { turnByTurnHref } from '../../services/navigation';
 import { exportShiftsToCalendar } from '../../services/calendarExport';
+import { ProviderNetworkError } from '../../providers/DataProvider';
 import { startOfWeekIso, startOfMonthIso, endOfMonthIso } from '../../utils/week';
 import { toLocalIso, todayIso, addDaysIso } from '../../utils/date';
 import { provider } from '../../providers';
@@ -413,6 +416,11 @@ const tripError = ref('');
 const tripStops = ref<TripStopWithSchedule[]>([]); // stops avec ETA/départ calculés, dans l'ordre optimisé
 const tripDistanceMeters = ref(0);
 const tripDurationSeconds = ref(0);
+// Vrai quand l'itinéraire affiché vient du cache (services/tripCache.ts) —
+// hors ligne, OSRM ne peut pas être rappelé pour un trajet à jour. L'agent
+// doit le savoir : ce n'est pas forcément l'ordre de passage qu'il aurait
+// obtenu en le recalculant maintenant.
+const tripFromCache = ref(false);
 const missingCoords = ref<string[]>([]);
 const mapEl = ref<HTMLElement | null>(null);
 let map: import('leaflet').Map | null = null;
@@ -435,6 +443,7 @@ function fmtTime(date: Date): string {
 async function loadTournee() {
   tripError.value = '';
   tripStops.value = [];
+  tripFromCache.value = false;
   missingCoords.value = [];
   tripLoading.value = true;
   try {
@@ -490,7 +499,24 @@ async function loadTournee() {
       ? [{ id: 'me', name: 'Position actuelle', ...current }, ...withCoords]
       : withCoords;
 
-    const trip = await getOptimizedTrip(points);
+    let trip: OptimizedTrip<TrippablePoint>;
+    try {
+      trip = await getOptimizedTrip(points);
+      tripFromCache.value = false;
+      void cacheTrip(selectedDate.value, withCoords, trip);
+    } catch (e) {
+      // OSRM est un service distant : recalculer un itinéraire est
+      // impossible hors ligne, quoi qu'il arrive. Le mieux qu'on puisse
+      // faire est de réafficher le dernier trajet connu pour ce même jour
+      // (voir services/tripCache.ts) plutôt que de laisser l'écran vide —
+      // exactement le repli que stores/planning.ts applique déjà au planning
+      // lui-même.
+      if (!(e instanceof ProviderNetworkError)) throw e;
+      const cached = await readCachedTrip(selectedDate.value, withCoords);
+      if (!cached) throw e;
+      trip = cached;
+      tripFromCache.value = true;
+    }
 
     let clock = current
       ? new Date()
@@ -795,7 +821,10 @@ onUnmounted(() => {
       <div class="map-summary-bar">
         <ion-chip class="sitem" outline><ion-icon :icon="mapOutline"></ion-icon> {{ fmtKm(tripDistanceMeters) }}</ion-chip>
         <ion-chip class="sitem" outline><ion-icon :icon="timeOutline"></ion-icon> {{ fmtDuration(tripDurationSeconds) }} trajet</ion-chip>
-        <ion-chip class="optimize-badge" color="success"><ion-icon :icon="sparklesOutline"></ion-icon> Optimisée</ion-chip>
+        <ion-chip v-if="tripFromCache" class="optimize-badge" color="warning">
+          <ion-icon :icon="cloudOfflineOutline"></ion-icon> Hors ligne · dernier itinéraire connu
+        </ion-chip>
+        <ion-chip v-else class="optimize-badge" color="success"><ion-icon :icon="sparklesOutline"></ion-icon> Optimisée</ion-chip>
       </div>
 
       <ion-button

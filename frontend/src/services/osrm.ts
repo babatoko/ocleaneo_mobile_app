@@ -1,3 +1,4 @@
+import { ProviderNetworkError } from '../providers/DataProvider';
 import type { Position } from '../types/models';
 
 // Service de calcul d'itinéraire optimisé via OSRM (Open Source Routing Machine).
@@ -64,7 +65,18 @@ export async function getOptimizedTrip<T extends TripPoint>(points: T[]): Promis
   const coords = points.map((p) => `${p.longitude},${p.latitude}`).join(';');
   const url = `${OSRM_URL}/trip/v1/driving/${coords}?source=first&roundtrip=false&geometries=geojson&overview=full`;
 
-  const res = await fetch(url);
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    // fetch() rejette avec un message technique brut (« Failed to fetch »,
+    // « NetworkError… ») indistinct d'une vraie panne serveur — jamais montré
+    // tel quel à l'écran. ProviderNetworkError, pas une Error générique : le
+    // même type que providers/DataProvider.ts, pour que l'appelant (Tournée)
+    // puisse retomber sur le dernier itinéraire mis en cache exactement comme
+    // stores/planning.ts le fait déjà pour le planning.
+    throw new ProviderNetworkError("Pas de connexion — l'itinéraire optimisé n'a pas pu être calculé.");
+  }
   if (!res.ok) throw new Error(`OSRM a répondu ${res.status}`);
   const data: OsrmTripResponse = await res.json();
   if (data.code !== 'Ok' || !data.trips?.length) {

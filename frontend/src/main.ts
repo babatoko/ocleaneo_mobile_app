@@ -5,6 +5,7 @@ import App from './App.vue';
 import router from './router';
 import { sessionExpiredNavigation } from './router/guard';
 import { usePointageStore } from './stores/pointage';
+import { usePlanningStore } from './stores/planning';
 import { useAuthStore } from './stores/auth';
 import { ensureNotificationChannel } from './services/notifications';
 import { initProvider } from './providers';
@@ -65,5 +66,10 @@ const pointage = usePointageStore(pinia);
 pointage.initGlobalListener(router);
 pointage.initOfflineSync();
 ensureNotificationChannel();
+
+// En tâche de fond, silencieux : sans jeton, l'appel échouerait de toute
+// façon (voir prefetchUpcoming(), qui avale l'erreur) — inutile de le tenter
+// avant que l'agent soit connecté.
+if (useAuthStore(pinia).isAuthenticated) void usePlanningStore(pinia).prefetchUpcoming();
 
 app.mount('#app');
