@@ -4,7 +4,33 @@ import { provider } from '../providers';
 import { ProviderError, ProviderNetworkError } from '../providers/DataProvider';
 import { syncShifts } from '../services/planningSync';
 import { startOfMonthIso, endOfMonthIso } from '../utils/week';
+import { todayIso, addDaysIso } from '../utils/date';
 import type { Shift } from '../types/models';
+
+// Nombre de jours (aujourd'hui inclus) couverts par prefetchUpcoming()
+// ci-dessous — voir sa docstring.
+const UPCOMING_DAYS = 15;
+const UPCOMING_CACHE_KEY = 'ocleaneo_shifts_upcoming';
+
+interface UpcomingCache {
+  from: string;
+  to: string;
+  data: Shift[];
+}
+
+/** Repli supplémentaire quand la plage exacte demandée n'a jamais été
+ *  visitée individuellement (donc jamais mise en cache par elle-même) mais
+ *  tombe dans la fenêtre glissante rafraîchie par prefetchUpcoming(). */
+async function fromUpcomingCache(from: string, to: string): Promise<Shift[] | null> {
+  const { value } = await Preferences.get({ key: UPCOMING_CACHE_KEY }).catch(() => ({ value: null }));
+  if (!value) return null;
+  const cache: UpcomingCache = JSON.parse(value);
+  if (from < cache.from || to > cache.to) return null;
+  return cache.data.filter((s) => {
+    const day = s.start_at.slice(0, 10);
+    return day >= from && day <= to;
+  });
+}
 
 // Cache local par plage de dates exacte (from/to) : hors ligne, on retombe
 // sur la dernière réponse connue pour cette même plage plutôt que sur un
@@ -22,6 +48,8 @@ async function fetchShiftsCached(from: string, to: string): Promise<Shift[]> {
     if (!(e instanceof ProviderNetworkError)) throw e;
     const { value } = await Preferences.get({ key: cacheKey }).catch(() => ({ value: null }));
     if (value) return JSON.parse(value);
+    const upcoming = await fromUpcomingCache(from, to);
+    if (upcoming) return upcoming;
     throw e;
   }
 }
@@ -110,6 +138,29 @@ export const usePlanningStore = defineStore('planning', {
         this.monthShifts = [];
       } finally {
         this.loading = false;
+      }
+    },
+
+    /**
+     * Rafraîchit en tâche de fond le cache des UPCOMING_DAYS prochains jours
+     * (aujourd'hui inclus) en un seul appel, pour que le planning reste
+     * consultable hors ligne au-delà des seuls jour/semaine/mois déjà
+     * ouverts individuellement — voir fromUpcomingCache() ci-dessus. Pensée
+     * pour un appel silencieux au démarrage (main.ts) : n'affecte ni
+     * `loading` ni `error`, et un échec (hors ligne dès l'ouverture, serveur
+     * indisponible...) n'a aucune conséquence visible — les caches par-plage
+     * déjà constitués restent le repli principal en attendant le prochain
+     * démarrage.
+     */
+    async prefetchUpcoming(): Promise<void> {
+      try {
+        const from = todayIso();
+        const to = addDaysIso(from, UPCOMING_DAYS - 1);
+        const data = await provider.fetchShifts({ from, to });
+        const cache: UpcomingCache = { from, to, data };
+        await Preferences.set({ key: UPCOMING_CACHE_KEY, value: JSON.stringify(cache) });
+      } catch {
+        // Silencieux — voir la docstring ci-dessus.
       }
     },
   },
