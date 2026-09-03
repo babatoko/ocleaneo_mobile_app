@@ -49,6 +49,11 @@ export interface Shift {
    *  pas besoin de recouper avec un autre appel pour le guidage. */
   latitude?: number | null;
   longitude?: number | null;
+  /** Identifiant du badge NFC du chantier (fsm.location.nfc_tag_id, voir
+   *  ocleaneo#13) — permet à clockWithTag() de matcher un scan contre le
+   *  planning du jour, correctement filtré par date, plutôt que seulement
+   *  contre /chantiers/aujourdhui (plafonné à 50, sans filtre de date). */
+  nfc_tag_id?: string | null;
 }
 
 export type TimeEntryType = 'in' | 'out' | 'pause_start' | 'pause_end';

@@ -142,6 +142,54 @@ describe('clockWithTag — position GPS indisponible', () => {
   });
 });
 
+// /chantiers/aujourdhui est plafonné à 50 et non filtré par date (voir
+// ocleaneo_mobile_pointage/controllers/pointage.py côté backend) : une
+// vacation bien planifiée aujourd'hui peut en être absente. clockWithTag()
+// doit d'abord matcher contre todayShifts (/planning, correctement filtré
+// par date) avant de retomber sur chantiers.list.
+describe('clockWithTag — matching contre le planning du jour (ocleaneo#13)', () => {
+  const SHIFT = {
+    id: 99,
+    employee_id: 1,
+    chantier_id: 99,
+    chantier_name: 'Chantier Hors Plafond',
+    chantier_address: '',
+    start_at: new Date().toISOString(),
+    end_at: new Date(Date.now() + 3600000).toISOString(),
+    status: 'confirmed' as const,
+    nfc_tag_id: '04:AA:BB:CC:DD:00:00',
+  };
+
+  it("matche un badge présent dans todayShifts mais absent de chantiers.list", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [];
+    fetchShifts.mockResolvedValue([SHIFT]);
+    const pointage = usePointageStore();
+
+    await pointage.clockWithTag('04AABBCCDD0000');
+
+    expect(pointage.scanError).toBe('');
+    expect(createTimeEntry).toHaveBeenCalledTimes(1);
+    expect(createTimeEntry.mock.calls[0][0]).toMatchObject({ chantierId: 99, shiftId: 99 });
+    // Le badge a matché via todayShifts : pas besoin d'aller chercher
+    // chantiers.list en repli.
+    expect(fetchChantiers).not.toHaveBeenCalled();
+  });
+
+  it("retombe sur chantiers.list quand le badge n'est dans aucune vacation du jour", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    fetchShifts.mockResolvedValue([SHIFT]);
+    const pointage = usePointageStore();
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(pointage.scanError).toBe('');
+    expect(createTimeEntry).toHaveBeenCalledTimes(1);
+    expect(createTimeEntry.mock.calls[0][0]).toMatchObject({ chantierId: CHANTIER.id });
+  });
+});
+
 describe('weekPlannedHours', () => {
   // Depuis que /planning garde les commandes clôturées au lieu de les faire
   // disparaître (voir odoo/addons/ocleaneo_mobile_api_planning), une

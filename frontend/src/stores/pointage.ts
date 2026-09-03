@@ -300,21 +300,51 @@ export const usePointageStore = defineStore('pointage', {
 
     async clockWithTag(uid: string): Promise<void> {
       this.scanError = '';
-      const chantiers = useChantiersStore();
-      if (!chantiers.list.length) await chantiers.fetchMine();
+      // loadSafe() d'abord : todayShifts (source /planning, correctement
+      // filtrée par date) est désormais la source primaire du matching
+      // ci-dessous, pas seulement de calcul du type in/out.
+      await this.loadSafe();
       const scannedId = normalizeNfcId(uid);
-      const chantier = chantiers.list.find(
-        (c) => c.nfc_tag_id && normalizeNfcId(c.nfc_tag_id) === scannedId
+      const shiftMatch = this.todayShifts.find(
+        (s) => s.nfc_tag_id && normalizeNfcId(s.nfc_tag_id) === scannedId
       );
-      if (!chantier) {
+
+      const chantiers = useChantiersStore();
+      // Repli sur /chantiers/aujourdhui (voir ocleaneo#13 : plafonné à 50 et
+      // pas filtré par date, donc pas fiable comme source primaire) —
+      // seulement si le badge n'appartient à aucune vacation du planning du
+      // jour, par ex. un départ oublié hier sur un chantier déjà sorti du
+      // planning d'aujourd'hui.
+      if (!shiftMatch && !chantiers.list.length) await chantiers.fetchMine();
+      const chantierMatch = !shiftMatch
+        ? chantiers.list.find((c) => c.nfc_tag_id && normalizeNfcId(c.nfc_tag_id) === scannedId)
+        : undefined;
+
+      const site = shiftMatch
+        ? {
+            id: shiftMatch.chantier_id,
+            name: shiftMatch.chantier_name,
+            latitude: shiftMatch.latitude ?? null,
+            longitude: shiftMatch.longitude ?? null,
+          }
+        : chantierMatch
+        ? {
+            id: chantierMatch.id,
+            name: chantierMatch.name,
+            latitude: chantierMatch.latitude ?? null,
+            longitude: chantierMatch.longitude ?? null,
+          }
+        : null;
+
+      if (!site) {
         // Confirmé sur le terrain (journal d'erreurs) : le badge scanné était
         // en réalité connu, mais sous une forme différente côté Odoo
         // ("04:17:79:C9:78:00:00" vs "041779C9780000" côté lecteur) — d'où
         // normalizeNfcId() ci-dessus. Ce log reste utile pour un vrai badge
-        // absent de la liste, ou un futur format qui échapperait encore à la
-        // normalisation.
+        // absent des deux listes, ou un futur format qui échapperait encore
+        // à la normalisation.
         void recordError(
-          `UID scanné (brut): "${uid}" (format Odoo: "${formatNfcIdWithColons(uid)}") — nfc_tag_id connus: ${JSON.stringify(chantiers.list.map((c) => c.nfc_tag_id))}`,
+          `UID scanné (brut): "${uid}" (format Odoo: "${formatNfcIdWithColons(uid)}") — nfc_tag_id connus (planning du jour): ${JSON.stringify(this.todayShifts.map((s) => s.nfc_tag_id))}, (chantiers): ${JSON.stringify(chantiers.list.map((c) => c.nfc_tag_id))}`,
           'pointage.clockWithTag: badge non reconnu',
         );
         this.scanError = 'Badge non reconnu. Contactez votre responsable.';
@@ -322,16 +352,15 @@ export const usePointageStore = defineStore('pointage', {
         return;
       }
 
-      await this.loadSafe();
       const position = await getPosition();
-      const geo = checkGeofence(position, chantier);
+      const geo = checkGeofence(position, site);
       const lastForChantier = [...this.entries]
         .reverse()
-        .find((e) => e.chantier_id === chantier.id && (e.type === 'in' || e.type === 'out'));
-      const shift = this.todayShifts.find((s) => s.chantier_id === chantier.id);
+        .find((e) => e.chantier_id === site.id && (e.type === 'in' || e.type === 'out'));
+      const shift = shiftMatch ?? this.todayShifts.find((s) => s.chantier_id === site.id);
       const type: TimeEntryType = lastForChantier?.type === 'in' ? 'out' : 'in';
 
-      await this.postEntry(type, { chantierId: chantier.id, shiftId: shift?.id, position, geo });
+      await this.postEntry(type, { chantierId: site.id, shiftId: shift?.id, position, geo });
       hapticSuccess();
 
       if (type === 'in' && shift) {
@@ -339,13 +368,13 @@ export const usePointageStore = defineStore('pointage', {
         const estimatedDeparture = (this.estimatedDepartureFor as (shift: Shift) => Date | null)(shift);
         const lastEntry = this.lastEntry as TimeEntry | undefined;
         await showClockedInNotification({
-          chantierName: chantier.name,
+          chantierName: site.name,
           arrivalAt: lastEntry?.recorded_at ?? new Date().toISOString(),
           estimatedDeparture: estimatedDeparture ?? new Date(),
           next: next ? { chantierName: next.chantier_name, startAt: next.start_at } : null,
         });
-        await scheduleDepartureReminder({ chantierName: chantier.name, estimatedDeparture });
-        await scheduleEndOfShiftReminder({ chantierName: chantier.name, estimatedDeparture });
+        await scheduleDepartureReminder({ chantierName: site.name, estimatedDeparture });
+        await scheduleEndOfShiftReminder({ chantierName: site.name, estimatedDeparture });
         // L'arrivée est badguée : plus la peine d'alerter sur un retard pour
         // cette vacation (programmé par syncShifts sans savoir, lui, si le
         // salarié a déjà pointé).

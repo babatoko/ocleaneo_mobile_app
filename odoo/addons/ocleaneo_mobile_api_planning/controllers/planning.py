@@ -179,6 +179,11 @@ class MobilePlanningController(http.Controller):
                     "country": loc.country_id.name if loc and loc.country_id else False,
                     "latitude": loc.partner_latitude if loc else False,
                     "longitude": loc.partner_longitude if loc else False,
+                    # Même champ que /chantiers/aujourdhui (ocleaneo#13) :
+                    # le scan NFC doit pouvoir matcher une vacation du
+                    # planning du jour, pas seulement un chantier renvoyé
+                    # par la liste plafonnée/non filtrée par date.
+                    "nfc_tag_id": loc.nfc_tag_id if loc else False,
                 },
                 "customer": {
                     "id": customer.id if customer else False,
