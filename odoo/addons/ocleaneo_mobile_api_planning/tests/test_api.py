@@ -29,6 +29,15 @@ class TestMobilePlanningApi(MobilePlanningCommon, HttpCase):
         self.user.password = PASSWORD
         self.user.tz = TZ
         self.user.flush()
+        # Odoo's native login cooldown (_assert_can_auth) counts failures in
+        # *process memory*, keyed by source address — not transactional, so
+        # it survives the rollback between tests (see
+        # ocleaneo_mobile_pointage/tests/test_api.py:TestMobileAuthFailures,
+        # which documents and works around the same hazard). Now that this
+        # module depends on ocleaneo_mobile_pointage (ocleaneo#13), its own
+        # deliberate-bad-login tests always run before this class in the
+        # same CI process and can leave 127.0.0.1 throttled here too.
+        self.env["ir.config_parameter"].sudo().set_param("base.login_cooldown_after", "0")
 
         # Fenêtre du jour local (voir mobile_time.py) : place la vacation au
         # milieu de la journée locale, pas à "maintenant" — un test lancé
