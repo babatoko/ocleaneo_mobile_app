@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { clearToken } from '../services/tokenStore';
+import { clearToken, currentToken } from '../services/tokenStore';
 import { recordTrace } from '../services/errorLog';
 import { emitSessionExpired } from '../services/sessionEvents';
 import { DEFAULT_ODOO_BASE_URL, ODOO_API_VERSION, getOdooBaseUrl, initOdooBaseUrl, odooClient, setOdooBaseUrl } from './odooClient';
@@ -383,6 +383,13 @@ function isMobileErrorResult(x: unknown): x is MobileErrorResult {
 let rpcId = 0;
 
 async function callMobile<T>(path: string, params: Record<string, unknown> = {}): Promise<T> {
+  // Capturé avant l'appel : la biométrie (LoginView.onMounted) relance une
+  // connexion dès que le store passe déconnecté, ce qui peut réussir et
+  // reposer un jeton valide AVANT qu'un second appel, parti plus tôt avec
+  // l'ancien jeton, ne reçoive sa propre réponse 401 tardive. Sans cette
+  // comparaison, ce 401 périmé effacerait la session neuve tout juste
+  // rétablie — voir "if (tokenAtCallTime === currentToken())" plus bas.
+  const tokenAtCallTime = currentToken();
   let httpResponse;
   try {
     // Le préfixe de version est posé ici, et non dans l'URL de base : celle-ci
@@ -411,7 +418,7 @@ async function callMobile<T>(path: string, params: Record<string, unknown> = {})
   if (isMobileErrorResult(result)) {
     // Contrairement à restClient.ts (RestProvider), un token invalide
     // n'est jamais un 401 HTTP ici — voir la docstring de classe.
-    if (result.code === 401) {
+    if (result.code === 401 && tokenAtCallTime && tokenAtCallTime === currentToken()) {
       void clearToken();
       // Sans ceci, seul le dépôt de jeton était vidé : le store d'authentification
       // (déjà chargé, employé compris) restait persuadé d'être connecté et

@@ -43,10 +43,25 @@ restClient.interceptors.request.use((config) => {
   return config;
 });
 
+/** Jeton effectivement envoyé avec la requête en échec (posé par
+ *  l'intercepteur de requête ci-dessus), ou null pour un appel qui n'en
+ *  portait aucun (ex. login()). */
+function tokenFromFailedRequest(error: AxiosError): string | null {
+  const header = error.config?.headers?.get?.('Authorization');
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) return null;
+  return header.slice(7);
+}
+
 restClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    // La biométrie (LoginView.onMounted) relance une connexion dès que le
+    // store passe déconnecté, et peut réussir — reposant un jeton valide —
+    // AVANT qu'un second appel, parti plus tôt avec l'ancien jeton, ne
+    // reçoive sa propre réponse 401 tardive. Sans cette comparaison, ce 401
+    // périmé effacerait la session neuve tout juste rétablie.
+    const failedToken = error.response?.status === 401 ? tokenFromFailedRequest(error) : null;
+    if (failedToken && failedToken === currentToken()) {
       void clearToken();
       // Voir OdooProvider.ts / services/sessionEvents.ts : sans ce signal,
       // seul le dépôt de jeton était vidé, jamais le store d'authentification.
