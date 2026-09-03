@@ -32,6 +32,26 @@ async function fromUpcomingCache(from: string, to: string): Promise<Shift[] | nu
   });
 }
 
+// Clé du cache exact pour un seul jour (loadDay) — construite de la même
+// façon que fetchShiftsCached() ci-dessous, dupliquée ici pour que
+// markShiftDone() n'ait pas besoin d'importer fetchShiftsCached() lui-même.
+function dayCacheKey(dateIso: string): string {
+  return `ocleaneo_shifts_${dateIso}_${dateIso}`;
+}
+
+function withShiftDone(shifts: Shift[], shiftId: number): { data: Shift[]; changed: boolean } {
+  let changed = false;
+  const data = shifts.map((s) => {
+    // Une vacation annulée ne redevient jamais "terminée" — l'annulation
+    // reste la vérité, un départ badgé dessus n'aurait de toute façon pas dû
+    // pouvoir se produire.
+    if (s.id !== shiftId || s.status === 'done' || s.status === 'cancelled') return s;
+    changed = true;
+    return { ...s, status: 'done' as const };
+  });
+  return { data, changed };
+}
+
 // Cache local par plage de dates exacte (from/to) : hors ligne, on retombe
 // sur la dernière réponse connue pour cette même plage plutôt que sur un
 // écran vide.
@@ -161,6 +181,49 @@ export const usePlanningStore = defineStore('planning', {
         await Preferences.set({ key: UPCOMING_CACHE_KEY, value: JSON.stringify(cache) });
       } catch {
         // Silencieux — voir la docstring ci-dessus.
+      }
+    },
+
+    /**
+     * Un départ badgé clôture la commande FSM correspondante côté serveur
+     * (ocleaneo#11) — appelé par pointage.ts juste après. Sans ça, le cache
+     * glissant de prefetchUpcoming() et le cache exact du jour (loadDay)
+     * gardent le statut d'avant le départ : un agent qui repasse hors ligne
+     * avant le prochain fetch réussi verrait cette vacation réapparaître "à
+     * faire" au lieu de "terminée" dans une vue Planning retombée sur l'un
+     * de ces caches.
+     *
+     * Best-effort et silencieux comme prefetchUpcoming() : rien de ceci
+     * n'est visible si ça échoue, la prochaine synchronisation en ligne
+     * remettra de toute façon les caches à jour.
+     */
+    async markShiftDone(shiftId: number): Promise<void> {
+      this.dayShifts = withShiftDone(this.dayShifts, shiftId).data;
+      for (const day of Object.keys(this.weekShiftsByDay)) {
+        this.weekShiftsByDay[day] = withShiftDone(this.weekShiftsByDay[day], shiftId).data;
+      }
+      this.monthShifts = withShiftDone(this.monthShifts, shiftId).data;
+
+      try {
+        const { value } = await Preferences.get({ key: UPCOMING_CACHE_KEY });
+        if (value) {
+          const cache: UpcomingCache = JSON.parse(value);
+          const { data, changed } = withShiftDone(cache.data, shiftId);
+          if (changed) {
+            await Preferences.set({ key: UPCOMING_CACHE_KEY, value: JSON.stringify({ ...cache, data }) });
+          }
+        }
+
+        const todayKey = dayCacheKey(todayIso());
+        const { value: dayValue } = await Preferences.get({ key: todayKey });
+        if (dayValue) {
+          const { data, changed } = withShiftDone(JSON.parse(dayValue), shiftId);
+          if (changed) {
+            await Preferences.set({ key: todayKey, value: JSON.stringify(data) });
+          }
+        }
+      } catch {
+        // Best-effort — voir la docstring ci-dessus.
       }
     },
   },
