@@ -170,6 +170,9 @@ interface OdooPlanningLocation {
   city: string | false;
   latitude: number | false;
   longitude: number | false;
+  /** Absent sur un backend pas encore mis à jour sur ce commit (voir
+   *  ocleaneo#13) — d'où le repli sur `null` dans planningOrderToShift(). */
+  nfc_tag_id?: string | false;
 }
 
 interface OdooPlanningActivity {
@@ -287,6 +290,7 @@ function planningOrderToShift(order: OdooPlanningOrder): Shift {
     activities: (order.activities ?? []).map(activityToShiftActivity),
     latitude: loc.latitude || null,
     longitude: loc.longitude || null,
+    nfc_tag_id: loc.nfc_tag_id || null,
   };
 }
 

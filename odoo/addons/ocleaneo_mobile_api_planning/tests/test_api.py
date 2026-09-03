@@ -106,3 +106,16 @@ class TestMobilePlanningApi(MobilePlanningCommon, HttpCase):
 
         self.assertEqual(entry["status"], "cancelled")
         self.assertTrue(entry["is_closed"])
+
+    def test_location_exposes_nfc_tag_id(self):
+        """ocleaneo#13 : le scan NFC ne doit pas dépendre uniquement de
+        /chantiers/aujourdhui (plafonné à 50, non filtré par date) — /planning
+        doit porter le même identifiant de badge que sa vacation du jour."""
+        location, order = self._make_order(self.person)
+        location.nfc_tag_id = "04:17:79:C9:78:00:00"
+        order.write({"scheduled_date_start": self.scheduled_start, "scheduled_date_end": self.scheduled_end})
+        token = self._login()
+
+        entry = self._order_from_planning(token, order.id)
+
+        self.assertEqual(entry["location"]["nfc_tag_id"], "04:17:79:C9:78:00:00")

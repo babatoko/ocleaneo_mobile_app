@@ -5,9 +5,10 @@
 
 Same worker/employee/fsm.person chain as ocleaneo_mobile_pointage's own
 common.py (a mobile API token needs a res.users with a directly-linked
-hr.employee) — duplicated rather than imported: this module does not
-depend on ocleaneo_mobile_pointage, and shouldn't gain a test-time
-dependency it doesn't otherwise need.
+hr.employee) — duplicated rather than imported, to keep this module's own
+tests self-contained even though ocleaneo_mobile_api_planning now depends
+on ocleaneo_mobile_pointage at runtime (for fsm.location.nfc_tag_id, see
+ocleaneo#13).
 """
 
 from odoo.tests.common import TransactionCase
