@@ -38,6 +38,7 @@ import { useAuthStore } from '../../stores/auth';
 import { usePlanningStore } from '../../stores/planning';
 import { getCurrentPosition, getOptimizedTrip, type OptimizedTrip, type TripPoint } from '../../services/osrm';
 import { cacheTrip, readCachedTrip } from '../../services/tripCache';
+import { createOfflineTileLayer } from '../../services/offlineTileLayer';
 import { turnByTurnHref } from '../../services/navigation';
 import { exportShiftsToCalendar } from '../../services/calendarExport';
 import { ProviderNetworkError } from '../../providers/DataProvider';
@@ -566,9 +567,20 @@ async function renderMap(
   }
 
   map = L.map(mapEl.value, { zoomControl: false, attributionControl: false });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // Couche de tuiles créée à partir de L déjà chargé (et non un import
+  // statique de services/offlineTileLayer.ts) : sert les tuiles déjà vues
+  // depuis le cache hors ligne, plutôt que de laisser la carte blanche — voir
+  // ce fichier pour pourquoi createOfflineTileLayer() prend L en paramètre.
+  const OfflineTileLayer = createOfflineTileLayer(L);
+  const tileLayer = new OfflineTileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
   }).addTo(map);
+  // Chaque tuile chargée depuis le cache tient un URL objet (blob:) — à
+  // révoquer quand Leaflet la retire du DOM (zoom/déplacement), sinon elle
+  // reste en mémoire pour rien.
+  tileLayer.on('tileunload', (e: { tile: HTMLImageElement }) => {
+    if (e.tile.src.startsWith('blob:')) URL.revokeObjectURL(e.tile.src);
+  });
 
   const points: [number, number][] = [];
   if (current) {
