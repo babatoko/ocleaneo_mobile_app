@@ -134,14 +134,27 @@ async function tryBiometric() {
     // laisser croire que le capteur a échoué.
     if (e instanceof ProviderNetworkError) {
       error.value = loginErrorMessage(e);
-      void recordError(
-        `URL serveur : "${currentServerUrl.value ?? defaultServerUrl.value}" — ${e.message}`,
-        'LoginView.tryBiometric: échec de connexion',
-      );
-      errorsLogged.value += 1;
+    } else if (e instanceof ProviderError && (e.status === 401 || e.status === 403)) {
+      // L'empreinte a été reconnue (on a dépassé getSavedCredentials()) —
+      // c'est le mot de passe enregistré que le serveur refuse (changé
+      // depuis, compte désactivé...). Accuser le capteur ici enverrait
+      // l'agent essayer de re-scanner son doigt en boucle, sans jamais
+      // résoudre le vrai problème. On efface les identifiants devenus
+      // invalides et on retombe sur le mot de passe, comme forgetBiometric().
+      error.value = 'Mot de passe enregistré invalide — reconnectez-vous avec votre mot de passe.';
+      await clearSavedCredentials();
+      usePassword();
     } else {
       error.value = "Authentification par empreinte annulée ou impossible.";
     }
+    // Avant ce correctif, seul le cas réseau était journalisé : un échec
+    // d'identifiants ou une erreur native du capteur ne laissait aucune
+    // trace exploitable dans le journal local (services/errorLog.ts).
+    void recordError(
+      `URL serveur : "${currentServerUrl.value ?? defaultServerUrl.value}" — ${e instanceof Error ? e.message : String(e)}`,
+      'LoginView.tryBiometric: échec de connexion',
+    );
+    errorsLogged.value += 1;
   } finally {
     loading.value = false;
   }
