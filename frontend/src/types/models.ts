@@ -148,6 +148,16 @@ export interface CreateTimeEntryPayload {
   clientRef: string;
 }
 
+export interface CreateTimeEntryWithTagPayload {
+  uid: string;
+  type: TimeEntryType;
+  recordedAt: string;
+  latitude?: number;
+  longitude?: number;
+  outOfRange?: boolean;
+  clientRef: string;
+}
+
 export interface SubmitInventoryItemPayload {
   productId: number;
   packagingId: number;

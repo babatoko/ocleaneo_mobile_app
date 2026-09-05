@@ -3,13 +3,32 @@ import { Network } from '@capacitor/network';
 import { App } from '@capacitor/app';
 import { provider } from '../providers';
 import { ProviderNetworkError } from '../providers/DataProvider';
-import type { CreateTimeEntryPayload } from '../types/models';
+import type { CreateTimeEntryPayload, CreateTimeEntryWithTagPayload, TimeEntryType } from '../types/models';
 
 const QUEUE_KEY = 'ocleaneo_pointage_offline_queue';
 
-interface QueuedEntry extends CreateTimeEntryPayload {
+interface BaseQueuedEntry {
   localId: string;
+  clientRef: string;
+  type: TimeEntryType;
+  recordedAt: string;
+  latitude?: number;
+  longitude?: number;
+  outOfRange?: boolean;
+  withTag?: boolean;
 }
+
+interface TimeEntryQueuedEntry extends BaseQueuedEntry {
+  chantierId: number;
+  shiftId?: number;
+}
+
+interface TagQueuedEntry extends BaseQueuedEntry {
+  withTag: true;
+  uid: string;
+}
+
+type QueuedEntry = TimeEntryQueuedEntry | TagQueuedEntry;
 
 // Pas de garde sur la plateforme : @capacitor/preferences retombe sur
 // localStorage dans le navigateur — même raisonnement que le cache du planning
@@ -59,11 +78,14 @@ export function isNetworkError(e: unknown): boolean {
 }
 
 /** Ajoute un pointage à la file d'attente locale (persistante) et renvoie son id local. */
-export async function enqueue(payload: CreateTimeEntryPayload): Promise<string> {
+export async function enqueue(payload: CreateTimeEntryPayload | CreateTimeEntryWithTagPayload): Promise<string> {
   const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const queued = 'chantierId' in payload
+    ? ({ ...payload, localId } as TimeEntryQueuedEntry)
+    : ({ ...payload, localId, withTag: true as const } as TagQueuedEntry);
   await withQueueLock(async () => {
     const queue = await readQueue();
-    queue.push({ ...payload, localId });
+    queue.push(queued);
     await writeQueue(queue);
   });
   return localId;
@@ -87,16 +109,46 @@ export async function queueLength(): Promise<number> {
  */
 const FAILED_KEY = 'ocleaneo_pointage_failed_entries';
 
-export interface FailedEntry extends QueuedEntry {
+export interface FailedEntry {
+  localId: string;
+  clientRef: string;
+  type: TimeEntryType;
+  recordedAt: string;
+  latitude?: number;
+  longitude?: number;
+  outOfRange?: boolean;
+  withTag?: boolean;
+  chantierId?: number;
+  shiftId?: number;
+  uid?: string;
   failedAt: string;
   reason: string;
 }
 
 async function setAside(entry: QueuedEntry, reason: string): Promise<void> {
+  const failedEntry: FailedEntry = {
+    localId: entry.localId,
+    clientRef: entry.clientRef,
+    type: entry.type,
+    recordedAt: entry.recordedAt,
+    latitude: entry.latitude,
+    longitude: entry.longitude,
+    outOfRange: entry.outOfRange,
+    withTag: entry.withTag,
+    failedAt: new Date().toISOString(),
+    reason,
+  };
+  if ('chantierId' in entry) {
+    failedEntry.chantierId = entry.chantierId;
+    failedEntry.shiftId = entry.shiftId;
+  }
+  if ('uid' in entry) {
+    failedEntry.uid = entry.uid;
+  }
   await withQueueLock(async () => {
     const { value } = await Preferences.get({ key: FAILED_KEY });
     const failed: FailedEntry[] = value ? JSON.parse(value) : [];
-    failed.push({ ...entry, failedAt: new Date().toISOString(), reason });
+    failed.push(failedEntry);
     await Preferences.set({ key: FAILED_KEY, value: JSON.stringify(failed) });
   });
 }
@@ -146,8 +198,12 @@ async function drainQueue(): Promise<{ flushed: number; remaining: number }> {
     if (!next) break;
 
     try {
-      const { localId: _localId, ...payload } = next;
-      await provider.createTimeEntry(payload);
+      const { localId: _localId, withTag, ...payload } = next;
+      if (withTag) {
+        await provider.createTimeEntryWithTag(payload as CreateTimeEntryWithTagPayload);
+      } else {
+        await provider.createTimeEntry(payload as CreateTimeEntryPayload);
+      }
       flushed += 1;
     } catch (e) {
       if (isNetworkError(e)) break;

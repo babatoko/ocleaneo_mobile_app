@@ -1,11 +1,16 @@
 import { DataProvider } from './DataProvider';
 import { addDaysIso, todayIso } from '../utils/date';
 import { startOfWeekIso } from '../utils/week';
+
+function normalizeNfcId(value: string): string {
+  return value.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+}
 import type {
   Chantier,
   CreateOrderPayload,
   CreateOrderResult,
   CreateTimeEntryPayload,
+  CreateTimeEntryWithTagPayload,
   DateRange,
   Employee,
   InventoryLatest,
@@ -358,6 +363,24 @@ export class MockProvider extends DataProvider {
       type: payload.type,
       chantier_id: payload.chantierId,
       chantier_name: chantier?.name || '',
+      recorded_at: payload.recordedAt || new Date().toISOString(),
+      client_ref: payload.clientRef,
+    };
+    timeEntries.push(entry);
+    return entry;
+  }
+
+  async createTimeEntryWithTag(payload: CreateTimeEntryWithTagPayload): Promise<TimeEntry> {
+    await delay();
+    const existing = timeEntries.find((e) => e.client_ref === payload.clientRef);
+    if (existing) return existing;
+
+    const chantier = chantiers.find((c) => c.nfc_tag_id && normalizeNfcId(c.nfc_tag_id) === normalizeNfcId(payload.uid));
+    const entry: TimeEntry = {
+      id: nextEntryId++,
+      type: payload.type,
+      chantier_id: chantier?.id || 0,
+      chantier_name: chantier?.name || 'Badge inconnu (mock)',
       recorded_at: payload.recordedAt || new Date().toISOString(),
       client_ref: payload.clientRef,
     };
