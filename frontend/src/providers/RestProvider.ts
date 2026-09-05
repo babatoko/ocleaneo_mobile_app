@@ -5,6 +5,7 @@ import type {
   CreateOrderPayload,
   CreateOrderResult,
   CreateTimeEntryPayload,
+  CreateTimeEntryWithTagPayload,
   DateRange,
   Employee,
   InventoryLatest,
@@ -120,6 +121,10 @@ export class RestProvider extends DataProvider {
     } catch (e) {
       throw normalizeError(e);
     }
+  }
+
+  async createTimeEntryWithTag(_payload: CreateTimeEntryWithTagPayload): Promise<TimeEntry> {
+    throw new Error('RestProvider does not support NFC tag clocking.');
   }
 
   async fetchProducts(): Promise<Product[]> {
