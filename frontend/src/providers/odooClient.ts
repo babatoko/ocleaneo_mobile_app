@@ -5,7 +5,8 @@ import { currentToken } from '../services/tokenStore';
 // Client HTTP interne à OdooProvider — même rôle que restClient.ts pour
 // RestProvider : rien en dehors de providers/OdooProvider.ts ne doit
 // importer ce fichier.
-export const DEFAULT_ODOO_BASE_URL = import.meta.env.VITE_ODOO_API_URL || 'http://localhost:8069/api/mobile';
+export const DEFAULT_ODOO_BASE_URL = import.meta.env.VITE_ODOO_API_URL
+  || 'https://www.entretien-maconnais.fr/api/mobile';
 
 /**
  * Version d'API ciblée par ce client.

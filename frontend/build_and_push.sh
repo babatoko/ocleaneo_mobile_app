@@ -9,7 +9,6 @@ APK_DIR=$ANDROID/app/build/outputs/apk/debug
 CHAT_ID=1244541240
 
 cd "$FRONTEND"
-VITE_ODOO_API_URL=https://www.entretien-maconnais.fr/api/mobile \
 VITE_DATA_PROVIDER=odoo \
   npm run build
 
