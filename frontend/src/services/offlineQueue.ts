@@ -109,16 +109,46 @@ export async function queueLength(): Promise<number> {
  */
 const FAILED_KEY = 'ocleaneo_pointage_failed_entries';
 
-export interface FailedEntry extends QueuedEntry {
+export interface FailedEntry {
+  localId: string;
+  clientRef: string;
+  type: TimeEntryType;
+  recordedAt: string;
+  latitude?: number;
+  longitude?: number;
+  outOfRange?: boolean;
+  withTag?: boolean;
+  chantierId?: number;
+  shiftId?: number;
+  uid?: string;
   failedAt: string;
   reason: string;
 }
 
 async function setAside(entry: QueuedEntry, reason: string): Promise<void> {
+  const failedEntry: FailedEntry = {
+    localId: entry.localId,
+    clientRef: entry.clientRef,
+    type: entry.type,
+    recordedAt: entry.recordedAt,
+    latitude: entry.latitude,
+    longitude: entry.longitude,
+    outOfRange: entry.outOfRange,
+    withTag: entry.withTag,
+    failedAt: new Date().toISOString(),
+    reason,
+  };
+  if ('chantierId' in entry) {
+    failedEntry.chantierId = entry.chantierId;
+    failedEntry.shiftId = entry.shiftId;
+  }
+  if ('uid' in entry) {
+    failedEntry.uid = entry.uid;
+  }
   await withQueueLock(async () => {
     const { value } = await Preferences.get({ key: FAILED_KEY });
     const failed: FailedEntry[] = value ? JSON.parse(value) : [];
-    failed.push({ ...entry, failedAt: new Date().toISOString(), reason });
+    failed.push(failedEntry);
     await Preferences.set({ key: FAILED_KEY, value: JSON.stringify(failed) });
   });
 }

@@ -3,8 +3,10 @@ import type {
   CreateOrderPayload,
   CreateOrderResult,
   CreateTimeEntryPayload,
+  CreateTimeEntryWithTagPayload,
   DateRange,
   Employee,
+  InventoryLatest,
   LoginResult,
   Order,
   Product,
@@ -12,7 +14,6 @@ import type {
   SubmitInventoryPayload,
   TimeEntry,
   TodayTimeEntries,
-  InventoryLatest,
 } from '../types/models';
 
 /**
