@@ -316,6 +316,7 @@ export const usePointageStore = defineStore('pointage', {
           clientRef,
         });
         await this.loadSafe();
+        const resolvedType: TimeEntryType = entry.type || type;
 
         // Resolve site info for geofence feedback and notifications.
         const site = this._resolveSiteFromEntry(entry);
@@ -327,7 +328,7 @@ export const usePointageStore = defineStore('pointage', {
           : null;
 
         hapticSuccess();
-        await this._handlePostClocking(type, site, entry.shift_id);
+        await this._handlePostClocking(resolvedType, site, entry.shift_id);
       } catch (e) {
         if (e instanceof ProviderError && e.status === 404) {
           void recordError(
@@ -364,19 +365,8 @@ export const usePointageStore = defineStore('pointage', {
 
     /** Determine the next clocking type for a tag based on the most recent
      *  entry at the resolved location. Falls back to 'in' when unknown. */
-    _nextTypeForTag(uid: string): TimeEntryType {
-      // Best-effort local guess : if we already have an 'in' without 'out'
-      // for the same physical badge today, treat it as a departure. The
-      // backend is the final authority; this only drives the payload type.
-      const scannedId = normalizeNfcId(uid);
-      const lastForTag = [...this.entries]
-        .reverse()
-        .find((e) => {
-          const shift = this.todayShifts.find((s) => s.id === e.shift_id);
-          const tagId = shift?.nfc_tag_id ? normalizeNfcId(shift.nfc_tag_id) : '';
-          return tagId === scannedId && (e.type === 'in' || e.type === 'out');
-        });
-      return lastForTag?.type === 'in' ? 'out' : 'in';
+    _nextTypeForTag(_uid: string): TimeEntryType {
+      return 'in';
     },
 
     _resolveSiteFromEntry(entry: TimeEntry): { id: number; name: string; latitude: number | null; longitude: number | null } {
