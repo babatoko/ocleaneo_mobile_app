@@ -42,17 +42,25 @@ def _plain_instructions(text):
 
 
 def _order_status(order, cancelled_stage):
-    """'confirmed' / 'done' / 'cancelled' — jamais déduit du seul nom du
-    stage (voir ocleaneo#10 : un `search([("name", "ilike", ...)])`
+    """'confirmed' / 'partial' / 'done' / 'cancelled' — jamais déduit du seul
+    nom du stage (voir ocleaneo#10 : un `search([("name", "ilike", ...)])`
     similaire ne matchait que le libellé anglais et se taisait sur une
     instance traduite). "Completed" et "Cancelled" ont tous deux
     is_closed=True (fieldservice/data/fsm_stage.xml) : is_closed seul ne
     distingue pas une vacation terminée d'une vacation annulée.
+
+    'partial' : un départ a été pointé sans atteindre les 90% du temps
+    prévu (voir fsm_order.update_completion_from_worked_time, module
+    ocleaneo_mobile_pointage) — le stage reste ouvert (ce n'est pas
+    "terminé"), mais la vacation n'est plus "à faire" pour autant : le
+    salarié est déjà reparti.
     """
     if cancelled_stage and order.stage_id == cancelled_stage:
         return "cancelled"
     if order.stage_id and order.stage_id.is_closed:
         return "done"
+    if order.completion_state == "partial":
+        return "partial"
     return "confirmed"
 
 
@@ -168,6 +176,12 @@ class MobilePlanningController(http.Controller):
                 "scheduled_date_end": order.scheduled_date_end.isoformat() if order.scheduled_date_end else False,
                 "date_start": order.date_start.isoformat() if order.date_start else False,
                 "date_end": order.date_end.isoformat() if order.date_end else False,
+                # Absent tant qu'aucun départ n'a encore été pointé sur la
+                # commande (voir fsm_order.update_completion_from_worked_time,
+                # module ocleaneo_mobile_pointage) : completion_state est
+                # alors False, jamais l'un des trois états réels.
+                "completion_ratio": order.completion_ratio or False,
+                "completion_state": order.completion_state or False,
                 "location": {
                     "id": loc.id if loc else False,
                     "name": loc.name if loc else False,

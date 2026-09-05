@@ -21,7 +21,11 @@ export interface Chantier {
   longitude?: number | null;
 }
 
-export type ShiftStatus = 'confirmed' | 'done' | 'cancelled' | string;
+/** 'partial' : un départ a été pointé sans atteindre 90% du temps prévu —
+ *  le chantier n'est plus "à faire" (le salarié est reparti) mais n'est pas
+ *  non plus "terminé" (voir fsm_order.update_completion_from_worked_time
+ *  côté Odoo, module ocleaneo_mobile_pointage). */
+export type ShiftStatus = 'confirmed' | 'partial' | 'done' | 'cancelled' | string;
 
 /** Une tâche de la checklist d'un chantier (fsm.activity côté Odoo) —
  *  affichage seul pour l'instant, pas encore de coche depuis le mobile. */
@@ -54,6 +58,10 @@ export interface Shift {
    *  planning du jour, correctement filtré par date, plutôt que seulement
    *  contre /chantiers/aujourdhui (plafonné à 50, sans filtre de date). */
   nfc_tag_id?: string | null;
+  /** Temps de présence réel / temps prévu pour cette vacation, connu une
+   *  fois un départ pointé (voir ShiftStatus 'partial'). `null` tant
+   *  qu'aucun départ n'a encore eu lieu — ce n'est pas 0%. */
+  completion_ratio?: number | null;
 }
 
 export type TimeEntryType = 'in' | 'out' | 'pause_start' | 'pause_end';
@@ -70,6 +78,11 @@ export interface TimeEntry {
   /** Clé d'idempotence du pointage d'origine (voir CreateTimeEntryPayload.clientRef).
    *  Optionnelle côté lecture : un provider n'est pas tenu de la renvoyer. */
   client_ref?: string;
+  /** Renvoyés uniquement par un pointage de type 'out' sur un chantier
+   *  (voir Shift.completion_ratio) : permettent à postEntry() de savoir
+   *  quel statut réel donner à la vacation au lieu de supposer "terminé". */
+  shift_status?: ShiftStatus;
+  completion_ratio?: number | null;
 }
 
 export interface TodayTimeEntries {

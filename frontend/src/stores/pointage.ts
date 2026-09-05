@@ -257,7 +257,7 @@ export const usePointageStore = defineStore('pointage', {
       this.refreshQueueCount();
     },
 
-    async postEntry(type: TimeEntryType, { chantierId, shiftId, position, geo }: PostEntryOptions = {}): Promise<void> {
+    async postEntry(type: TimeEntryType, { chantierId, shiftId, position, geo }: PostEntryOptions = {}): Promise<TimeEntry | undefined> {
       const recordedAt = new Date().toISOString();
       const payload = {
         chantierId: chantierId as number,
@@ -274,7 +274,7 @@ export const usePointageStore = defineStore('pointage', {
       };
 
       try {
-        await provider.createTimeEntry(payload);
+        const created = await provider.createTimeEntry(payload);
         await this.loadSafe();
         // Même logique dans les deux cas — avertir sans jamais bloquer, voir
         // GEOFENCE_TOLERANCE_M (geofence.ts) — mais deux causes distinctes :
@@ -285,6 +285,7 @@ export const usePointageStore = defineStore('pointage', {
           : geo && !geo.withinRange
           ? { type: 'warn', text: `Position à ~${geo.distanceMeters} m du chantier — pointage tout de même enregistré.` }
           : null;
+        return created;
       } catch (e) {
         if (!(e instanceof ProviderNetworkError)) throw e;
         await enqueue(payload);
@@ -296,6 +297,10 @@ export const usePointageStore = defineStore('pointage', {
           { id: `pending-${recordedAt}`, type, chantier_id: chantierId as number, recorded_at: recordedAt, pending: true },
         ];
         this.lastMessage = { type: 'queued', text: 'Hors ligne : pointage enregistré, synchronisation dès que possible.' };
+        // Résultat inconnu tant que ce pointage n'a pas été rejoué avec
+        // succès — voir clockWithTag() sur 'out' : à défaut, il retombe sur
+        // l'ancien comportement (vacation supposée "done").
+        return undefined;
       }
     },
 
@@ -416,7 +421,20 @@ export const usePointageStore = defineStore('pointage', {
       if (type === 'out') {
         const chantiers = useChantiersStore();
         await chantiers.fetchMine();
-        await usePlanningStore().markShiftDone(site.id);
+        // Même raisonnement côté planning : sans ça, le cache hors ligne
+        // (glissant ou du jour) garde cette vacation "à faire" jusqu'au
+        // prochain fetch réussi (voir markShiftDone()). Le statut réel
+        // (confirmed/partial/done) vient du serveur — un départ ne clôture
+        // plus systématiquement le chantier, voir
+        // fsm_order.update_completion_from_worked_time côté Odoo ; sans
+        // vérdict connu (hors ligne, ou backend pas encore mis à jour sur
+        // ce commit), markShiftDone() retombe seule sur son ancien
+        // comportement ("done").
+        if (entry?.shift_status) {
+          await usePlanningStore().markShiftDone(site.id, entry.shift_status);
+        } else {
+          await usePlanningStore().markShiftDone(site.id);
+        }
       }
     },
 

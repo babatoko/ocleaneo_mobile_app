@@ -329,7 +329,11 @@ function pickDay(date: Date) {
 
 function badgeColor(status: string): string {
   if (status === 'confirmed') return 'success';
-  if (status === 'modified' || status === 'pending') return 'warning';
+  // 'partial' : départ badgé sous 90% du temps prévu (voir
+  // fsm_order.update_completion_from_worked_time côté Odoo) — c'est
+  // l'alerte remontée côté app pour ce cas, au même titre que l'activité
+  // envoyée au manager côté serveur.
+  if (status === 'modified' || status === 'pending' || status === 'partial') return 'warning';
   if (status === 'cancelled') return 'danger';
   // Teinte de l'app (var(--accent), voir --ion-color-primary), distincte du
   // vert "confirmé" — pour ne pas laisser croire qu'une vacation terminée
@@ -341,6 +345,7 @@ function badgeColor(status: string): string {
 function statusLabel(status: string): string {
   if (status === 'confirmed') return 'confirmé';
   if (status === 'modified') return 'modifié';
+  if (status === 'partial') return 'fait partiellement';
   if (status === 'done') return 'terminé';
   if (status === 'cancelled') return 'annulé';
   return status;
@@ -455,10 +460,14 @@ async function loadTournee() {
       tripError.value = planning.error;
       return;
     }
-    // Une vacation déjà terminée ou annulée n'a plus sa place dans une
-    // tournée à venir — s'y rendre n'a pas de sens, et l'y inclure fausserait
-    // aussi bien l'itinéraire optimisé que missingCoords ci-dessous.
-    const dayShifts = planning.dayShifts.filter((s) => s.status !== 'done' && s.status !== 'cancelled');
+    // Une vacation déjà terminée, partiellement effectuée ou annulée n'a
+    // plus sa place dans une tournée à venir — le salarié est déjà reparti
+    // (voir ShiftStatus 'partial'), s'y rendre n'a pas de sens, et l'y
+    // inclure fausserait aussi bien l'itinéraire optimisé que missingCoords
+    // ci-dessous.
+    const dayShifts = planning.dayShifts.filter(
+      (s) => s.status !== 'done' && s.status !== 'partial' && s.status !== 'cancelled'
+    );
 
     // Les coordonnées viennent du shift lui-même (Shift.latitude/longitude,
     // déjà renvoyées par /planning) — PAS de la liste chantiers.list
