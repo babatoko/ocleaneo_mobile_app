@@ -8,6 +8,7 @@ import type { ProviderFeature } from './DataProvider';
 import type {
   Chantier,
   CreateTimeEntryPayload,
+  CreateTimeEntryWithTagPayload,
   DateRange,
   Employee,
   LoginResult,
@@ -124,6 +125,24 @@ export class OdooProvider extends DataProvider {
       id: data.id,
       type: TYPE_TO_FRONTEND[data.type] || payload.type,
       chantier_id: data.fsm_order_id || payload.chantierId,
+      recorded_at: withUtcSuffix(data.datetime),
+      client_ref: payload.clientRef,
+    };
+  }
+
+  async createTimeEntryWithTag(payload: CreateTimeEntryWithTagPayload): Promise<TimeEntry> {
+    const data = await callMobile<OdooPointageResponse>('/pointage/with-tag', {
+      type: TYPE_TO_ODOO[payload.type],
+      nfc_tag_id: payload.uid,
+      datetime: payload.recordedAt,
+      gps_latitude: payload.latitude,
+      gps_longitude: payload.longitude,
+      client_ref: payload.clientRef,
+    });
+    return {
+      id: data.id,
+      type: TYPE_TO_FRONTEND[data.type] || payload.type,
+      chantier_id: data.fsm_order_id || 0,
       recorded_at: withUtcSuffix(data.datetime),
       client_ref: payload.clientRef,
     };

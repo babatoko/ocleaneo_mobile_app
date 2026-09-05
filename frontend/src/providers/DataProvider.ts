@@ -123,6 +123,15 @@ export abstract class DataProvider {
     throw notImplemented('createTimeEntry');
   }
 
+  /**
+   * Create a time entry from a scanned NFC badge. The backend resolves the
+   * tag, finds the best matching FSM order, and records the clocking.
+   * Falls back to a location-only entry if no order exists.
+   */
+  async createTimeEntryWithTag(_payload: CreateTimeEntryWithTagPayload): Promise<TimeEntry> {
+    throw notImplemented('createTimeEntryWithTag');
+  }
+
   // --- Produits / stock ------------------------------------------------------
 
   /** Catalogue produits (avec packagings). */

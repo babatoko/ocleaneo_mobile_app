@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { NFC } from '@exxili/capacitor-nfc';
 import type { Router } from 'vue-router';
 import { provider } from '../providers';
-import { ProviderNetworkError } from '../providers/DataProvider';
+import { ProviderError, ProviderNetworkError } from '../providers/DataProvider';
 import { useAuthStore } from './auth';
 import { useChantiersStore } from './chantiers';
 import { usePlanningStore } from './planning';
@@ -301,72 +301,111 @@ export const usePointageStore = defineStore('pointage', {
 
     async clockWithTag(uid: string): Promise<void> {
       this.scanError = '';
-      // loadSafe() d'abord : todayShifts (source /planning, correctement
-      // filtrée par date) est désormais la source primaire du matching
-      // ci-dessous, pas seulement de calcul du type in/out.
-      await this.loadSafe();
-      const scannedId = normalizeNfcId(uid);
-      const shiftMatch = this.todayShifts.find(
-        (s) => s.nfc_tag_id && normalizeNfcId(s.nfc_tag_id) === scannedId
-      );
-
-      const chantiers = useChantiersStore();
-      // Repli sur /chantiers/aujourdhui (voir ocleaneo#13 : plafonné à 50 et
-      // pas filtré par date, donc pas fiable comme source primaire) —
-      // seulement si le badge n'appartient à aucune vacation du planning du
-      // jour, par ex. un départ oublié hier sur un chantier déjà sorti du
-      // planning d'aujourd'hui.
-      if (!shiftMatch && !chantiers.list.length) await chantiers.fetchMine();
-      const chantierMatch = !shiftMatch
-        ? chantiers.list.find((c) => c.nfc_tag_id && normalizeNfcId(c.nfc_tag_id) === scannedId)
-        : undefined;
-
-      const site = shiftMatch
-        ? {
-            id: shiftMatch.chantier_id,
-            name: shiftMatch.chantier_name,
-            latitude: shiftMatch.latitude ?? null,
-            longitude: shiftMatch.longitude ?? null,
-          }
-        : chantierMatch
-        ? {
-            id: chantierMatch.id,
-            name: chantierMatch.name,
-            latitude: chantierMatch.latitude ?? null,
-            longitude: chantierMatch.longitude ?? null,
-          }
-        : null;
-
-      if (!site) {
-        // Confirmé sur le terrain (journal d'erreurs) : le badge scanné était
-        // en réalité connu, mais sous une forme différente côté Odoo
-        // ("04:17:79:C9:78:00:00" vs "041779C9780000" côté lecteur) — d'où
-        // normalizeNfcId() ci-dessus. Ce log reste utile pour un vrai badge
-        // absent des deux listes, ou un futur format qui échapperait encore
-        // à la normalisation.
-        void recordError(
-          `UID scanné (brut): "${uid}" (format Odoo: "${formatNfcIdWithColons(uid)}") — nfc_tag_id connus (planning du jour): ${JSON.stringify(this.todayShifts.map((s) => s.nfc_tag_id))}, (chantiers): ${JSON.stringify(chantiers.list.map((c) => c.nfc_tag_id))}`,
-          'pointage.clockWithTag: badge non reconnu',
-        );
-        this.scanError = 'Badge non reconnu. Contactez votre responsable.';
-        hapticError();
-        return;
-      }
-
       const position = await getPosition();
-      const geo = checkGeofence(position, site);
-      const lastForChantier = [...this.entries]
+      const recordedAt = new Date().toISOString();
+      const clientRef = newClientRef();
+      const type: TimeEntryType = this._nextTypeForTag(uid);
+
+      try {
+        const entry = await provider.createTimeEntryWithTag({
+          uid,
+          type,
+          recordedAt,
+          latitude: position?.latitude,
+          longitude: position?.longitude,
+          clientRef,
+        });
+        await this.loadSafe();
+
+        // Resolve site info for geofence feedback and notifications.
+        const site = this._resolveSiteFromEntry(entry);
+        const geo = checkGeofence(position, site);
+        this.lastMessage = !position
+          ? { type: 'warn', text: 'Position non disponible — vérifiez que la localisation est activée. Pointage tout de même enregistré.' }
+          : geo && !geo.withinRange
+          ? { type: 'warn', text: `Position à ~${geo.distanceMeters} m du chantier — pointage tout de même enregistré.` }
+          : null;
+
+        hapticSuccess();
+        await this._handlePostClocking(type, site, entry.shift_id);
+      } catch (e) {
+        if (e instanceof ProviderError && e.status === 404) {
+          void recordError(
+            `UID scanné (brut): "${uid}" (format Odoo: "${formatNfcIdWithColons(uid)}")`,
+            'pointage.clockWithTag: badge non reconnu',
+          );
+          this.scanError = 'Badge non reconnu. Contactez votre responsable.';
+          hapticError();
+          return;
+        }
+        // Network / retryable errors go to the offline queue.
+        if (e instanceof ProviderNetworkError) {
+          await enqueue({
+            uid,
+            type,
+            recordedAt,
+            latitude: position?.latitude,
+            longitude: position?.longitude,
+            clientRef,
+            withTag: true,
+          } as unknown as Parameters<typeof enqueue>[0]);
+          await this.refreshQueueCount();
+          this.entries = [
+            ...this.entries,
+            { id: `pending-${recordedAt}`, type, chantier_id: 0, recorded_at: recordedAt, pending: true },
+          ];
+          this.lastMessage = { type: 'queued', text: 'Hors ligne : pointage enregistré, synchronisation dès que possible.' };
+          hapticSuccess();
+          return;
+        }
+        throw e;
+      }
+    },
+
+    /** Determine the next clocking type for a tag based on the most recent
+     *  entry at the resolved location. Falls back to 'in' when unknown. */
+    _nextTypeForTag(uid: string): TimeEntryType {
+      // Best-effort local guess : if we already have an 'in' without 'out'
+      // for the same physical badge today, treat it as a departure. The
+      // backend is the final authority; this only drives the payload type.
+      const scannedId = normalizeNfcId(uid);
+      const lastForTag = [...this.entries]
         .reverse()
-        .find((e) => e.chantier_id === site.id && (e.type === 'in' || e.type === 'out'));
-      const shift = shiftMatch ?? this.todayShifts.find((s) => s.chantier_id === site.id);
-      const type: TimeEntryType = lastForChantier?.type === 'in' ? 'out' : 'in';
+        .find((e) => {
+          const shift = this.todayShifts.find((s) => s.id === e.shift_id);
+          const tagId = shift?.nfc_tag_id ? normalizeNfcId(shift.nfc_tag_id) : '';
+          return tagId === scannedId && (e.type === 'in' || e.type === 'out');
+        });
+      return lastForTag?.type === 'in' ? 'out' : 'in';
+    },
 
-      await this.postEntry(type, { chantierId: site.id, shiftId: shift?.id, position, geo });
-      hapticSuccess();
+    _resolveSiteFromEntry(entry: TimeEntry): { id: number; name: string; latitude: number | null; longitude: number | null } {
+      const shift = entry.shift_id ? this.todayShifts.find((s) => s.id === entry.shift_id) : undefined;
+      if (shift) {
+        return {
+          id: shift.chantier_id,
+          name: shift.chantier_name,
+          latitude: shift.latitude ?? null,
+          longitude: shift.longitude ?? null,
+        };
+      }
+      // Fallback: try to find a chantier with the same id (backend may set
+      // chantier_id to the fsm_order_id; either way we use what we have).
+      const chantiers = useChantiersStore();
+      const chantier = chantiers.list.find((c) => c.id === entry.chantier_id);
+      return {
+        id: entry.chantier_id || 0,
+        name: chantier?.name || 'Chantier inconnu',
+        latitude: chantier?.latitude ?? null,
+        longitude: chantier?.longitude ?? null,
+      };
+    },
 
-      if (type === 'in' && shift) {
-        const next = (this.nextShiftAfter as (shift: Shift) => Shift | null)(shift);
-        const estimatedDeparture = (this.estimatedDepartureFor as (shift: Shift) => Date | null)(shift);
+    async _handlePostClocking(type: TimeEntryType, site: { id: number; name: string }, shiftId?: number): Promise<void> {
+      if (type === 'in') {
+        const shift = this.todayShifts.find((s) => s.id === shiftId);
+        const next = shift ? (this.nextShiftAfter as (shift: Shift) => Shift | null)(shift) : null;
+        const estimatedDeparture = shift ? (this.estimatedDepartureFor as (shift: Shift) => Date | null)(shift) : null;
         const lastEntry = this.lastEntry as TimeEntry | undefined;
         await showClockedInNotification({
           chantierName: site.name,
@@ -376,29 +415,17 @@ export const usePointageStore = defineStore('pointage', {
         });
         await scheduleDepartureReminder({ chantierName: site.name, estimatedDeparture });
         await scheduleEndOfShiftReminder({ chantierName: site.name, estimatedDeparture });
-        // L'arrivée est badguée : plus la peine d'alerter sur un retard pour
-        // cette vacation (programmé par syncShifts sans savoir, lui, si le
-        // salarié a déjà pointé).
         if (shift) await cancelLateReminder(shift.id);
       } else {
         await clearClockedInNotification();
         await cancelDepartureReminder();
         await cancelEndOfShiftReminder();
-        // Départ badgé pendant une pause (cas réel géré par computeWorkedHours) :
-        // le rappel de reprise n'a plus lieu d'être.
         await cancelPauseReminder();
       }
 
       if (type === 'out') {
-        // Un départ clôture désormais le workorder côté serveur (voir
-        // ocleaneo#11) — /chantiers/aujourdhui ne le renverra plus. Sans ce
-        // rafraîchissement, la liste locale garde ce chantier affiché comme
-        // actif jusqu'à la prochaine relance de l'app : un salarié pourrait
-        // re-badger sur un chantier déjà clôturé sans que rien ne le signale.
+        const chantiers = useChantiersStore();
         await chantiers.fetchMine();
-        // Même raisonnement côté planning : sans ça, le cache hors ligne
-        // (glissant ou du jour) garde cette vacation "à faire" jusqu'au
-        // prochain fetch réussi (voir markShiftDone()).
         await usePlanningStore().markShiftDone(site.id);
       }
     },
