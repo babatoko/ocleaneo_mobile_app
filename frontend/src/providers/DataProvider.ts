@@ -3,8 +3,10 @@ import type {
   CreateOrderPayload,
   CreateOrderResult,
   CreateTimeEntryPayload,
+  CreateTimeEntryWithTagPayload,
   DateRange,
   Employee,
+  InventoryLatest,
   LoginResult,
   Order,
   Product,
@@ -12,7 +14,6 @@ import type {
   SubmitInventoryPayload,
   TimeEntry,
   TodayTimeEntries,
-  InventoryLatest,
 } from '../types/models';
 
 /**
@@ -121,6 +122,15 @@ export abstract class DataProvider {
 
   async createTimeEntry(_payload: CreateTimeEntryPayload): Promise<TimeEntry> {
     throw notImplemented('createTimeEntry');
+  }
+
+  /**
+   * Create a time entry from a scanned NFC badge. The backend resolves the
+   * tag, finds the best matching FSM order, and records the clocking.
+   * Falls back to a location-only entry if no order exists.
+   */
+  async createTimeEntryWithTag(_payload: CreateTimeEntryWithTagPayload): Promise<TimeEntry> {
+    throw notImplemented('createTimeEntryWithTag');
   }
 
   // --- Produits / stock ------------------------------------------------------
