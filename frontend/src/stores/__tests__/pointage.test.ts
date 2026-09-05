@@ -164,14 +164,17 @@ describe('clockWithTag — rafraîchissement de la liste des chantiers', () => {
       entries: [{ id: 'e1', type: 'in', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString() }],
       status: 'in',
     });
-    createTimeEntry.mockResolvedValue({
-      id: 2,
-      type: 'out',
-      chantier_id: CHANTIER.id,
-      recorded_at: new Date().toISOString(),
-      shift_status: 'partial',
-      completion_ratio: 0.5,
-    });
+    createTimeEntryWithTag.mockImplementation((_payload: { type: string; uid: string }) =>
+      Promise.resolve({
+        id: 2,
+        type: 'out' as TimeEntryType,
+        chantier_id: CHANTIER.id,
+        shift_id: undefined as number | undefined,
+        recorded_at: new Date().toISOString(),
+        shift_status: 'partial' as const,
+        completion_ratio: 0.5,
+      }),
+    );
 
     await pointage.clockWithTag('041779C9780000');
 

@@ -24,7 +24,7 @@ import { enqueue, queueLength, flushQueue, watchConnectivity } from '../services
 import { startOfWeekIso } from '../utils/week';
 import { todayIso } from '../utils/date';
 import { recordError } from '../services/errorLog';
-import type { Position, Shift, TimeEntry, TimeEntryType } from '../types/models';
+import type { Position, Shift, ShiftStatus, TimeEntry, TimeEntryType } from '../types/models';
 
 function newClientRef(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -333,7 +333,7 @@ export const usePointageStore = defineStore('pointage', {
           : null;
 
         hapticSuccess();
-        await this._handlePostClocking(resolvedType, site, entry.shift_id);
+        await this._handlePostClocking(resolvedType, site, entry.shift_id, entry.shift_status);
       } catch (e) {
         if (e instanceof ProviderError && e.status === 404) {
           void recordError(
@@ -396,7 +396,12 @@ export const usePointageStore = defineStore('pointage', {
       };
     },
 
-    async _handlePostClocking(type: TimeEntryType, site: { id: number; name: string }, shiftId?: number): Promise<void> {
+    async _handlePostClocking(
+      type: TimeEntryType,
+      site: { id: number; name: string },
+      shiftId?: number,
+      shiftStatus?: ShiftStatus,
+    ): Promise<void> {
       if (type === 'in') {
         const shift = this.todayShifts.find((s) => s.id === shiftId);
         const next = shift ? (this.nextShiftAfter as (shift: Shift) => Shift | null)(shift) : null;
@@ -430,8 +435,8 @@ export const usePointageStore = defineStore('pointage', {
         // vérdict connu (hors ligne, ou backend pas encore mis à jour sur
         // ce commit), markShiftDone() retombe seule sur son ancien
         // comportement ("done").
-        if (entry?.shift_status) {
-          await usePlanningStore().markShiftDone(site.id, entry.shift_status);
+        if (shiftStatus) {
+          await usePlanningStore().markShiftDone(site.id, shiftStatus);
         } else {
           await usePlanningStore().markShiftDone(site.id);
         }
