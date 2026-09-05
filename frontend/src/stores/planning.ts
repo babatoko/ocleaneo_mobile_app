@@ -5,7 +5,7 @@ import { ProviderError, ProviderNetworkError } from '../providers/DataProvider';
 import { syncShifts } from '../services/planningSync';
 import { startOfMonthIso, endOfMonthIso } from '../utils/week';
 import { todayIso, addDaysIso } from '../utils/date';
-import type { Shift } from '../types/models';
+import type { Shift, ShiftStatus } from '../types/models';
 
 // Nombre de jours (aujourd'hui inclus) couverts par prefetchUpcoming()
 // ci-dessous — voir sa docstring.
@@ -39,15 +39,16 @@ function dayCacheKey(dateIso: string): string {
   return `ocleaneo_shifts_${dateIso}_${dateIso}`;
 }
 
-function withShiftDone(shifts: Shift[], shiftId: number): { data: Shift[]; changed: boolean } {
+function withShiftStatus(shifts: Shift[], shiftId: number, status: ShiftStatus): { data: Shift[]; changed: boolean } {
   let changed = false;
   const data = shifts.map((s) => {
-    // Une vacation annulée ne redevient jamais "terminée" — l'annulation
-    // reste la vérité, un départ badgé dessus n'aurait de toute façon pas dû
-    // pouvoir se produire.
+    // Une vacation annulée ou déjà terminée ne redevient jamais "partielle"
+    // ou "confirmée" — l'annulation reste la vérité, et une fois vraiment
+    // terminée (>=90% du temps prévu), un second départ badgé dessus
+    // n'aurait de toute façon pas dû pouvoir se produire.
     if (s.id !== shiftId || s.status === 'done' || s.status === 'cancelled') return s;
     changed = true;
-    return { ...s, status: 'done' as const };
+    return { ...s, status };
   });
   return { data, changed };
 }
@@ -197,18 +198,25 @@ export const usePlanningStore = defineStore('planning', {
      * n'est visible si ça échoue, la prochaine synchronisation en ligne
      * remettra de toute façon les caches à jour.
      */
-    async markShiftDone(shiftId: number): Promise<void> {
-      this.dayShifts = withShiftDone(this.dayShifts, shiftId).data;
+    // `status` par défaut à 'done' : le seul appelant qui ne connaît pas le
+    // résultat réel d'un départ (pointage.ts, quand le pointage vient d'être
+    // mis en file hors ligne, ou avec un backend pas encore mis à jour sur
+    // ce commit) suppose une vacation entièrement effectuée, comme avant la
+    // règle de complétion — voir fsm_order.update_completion_from_worked_time
+    // côté Odoo. Quand le départ a bien été traité en ligne, l'appelant
+    // passe le statut réel (confirmed/partial/done) renvoyé par le serveur.
+    async markShiftDone(shiftId: number, status: ShiftStatus = 'done'): Promise<void> {
+      this.dayShifts = withShiftStatus(this.dayShifts, shiftId, status).data;
       for (const day of Object.keys(this.weekShiftsByDay)) {
-        this.weekShiftsByDay[day] = withShiftDone(this.weekShiftsByDay[day], shiftId).data;
+        this.weekShiftsByDay[day] = withShiftStatus(this.weekShiftsByDay[day], shiftId, status).data;
       }
-      this.monthShifts = withShiftDone(this.monthShifts, shiftId).data;
+      this.monthShifts = withShiftStatus(this.monthShifts, shiftId, status).data;
 
       try {
         const { value } = await Preferences.get({ key: UPCOMING_CACHE_KEY });
         if (value) {
           const cache: UpcomingCache = JSON.parse(value);
-          const { data, changed } = withShiftDone(cache.data, shiftId);
+          const { data, changed } = withShiftStatus(cache.data, shiftId, status);
           if (changed) {
             await Preferences.set({ key: UPCOMING_CACHE_KEY, value: JSON.stringify({ ...cache, data }) });
           }
@@ -217,7 +225,7 @@ export const usePlanningStore = defineStore('planning', {
         const todayKey = dayCacheKey(todayIso());
         const { value: dayValue } = await Preferences.get({ key: todayKey });
         if (dayValue) {
-          const { data, changed } = withShiftDone(JSON.parse(dayValue), shiftId);
+          const { data, changed } = withShiftStatus(JSON.parse(dayValue), shiftId, status);
           if (changed) {
             await Preferences.set({ key: todayKey, value: JSON.stringify(data) });
           }

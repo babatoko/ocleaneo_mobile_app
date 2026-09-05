@@ -126,8 +126,26 @@ export class OdooProvider extends DataProvider {
       chantier_id: data.fsm_order_id || payload.chantierId,
       recorded_at: withUtcSuffix(data.datetime),
       client_ref: payload.clientRef,
+      // Présents seulement sur un 'out' avec fsm_order_id (voir le
+      // contrôleur pointage.py) : absents sur une 'arrivee'/pause, d'où le
+      // repli sur undefined plutôt que sur un état par défaut trompeur.
+      shift_status: completionStateToShiftStatus(data.completion_state),
+      completion_ratio: data.completion_ratio === false || data.completion_ratio == null ? null : data.completion_ratio,
     };
   }
+}
+
+/** Traduit fsm.order.completion_state (not_done/partial/done/false, voir
+ *  ocleaneo_mobile_pointage.fsm_order.update_completion_from_worked_time)
+ *  vers le même vocabulaire de statut que /planning (_order_status côté
+ *  Python) : un chantier "not_done" reste, comme avant cette règle, une
+ *  vacation "confirmed" ordinaire — seul le cas 'partial' mérite un badge
+ *  distinct côté app. */
+function completionStateToShiftStatus(state: string | false | undefined): ShiftStatus | undefined {
+  if (state === 'done') return 'done';
+  if (state === 'partial') return 'partial';
+  if (state === 'not_done') return 'confirmed';
+  return undefined;
 }
 
 // --- Forme brute des réponses Odoo (JSON-RPC .result) ------------------
@@ -198,6 +216,10 @@ interface OdooPlanningOrder {
    *  était forcément active (l'ancien /planning excluait déjà tout ce qui
    *  était clôturé), d'où le repli 'confirmed' dans planningOrderToShift(). */
   status?: ShiftStatus;
+  /** Absent sur un backend pas encore mis à jour sur ce commit, ou tant
+   *  qu'aucun départ n'a encore été pointé sur la commande — d'où le repli
+   *  sur `null` dans planningOrderToShift(), jamais 0 (0% serait faux). */
+  completion_ratio?: number | false;
 }
 
 interface OdooPlanningResult {
@@ -210,6 +232,11 @@ interface OdooPointageResponse {
   type: string;
   datetime: string | false;
   fsm_order_id: number | false;
+  /** Absents sur une 'arrivee'/pause, ou sur un backend pas encore mis à
+   *  jour sur ce commit — d'où le repli sur undefined dans
+   *  completionStateToShiftStatus() plutôt que sur un état par défaut. */
+  completion_ratio?: number | false;
+  completion_state?: string | false;
 }
 
 interface OdooPointageEntry {
@@ -291,6 +318,7 @@ function planningOrderToShift(order: OdooPlanningOrder): Shift {
     latitude: loc.latitude || null,
     longitude: loc.longitude || null,
     nfc_tag_id: loc.nfc_tag_id || null,
+    completion_ratio: order.completion_ratio === false || order.completion_ratio == null ? null : order.completion_ratio,
   };
 }
 

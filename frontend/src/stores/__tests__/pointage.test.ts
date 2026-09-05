@@ -147,6 +147,34 @@ describe('clockWithTag — rafraîchissement de la liste des chantiers', () => {
 
     expect(markShiftDone).toHaveBeenCalledWith(CHANTIER.id);
   });
+
+  it('répercute le vrai statut de complétion renvoyé par le serveur (chantier fait partiellement)', async () => {
+    // Un départ sous 90% du temps prévu ne clôture plus le chantier — voir
+    // fsm_order.update_completion_from_worked_time côté Odoo. Le statut réel
+    // (ici 'partial') doit être transmis à markShiftDone(), pas le défaut
+    // 'done' qui supposerait à tort une vacation entièrement effectuée.
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+    const planning = usePlanningStore();
+    const markShiftDone = vi.spyOn(planning, 'markShiftDone').mockResolvedValue();
+    fetchTodayTimeEntries.mockResolvedValue({
+      entries: [{ id: 'e1', type: 'in', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString() }],
+      status: 'in',
+    });
+    createTimeEntry.mockResolvedValue({
+      id: 2,
+      type: 'out',
+      chantier_id: CHANTIER.id,
+      recorded_at: new Date().toISOString(),
+      shift_status: 'partial',
+      completion_ratio: 0.5,
+    });
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(markShiftDone).toHaveBeenCalledWith(CHANTIER.id, 'partial');
+  });
 });
 
 describe('clockWithTag — position GPS indisponible', () => {

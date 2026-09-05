@@ -69,7 +69,7 @@ const BASE_ORDER = {
 };
 
 describe('OdooProvider.fetchShifts — statut de la vacation', () => {
-  it.each(['confirmed', 'done', 'cancelled'] as const)(
+  it.each(['confirmed', 'partial', 'done', 'cancelled'] as const)(
     "reporte status: '%s' du backend sur le Shift",
     async (status) => {
       post.mockResolvedValueOnce(planningResponse({ ...BASE_ORDER, status }));
@@ -87,5 +87,25 @@ describe('OdooProvider.fetchShifts — statut de la vacation', () => {
     const [shift] = await new OdooProvider().fetchShifts({ from: '2026-09-04', to: '2026-09-04' });
 
     expect(shift.status).toBe('confirmed');
+  });
+
+  // fsm_order.update_completion_from_worked_time (module
+  // ocleaneo_mobile_pointage) : le taux de réalisation n'existe qu'une fois
+  // un départ pointé sur la commande — false côté backend tant que ce n'est
+  // pas le cas, jamais 0 (0% serait un mensonge, pas une absence de donnée).
+  it('reporte completion_ratio du backend sur le Shift', async () => {
+    post.mockResolvedValueOnce(planningResponse({ ...BASE_ORDER, status: 'partial', completion_ratio: 0.5 }));
+
+    const [shift] = await new OdooProvider().fetchShifts({ from: '2026-09-04', to: '2026-09-04' });
+
+    expect(shift.completion_ratio).toBe(0.5);
+  });
+
+  it("retombe sur null quand completion_ratio est absent ou false (aucun départ pointé)", async () => {
+    post.mockResolvedValueOnce(planningResponse({ ...BASE_ORDER, completion_ratio: false }));
+
+    const [shift] = await new OdooProvider().fetchShifts({ from: '2026-09-04', to: '2026-09-04' });
+
+    expect(shift.completion_ratio).toBeNull();
   });
 });

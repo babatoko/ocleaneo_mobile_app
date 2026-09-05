@@ -97,6 +97,8 @@ class MobilePointageController(http.Controller):
                 "stage": order.stage_id.name,
                 "date_start": order.date_start.isoformat() if order.date_start else False,
                 "date_end": order.date_end.isoformat() if order.date_end else False,
+                "completion_ratio": order.completion_ratio or False,
+                "completion_state": order.completion_state or False,
             })
         return {"count": len(result), "orders": result}
 
@@ -271,17 +273,14 @@ class MobilePointageController(http.Controller):
         if timesheet_ids:
             pointage.timesheet_line_ids = [(6, 0, timesheet_ids)]
 
-        # ---- Close FSM order on depart ----
+        # ---- Update FSM order completion on depart ----
+        # Closing on depart used to be unconditional: clocking in and
+        # immediately back out marked the job "Completed" the same as an
+        # honest full visit. update_completion_from_worked_time() only
+        # closes the order once enough of the scheduled duration was
+        # actually spent on site — see its docstring for the exact rule.
         if pointage_type == "depart" and order and order.exists():
-            completed_stage = env["fsm.stage"].sudo().search([
-                ("name", "ilike", "completed"),
-                ("is_closed", "=", True),
-            ], limit=1)
-            if completed_stage:
-                try:
-                    order.write({"stage_id": completed_stage.id, "is_button": True})
-                except Exception as e:
-                    _logger.warning("Could not set FSM order %s to Completed: %s", order.id, e)
+            order.sudo().update_completion_from_worked_time(employee)
 
         return self._pointage_response(pointage, timesheet_ids)
 
@@ -352,7 +351,7 @@ class MobilePointageController(http.Controller):
         """
         if timesheet_ids is None:
             timesheet_ids = pointage.timesheet_line_ids.ids
-        return {
+        response = {
             "id": pointage.id,
             "type": pointage.type,
             "datetime": pointage.datetime.isoformat(),
@@ -360,6 +359,15 @@ class MobilePointageController(http.Controller):
             "timesheet_ids": timesheet_ids,
             "fsm_order_id": pointage.fsm_order_id.id if pointage.fsm_order_id else False,
         }
+        # Only meaningful once a 'depart' has run
+        # update_completion_from_worked_time() at least once — False/absent
+        # completion_state on an order that was never departed from is
+        # expected, not an error, so the mobile app must treat it as "no
+        # verdict yet" rather than as one of the three real states.
+        if pointage.fsm_order_id:
+            response["completion_ratio"] = pointage.fsm_order_id.completion_ratio
+            response["completion_state"] = pointage.fsm_order_id.completion_state or False
+        return response
 
     def _get_project_pointage_chantiers(self, env, company_id):
         """Return the generic 'Pointage chantiers' project for the given company.

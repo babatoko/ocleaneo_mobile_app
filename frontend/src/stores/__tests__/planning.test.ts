@@ -174,4 +174,18 @@ describe('markShiftDone', () => {
 
     await expect(planning.markShiftDone(1)).resolves.toBeUndefined();
   });
+
+  it('accepte un statut réel autre que "done" (départ sous 90% du temps prévu)', async () => {
+    // Un départ ne clôture plus systématiquement le chantier — voir
+    // fsm_order.update_completion_from_worked_time côté Odoo. pointage.ts
+    // passe alors le statut réel renvoyé par le serveur plutôt que de
+    // laisser markShiftDone() retomber sur son défaut ('done').
+    fetchShifts.mockResolvedValueOnce([shift(1, `${todayIso()}T08:00:00.000Z`)]);
+    const planning = usePlanningStore();
+    await planning.loadDay(todayIso());
+
+    await planning.markShiftDone(1, 'partial');
+
+    expect(planning.dayShifts[0].status).toBe('partial');
+  });
 });
