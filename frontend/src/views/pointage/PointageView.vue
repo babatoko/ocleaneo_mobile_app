@@ -167,6 +167,13 @@ const statusIcon = computed(() =>
   pointage.status === 'in' ? playOutline : pointage.status === 'paused' ? pauseOutline : stopOutline
 );
 
+const messageIcon = computed(() => {
+  const type = pointage.lastMessage?.type;
+  if (type === 'warn') return warningOutline;
+  if (type === 'success') return checkmarkOutline;
+  return cloudUploadOutline;
+});
+
 function fmtOverdue(min: number): string {
   if (min < 60) return `${min} min`;
   return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
@@ -249,7 +256,7 @@ function fmtTime(iso: string | Date | null | undefined): string {
   </ion-item>
 
   <ion-item v-if="pointage.lastMessage" class="soft-banner" :class="pointage.lastMessage.type" lines="none">
-    <ion-icon slot="start" :icon="pointage.lastMessage.type === 'warn' ? warningOutline : cloudUploadOutline"></ion-icon>
+    <ion-icon slot="start" :icon="messageIcon"></ion-icon>
     <ion-label class="ion-text-wrap">{{ pointage.lastMessage.text }}</ion-label>
   </ion-item>
 
@@ -399,6 +406,11 @@ function fmtTime(iso: string | Date | null | undefined): string {
 .soft-banner.queued {
   --background: var(--accent-bg);
   --color: var(--accent-text);
+}
+
+.soft-banner.success {
+  --background: var(--success-bg);
+  --color: var(--success-text);
 }
 
 .nfc-circle {
