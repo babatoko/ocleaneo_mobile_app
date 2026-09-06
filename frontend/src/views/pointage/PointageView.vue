@@ -225,6 +225,14 @@ function fmtTime(iso: string | Date | null | undefined): string {
   if (!iso) return '--:--';
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
+
+/** chantier_name n'est pas garanti renseigné par le backend sur une entrée
+ *  d'historique (voir OdooProvider.pointageEntryToTimeEntry) — un template
+ *  literal sur un champ undefined afficherait littéralement le texte
+ *  "undefined" à l'agent, il faut donc composer la sous-ligne à la main. */
+function historySubtitle(e: TimeEntry): string {
+  return [e.chantier_name, e.comment].filter((part): part is string => Boolean(part)).join(' — ');
+}
 </script>
 
 <template>
@@ -240,29 +248,29 @@ function fmtTime(iso: string | Date | null | undefined): string {
       <ion-chip class="status-pill" :class="pointage.status">
         <ion-icon slot="start" :icon="statusIcon"></ion-icon>
         <span>{{ statusText }}</span>
-        </ion-chip>
-        </div>
-        </div>
+      </ion-chip>
+    </div>
+  </div>
 
-        <!-- Champ commentaire libre pour le prochain pointage -->
-        <div class="comment-input">
-        <ion-item lines="none">
-        <ion-icon slot="start" :icon="documentTextOutline"></ion-icon>
-        <ion-label position="stacked">Note pour le prochain pointage</ion-label>
-        <ion-textarea
-          v-model="pointage.pendingComment"
-          placeholder="Ex: EI, chantier pas fini, client demande la facture..."
-          rows="2"
-          maxlength="500"
-          auto-grow
-        ></ion-textarea>
-        </ion-item>
-        <p v-if="pointage.pendingComment.length > 0" class="comment-hint">
-        Sera envoyée avec le prochain badge.
-        </p>
-        </div>
+  <!-- Champ commentaire libre pour le prochain pointage -->
+  <div class="comment-input">
+    <ion-item lines="none">
+      <ion-icon slot="start" :icon="documentTextOutline"></ion-icon>
+      <ion-label position="stacked">Note pour le prochain pointage</ion-label>
+      <ion-textarea
+        v-model="pointage.pendingComment"
+        placeholder="Ex: EI, chantier pas fini, client demande la facture..."
+        rows="2"
+        maxlength="500"
+        auto-grow
+      ></ion-textarea>
+    </ion-item>
+    <p v-if="pointage.pendingComment.length > 0" class="comment-hint">
+      Sera envoyée avec le prochain badge.
+    </p>
+  </div>
 
-        <ion-item v-if="pointage.offlineQueueCount > 0" class="offline-banner" lines="none">
+  <ion-item v-if="pointage.offlineQueueCount > 0" class="offline-banner" lines="none">
     <ion-icon slot="start" :icon="cloudOfflineOutline"></ion-icon>
     <ion-label class="ion-text-wrap">{{ pointage.offlineQueueCount }} pointage{{ pointage.offlineQueueCount > 1 ? 's' : '' }} en attente de synchronisation</ion-label>
   </ion-item>
@@ -347,7 +355,7 @@ function fmtTime(iso: string | Date | null | undefined): string {
         <ion-label>
           <p class="lbl" :class="{ muted: e.planned }">{{ entryLabel(e.type) }}</p>
           <p class="sub">
-            {{ e.planned ? `Prévu ${fmtTime(e.plannedTime)}` : e.pending ? 'En attente de synchronisation' : (e.comment ? `${e.chantier_name} — ${e.comment}` : e.chantier_name) }}
+            {{ e.planned ? `Prévu ${fmtTime(e.plannedTime)}` : e.pending ? 'En attente de synchronisation' : historySubtitle(e) }}
           </p>
         </ion-label>
         <ion-note slot="end" class="hist-time" :class="{ muted: e.planned || e.pending }">{{ e.planned ? '--:--' : fmtTime(e.recorded_at) }}</ion-note>
