@@ -94,6 +94,7 @@ onMounted(async () => {
     await pointage.loadSafe();
     await pointage.loadWeekSummary().catch(() => {});
     await pointage.refreshQueueCount();
+    await pointage.loadPendingCompteRendus();
   } catch {
     // Rien de plus à faire ici : DataState/le contenu affiché restent dans
     // leur dernier état connu. Ce qui compte, c'est de ne pas sauter la
@@ -282,6 +283,25 @@ function historySubtitle(e: TimeEntry): string {
     <ion-label class="ion-text-wrap">{{ pointage.offlineQueueCount }} pointage{{ pointage.offlineQueueCount > 1 ? 's' : '' }} en attente de synchronisation</ion-label>
   </ion-item>
 
+  <!-- Un départ sans compte-rendu soumis (écran quitté, app tuée avant
+       validation) reste signalé ici tant qu'il n'est pas traité — cette
+       liste est relue depuis le stockage local au montage (voir
+       loadPendingCompteRendus), donc ça survient même après redémarrage. -->
+  <RouterLink
+    v-if="pointage.pendingCompteRendus.length > 0"
+    to="/pointage/compte-rendu"
+    class="cr-pending-banner"
+  >
+    <ion-icon :icon="documentTextOutline"></ion-icon>
+    <span>
+      Compte-rendu en attente — {{ pointage.pendingCompteRendus[0].chantierName }}
+      <template v-if="pointage.pendingCompteRendus.length > 1">
+        (+{{ pointage.pendingCompteRendus.length - 1 }})
+      </template>
+    </span>
+    <ion-icon :icon="chevronForwardOutline" class="chev"></ion-icon>
+  </RouterLink>
+
   <ion-item v-if="pointage.lastMessage" class="soft-banner" :class="pointage.lastMessage.type" lines="none">
     <ion-icon slot="start" :icon="messageIcon"></ion-icon>
     <ion-label class="ion-text-wrap">{{ pointage.lastMessage.text }}</ion-label>
@@ -438,6 +458,33 @@ function historySubtitle(e: TimeEntry): string {
 .soft-banner.success {
   --background: var(--success-bg);
   --color: var(--success-text);
+}
+
+.cr-pending-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 18px 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.cr-pending-banner > ion-icon:first-child {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.cr-pending-banner span {
+  flex: 1;
+}
+
+.cr-pending-banner .chev {
+  font-size: 15px;
+  flex-shrink: 0;
 }
 
 .nfc-circle {

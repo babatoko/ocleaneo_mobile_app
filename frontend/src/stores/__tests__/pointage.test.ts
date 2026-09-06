@@ -24,6 +24,20 @@ vi.mock('../../providers', () => ({
     fetchShifts: vi.fn(async () => []),
     fetchTodayTimeEntries: vi.fn(async () => ({ entries: [], status: 'out' })),
     fetchTimeEntries: vi.fn(async () => []),
+    submitCompteRendu: vi.fn(async () => {}),
+  },
+}));
+
+// Même mock que planning.test.ts : @capacitor/preferences retombe sur
+// localStorage en web, absent de cet environnement de test (node, pas
+// jsdom — voir le vi.stubGlobal('navigator', {}) ci-dessus).
+const preferencesStore = new Map<string, string>();
+vi.mock('@capacitor/preferences', () => ({
+  Preferences: {
+    get: async ({ key }: { key: string }) => ({ value: preferencesStore.get(key) ?? null }),
+    set: async ({ key, value }: { key: string; value: string }) => {
+      preferencesStore.set(key, value);
+    },
   },
 }));
 
@@ -61,7 +75,7 @@ const { ProviderNetworkError } = await import('../../providers/DataProvider');
 const { usePointageStore } = await import('../pointage');
 const { useChantiersStore } = await import('../chantiers');
 const { usePlanningStore } = await import('../planning');
-const { enqueue } = await import('../../services/offlineQueue');
+const { enqueue, flushQueue } = await import('../../services/offlineQueue');
 
 const fetchChantiers = vi.mocked(provider.fetchChantiers);
 const createTimeEntry = vi.mocked(provider.createTimeEntry);
@@ -69,6 +83,7 @@ const createTimeEntryWithTag = vi.mocked(provider.createTimeEntryWithTag);
 const fetchTodayTimeEntries = vi.mocked(provider.fetchTodayTimeEntries);
 const fetchShifts = vi.mocked(provider.fetchShifts);
 const fetchTimeEntries = vi.mocked(provider.fetchTimeEntries);
+const submitCompteRendu = vi.mocked(provider.submitCompteRendu);
 
 const CHANTIER = {
   id: 42,
@@ -81,6 +96,9 @@ const CHANTIER = {
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.mocked(enqueue).mockClear();
+  vi.mocked(flushQueue).mockReset().mockResolvedValue({ flushed: 0 } as { flushed: number; remaining: number });
+  preferencesStore.clear();
+  submitCompteRendu.mockReset().mockResolvedValue(undefined);
   fetchChantiers.mockReset();
   fetchTodayTimeEntries.mockReset().mockResolvedValue({ entries: [], status: 'out' });
   fetchShifts.mockReset().mockResolvedValue([]);
@@ -308,6 +326,136 @@ describe('commentaire — conservé même quand le badge NFC part en file hors l
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect(vi.mocked(enqueue).mock.calls[0][0]).toMatchObject({ comment: 'Client absent' });
     expect(pointage.pendingComment).toBe('');
+  });
+});
+
+describe('pendingCompteRendus — un départ résolu ouvre un compte-rendu à valider', () => {
+  const SHIFT_WITH_ACTIVITIES = {
+    id: 7,
+    employee_id: 1,
+    chantier_id: CHANTIER.id,
+    chantier_name: 'Chantier Test',
+    chantier_address: '',
+    start_at: new Date().toISOString(),
+    end_at: new Date(Date.now() + 3600000).toISOString(),
+    status: 'confirmed' as const,
+    activities: [
+      { id: 1, name: 'Nettoyage des sanitaires', required: true, completed: false },
+      { id: 2, name: 'Dépoussiérage bureaux', required: false, completed: false },
+    ],
+  };
+
+  it("un départ réussi (résolu 'out' par le serveur) ajoute une entrée avec le chantier et ses activités", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+    // clockWithTag() rafraîchit todayShifts (loadSafe -> fetchShifts) avant
+    // de résoudre les activités du départ : le mock doit donc porter sur
+    // fetchShifts, pas sur un set direct de pointage.todayShifts (écrasé
+    // entre-temps).
+    fetchShifts.mockResolvedValueOnce([SHIFT_WITH_ACTIVITIES]);
+    createTimeEntryWithTag.mockResolvedValueOnce({
+      id: 9,
+      type: 'out' as TimeEntryType,
+      chantier_id: CHANTIER.id,
+      shift_id: SHIFT_WITH_ACTIVITIES.id,
+      recorded_at: new Date().toISOString(),
+      client_ref: 'cr-depart-1',
+    });
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(pointage.pendingCompteRendus).toHaveLength(1);
+    expect(pointage.pendingCompteRendus[0]).toMatchObject({
+      clientRef: 'cr-depart-1',
+      chantierName: 'Chantier Test',
+      activities: SHIFT_WITH_ACTIVITIES.activities,
+    });
+  });
+
+  it("une arrivée (résolue 'in') n'ajoute rien", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(pointage.pendingCompteRendus).toHaveLength(0);
+  });
+
+  it("un départ mis en file hors ligne n'ajoute rien tant que la synchro n'a pas abouti, mais l'ajoute une fois rejoué avec succès", async () => {
+    const pointage = usePointageStore();
+    pointage.todayShifts = [SHIFT_WITH_ACTIVITIES];
+    // _nextTypeForTag ne devine que 'in' aujourd'hui (voir pointage.ts) :
+    // impossible de savoir avant la synchro qu'il s'agissait d'un départ.
+    createTimeEntryWithTag.mockRejectedValueOnce(new ProviderNetworkError());
+
+    await pointage.clockWithTag('041779C9780000');
+    expect(pointage.pendingCompteRendus).toHaveLength(0);
+
+    // Le rejeu (flushOfflineQueue) reçoit le type réel une fois la requête
+    // effectivement passée — c'est à ce moment, et seulement à ce moment,
+    // que le compte-rendu doit apparaître.
+    vi.mocked(flushQueue).mockImplementationOnce(async (onEntry) => {
+      onEntry?.({
+        id: 9,
+        type: 'out',
+        chantier_id: CHANTIER.id,
+        shift_id: SHIFT_WITH_ACTIVITIES.id,
+        recorded_at: new Date().toISOString(),
+        client_ref: 'cr-depart-2',
+      });
+      return { flushed: 1, remaining: 0 };
+    });
+
+    await pointage.flushOfflineQueue();
+
+    expect(pointage.pendingCompteRendus).toHaveLength(1);
+    expect(pointage.pendingCompteRendus[0].clientRef).toBe('cr-depart-2');
+  });
+});
+
+describe('submitCompteRendu', () => {
+  it('réussi : appelle le provider et vide pendingCompteRendus', async () => {
+    const pointage = usePointageStore();
+    pointage.pendingCompteRendus = [
+      { clientRef: 'cr-1', chantierId: CHANTIER.id, chantierName: 'Chantier Test', activities: [], recordedAt: new Date().toISOString() },
+    ];
+
+    await pointage.submitCompteRendu('cr-1', 'RAS, tout est fait.', [{ id: 1, completed: true }]);
+
+    expect(submitCompteRendu).toHaveBeenCalledWith({
+      clientRef: 'cr-1',
+      commentaire: 'RAS, tout est fait.',
+      activities: [{ id: 1, completed: true }],
+    });
+    expect(pointage.pendingCompteRendus).toHaveLength(0);
+  });
+
+  it('échec réseau : met en file hors ligne mais vide quand même pendingCompteRendus (livraison déléguée à la file)', async () => {
+    const pointage = usePointageStore();
+    pointage.pendingCompteRendus = [
+      { clientRef: 'cr-1', chantierId: CHANTIER.id, chantierName: 'Chantier Test', activities: [], recordedAt: new Date().toISOString() },
+    ];
+    submitCompteRendu.mockRejectedValueOnce(new ProviderNetworkError());
+
+    await pointage.submitCompteRendu('cr-1', 'RAS', []);
+
+    expect(enqueue).toHaveBeenCalledWith({ clientRef: 'cr-1', commentaire: 'RAS', activities: [] });
+    expect(pointage.pendingCompteRendus).toHaveLength(0);
+  });
+
+  it('ne retire que le compte-rendu soumis, laisse les autres en attente', async () => {
+    const pointage = usePointageStore();
+    pointage.pendingCompteRendus = [
+      { clientRef: 'cr-1', chantierId: 1, chantierName: 'A', activities: [], recordedAt: new Date().toISOString() },
+      { clientRef: 'cr-2', chantierId: 2, chantierName: 'B', activities: [], recordedAt: new Date().toISOString() },
+    ];
+
+    await pointage.submitCompteRendu('cr-1', 'RAS', []);
+
+    expect(pointage.pendingCompteRendus).toHaveLength(1);
+    expect(pointage.pendingCompteRendus[0].clientRef).toBe('cr-2');
   });
 });
 

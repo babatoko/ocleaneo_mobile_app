@@ -3,7 +3,7 @@ import { Network } from '@capacitor/network';
 import { App } from '@capacitor/app';
 import { provider } from '../providers';
 import { ProviderNetworkError } from '../providers/DataProvider';
-import type { CreateTimeEntryPayload, CreateTimeEntryWithTagPayload, TimeEntryType } from '../types/models';
+import type { CompteRenduPayload, CreateTimeEntryPayload, CreateTimeEntryWithTagPayload, TimeEntry, TimeEntryType } from '../types/models';
 
 const QUEUE_KEY = 'ocleaneo_pointage_offline_queue';
 
@@ -28,7 +28,18 @@ interface TagQueuedEntry extends BaseQueuedEntry {
   uid: string;
 }
 
-type QueuedEntry = TimeEntryQueuedEntry | TagQueuedEntry;
+/** Compte-rendu de fin de chantier en attente d'envoi — n'est pas un
+ *  pointage (le départ, lui, a déjà été envoyé ou mis en file séparément) :
+ *  seuls le texte et les activités validées restent à transmettre. */
+interface CompteRenduQueuedEntry {
+  localId: string;
+  isCompteRendu: true;
+  clientRef: string;
+  commentaire: string;
+  activities?: { id: number; completed: boolean }[];
+}
+
+type QueuedEntry = TimeEntryQueuedEntry | TagQueuedEntry | CompteRenduQueuedEntry;
 
 // Pas de garde sur la plateforme : @capacitor/preferences retombe sur
 // localStorage dans le navigateur — même raisonnement que le cache du planning
@@ -77,10 +88,15 @@ export function isNetworkError(e: unknown): boolean {
   return e instanceof ProviderNetworkError; // posé par tout DataProvider pour une coupure réseau (voir providers/DataProvider.ts)
 }
 
-/** Ajoute un pointage à la file d'attente locale (persistante) et renvoie son id local. */
-export async function enqueue(payload: CreateTimeEntryPayload | CreateTimeEntryWithTagPayload): Promise<string> {
+/** Ajoute un pointage — ou un compte-rendu de fin de chantier — à la file
+ *  d'attente locale (persistante) et renvoie son id local. */
+export async function enqueue(
+  payload: CreateTimeEntryPayload | CreateTimeEntryWithTagPayload | CompteRenduPayload,
+): Promise<string> {
   const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const queued = 'chantierId' in payload
+  const queued = 'commentaire' in payload
+    ? ({ ...payload, localId, isCompteRendu: true as const } as CompteRenduQueuedEntry)
+    : 'chantierId' in payload
     ? ({ ...payload, localId } as TimeEntryQueuedEntry)
     : ({ ...payload, localId, withTag: true as const } as TagQueuedEntry);
   await withQueueLock(async () => {
@@ -112,8 +128,8 @@ const FAILED_KEY = 'ocleaneo_pointage_failed_entries';
 export interface FailedEntry {
   localId: string;
   clientRef: string;
-  type: TimeEntryType;
-  recordedAt: string;
+  type?: TimeEntryType;
+  recordedAt?: string;
   latitude?: number;
   longitude?: number;
   outOfRange?: boolean;
@@ -121,11 +137,30 @@ export interface FailedEntry {
   chantierId?: number;
   shiftId?: number;
   uid?: string;
+  isCompteRendu?: boolean;
+  commentaire?: string;
   failedAt: string;
   reason: string;
 }
 
 async function setAside(entry: QueuedEntry, reason: string): Promise<void> {
+  if ('isCompteRendu' in entry) {
+    const failedEntry: FailedEntry = {
+      localId: entry.localId,
+      clientRef: entry.clientRef,
+      isCompteRendu: true,
+      commentaire: entry.commentaire,
+      failedAt: new Date().toISOString(),
+      reason,
+    };
+    await withQueueLock(async () => {
+      const { value } = await Preferences.get({ key: FAILED_KEY });
+      const failed: FailedEntry[] = value ? JSON.parse(value) : [];
+      failed.push(failedEntry);
+      await Preferences.set({ key: FAILED_KEY, value: JSON.stringify(failed) });
+    });
+    return;
+  }
   const failedEntry: FailedEntry = {
     localId: entry.localId,
     clientRef: entry.clientRef,
@@ -191,18 +226,28 @@ async function removeFromQueue(localId: string): Promise<void> {
  * écritures de la file sont sérialisées. Un POST lent ne doit pas empêcher un
  * salarié de badger — c'est justement ce qui remplit la file.
  */
-async function drainQueue(): Promise<{ flushed: number; remaining: number }> {
+async function drainQueue(onEntry?: (entry: TimeEntry) => void): Promise<{ flushed: number; remaining: number }> {
   let flushed = 0;
   for (;;) {
     const next = await withQueueLock(async () => (await readQueue())[0]);
     if (!next) break;
 
     try {
-      const { localId: _localId, withTag, ...payload } = next;
-      if (withTag) {
-        await provider.createTimeEntryWithTag(payload as CreateTimeEntryWithTagPayload);
+      if ('isCompteRendu' in next) {
+        const { localId: _localId, isCompteRendu: _isCompteRendu, ...payload } = next;
+        await provider.submitCompteRendu(payload as CompteRenduPayload);
       } else {
-        await provider.createTimeEntry(payload as CreateTimeEntryPayload);
+        const { localId: _localId, withTag, ...payload } = next;
+        // Un pointage rejoué hors ligne n'était encodé qu'avec le type
+        // *deviné* côté client (voir _nextTypeForTag, toujours 'in' pour
+        // l'instant) — seule la réponse du serveur dit s'il s'agissait en
+        // réalité d'un départ. onEntry laisse l'appelant réagir sur ce type
+        // résolu (ex. déclencher le rappel de compte-rendu) une fois que
+        // la synchro a réellement abouti, jamais avant.
+        const entry = withTag
+          ? await provider.createTimeEntryWithTag(payload as CreateTimeEntryWithTagPayload)
+          : await provider.createTimeEntry(payload as CreateTimeEntryPayload);
+        onEntry?.(entry);
       }
       flushed += 1;
     } catch (e) {
@@ -229,9 +274,9 @@ async function drainQueue(): Promise<{ flushed: number; remaining: number }> {
  */
 let inFlight: Promise<{ flushed: number; remaining: number }> | null = null;
 
-export function flushQueue(): Promise<{ flushed: number; remaining: number }> {
+export function flushQueue(onEntry?: (entry: TimeEntry) => void): Promise<{ flushed: number; remaining: number }> {
   if (inFlight) return inFlight;
-  inFlight = drainQueue().finally(() => {
+  inFlight = drainQueue(onEntry).finally(() => {
     inFlight = null;
   });
   return inFlight;
