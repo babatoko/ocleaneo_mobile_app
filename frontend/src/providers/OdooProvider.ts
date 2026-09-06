@@ -388,7 +388,12 @@ function pointageEntryToTimeEntry(entry: OdooPointageEntry): TimeEntry {
     id: entry.id,
     type: TYPE_TO_FRONTEND[entry.type] || 'in',
     chantier_id: entry.fsm_order_id || 0,
-    chantier_name: entry.fsm_order_name || undefined,
+    // Un badge NFC qui n'a matché aucun fsm.order ouvert ("location-only
+    // clocking", voir pointage_with_tag.py côté backend) laisse
+    // fsm_order_name vide alors que fsm_location_name, lui, est renseigné —
+    // c'est encore le nom du site où l'agent se trouve, donc un repli
+    // pertinent plutôt que de n'afficher aucun nom du tout.
+    chantier_name: entry.fsm_order_name || entry.fsm_location_name || undefined,
     recorded_at: withUtcSuffix(entry.datetime),
     client_ref: entry.client_ref || undefined,
     comment: entry.commentaire || null,
