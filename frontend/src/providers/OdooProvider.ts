@@ -7,6 +7,7 @@ import { DataProvider, ProviderError, ProviderNetworkError } from './DataProvide
 import type { ProviderFeature } from './DataProvider';
 import type {
   Chantier,
+  CompteRenduPayload,
   CreateTimeEntryPayload,
   CreateTimeEntryWithTagPayload,
   DateRange,
@@ -155,6 +156,14 @@ export class OdooProvider extends DataProvider {
       client_ref: payload.clientRef,
       comment: payload.comment || null,
     };
+  }
+
+  async submitCompteRendu(payload: CompteRenduPayload): Promise<void> {
+    await callMobile('/pointage/compte-rendu', {
+      client_ref: payload.clientRef,
+      commentaire: payload.commentaire,
+      activities: payload.activities,
+    });
   }
 }
 

@@ -21,10 +21,13 @@ import {
 import { hapticSuccess, hapticError, hapticTap } from '../services/haptics';
 import { checkGeofence, type GeofenceResult } from '../services/geofence';
 import { enqueue, queueLength, flushQueue, watchConnectivity } from '../services/offlineQueue';
+import { Preferences } from '@capacitor/preferences';
 import { startOfWeekIso } from '../utils/week';
 import { todayIso } from '../utils/date';
 import { recordError } from '../services/errorLog';
-import type { Position, Shift, ShiftStatus, TimeEntry, TimeEntryType } from '../types/models';
+import type { PendingCompteRendu, Position, Shift, ShiftActivity, ShiftStatus, TimeEntry, TimeEntryType } from '../types/models';
+
+const PENDING_COMPTE_RENDU_KEY = 'ocleaneo_pointage_pending_compte_rendu';
 
 function newClientRef(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -148,6 +151,13 @@ interface PointageState {
    *  `status` (dérivé de `entries`, mis à jour seulement après la requête)
    *  n'ait eu le temps de refléter la première action. */
   pauseActionPending: boolean;
+  /** Départs déjà enregistrés dont le compte-rendu de fin de chantier
+   *  (texte + activités) reste à soumettre — persisté (Preferences) pour
+   *  survivre à un redémarrage de l'app, seul moyen de le proposer à
+   *  nouveau si le réseau est coupé (voir loadPendingCompteRendus). Un
+   *  tableau, pas une seule entrée : un agent peut enchaîner deux départs
+   *  avant d'avoir traité le premier compte-rendu. */
+  pendingCompteRendus: PendingCompteRendu[];
 }
 
 export const usePointageStore = defineStore('pointage', {
@@ -163,6 +173,7 @@ export const usePointageStore = defineStore('pointage', {
     offlineQueueCount: 0,
     pendingComment: '',
     pauseActionPending: false,
+    pendingCompteRendus: [],
     // Horloge réactive : sans elle, weekWorkedHours (un getter) ne se
     // recalculerait jamais, puisqu'un `new Date()` interne n'est pas une
     // dépendance réactive. Le compteur resterait figé à la valeur du
@@ -254,6 +265,65 @@ export const usePointageStore = defineStore('pointage', {
       this.offlineQueueCount = await queueLength();
     },
 
+    /** Relit les compte-rendus en attente depuis le stockage local — à
+     *  appeler au démarrage de l'écran Pointage, pour que le bandeau de
+     *  rappel survive à un redémarrage de l'app (voir PendingCompteRendu). */
+    async loadPendingCompteRendus(): Promise<void> {
+      const { value } = await Preferences.get({ key: PENDING_COMPTE_RENDU_KEY });
+      this.pendingCompteRendus = value ? JSON.parse(value) : [];
+    },
+
+    async _savePendingCompteRendus(): Promise<void> {
+      await Preferences.set({
+        key: PENDING_COMPTE_RENDU_KEY,
+        value: JSON.stringify(this.pendingCompteRendus),
+      });
+    },
+
+    /** Ajoute un départ tout juste résolu comme 'out' à la liste des
+     *  compte-rendus en attente — appelé aussi bien juste après un badge
+     *  réussi que depuis le rejeu de la file hors ligne (flushOfflineQueue),
+     *  où le type réel n'est connu qu'une fois la synchro effectivement
+     *  aboutie (voir services/offlineQueue.ts, onEntry). */
+    async _registerPendingCompteRendu(entry: TimeEntry): Promise<void> {
+      const shift = entry.shift_id
+        ? this.todayShifts.find((s) => s.id === entry.shift_id)
+        : this.todayShifts.find((s) => s.chantier_id === entry.chantier_id);
+      const site = this._resolveSiteFromEntry(entry) as { id: number; name: string };
+      this.pendingCompteRendus = [
+        ...this.pendingCompteRendus,
+        {
+          clientRef: entry.client_ref || '',
+          chantierId: site.id,
+          chantierName: site.name,
+          activities: (shift?.activities as ShiftActivity[] | undefined) || [],
+          recordedAt: entry.recorded_at,
+        },
+      ];
+      await this._savePendingCompteRendus();
+    },
+
+    /** Soumet le compte-rendu d'un départ déjà enregistré (voir
+     *  CompteRenduPayload) — jamais un nouveau pointage. Le retrait de
+     *  pendingCompteRendus a lieu aussi bien au succès qu'à la mise en file
+     *  hors ligne : dans les deux cas la livraison finit par être garantie
+     *  (même confiance que le reste de l'app envers la file), donc le
+     *  rappel local n'a plus lieu d'être une fois délégué à enqueue(). */
+    async submitCompteRendu(
+      clientRef: string,
+      commentaire: string,
+      activities?: { id: number; completed: boolean }[],
+    ): Promise<void> {
+      try {
+        await provider.submitCompteRendu({ clientRef, commentaire, activities });
+      } catch (e) {
+        if (!(e instanceof ProviderNetworkError)) throw e;
+        await enqueue({ clientRef, commentaire, activities });
+      }
+      this.pendingCompteRendus = this.pendingCompteRendus.filter((p) => p.clientRef !== clientRef);
+      await this._savePendingCompteRendus();
+    },
+
     /** Avance l'horloge du store — appelée par l'écran Pointage tant qu'il est
      *  affiché, pour que le total d'heures de la semaine progresse en direct. */
     updateTick(): void {
@@ -261,7 +331,14 @@ export const usePointageStore = defineStore('pointage', {
     },
 
     async flushOfflineQueue(): Promise<void> {
-      const { flushed } = await flushQueue();
+      // Un badge mis en file hors ligne n'a été encodé qu'avec le type
+      // *deviné* côté client (voir _nextTypeForTag, toujours 'in' pour
+      // l'instant) : impossible de savoir avant ce rejeu s'il s'agissait
+      // réellement d'un départ. onEntry ne réagit donc qu'une fois la
+      // synchro effectivement aboutie, sur le type que le serveur a résolu.
+      const { flushed } = await flushQueue((entry) => {
+        if (entry.type === 'out') void this._registerPendingCompteRendu(entry);
+      });
       await this.refreshQueueCount();
       if (flushed > 0) await this.loadSafe();
     },
@@ -306,6 +383,10 @@ export const usePointageStore = defineStore('pointage', {
         if (!(e instanceof ProviderNetworkError)) throw e;
         await enqueue(payload);
         await this.refreshQueueCount();
+        // Le commentaire est déjà dans `payload` (donc bien conservé pour le
+        // rejeu) : le vider ici évite qu'il ne s'attache par erreur à un
+        // pointage suivant tapé avant que la file ne soit synchronisée.
+        this.pendingComment = '';
         // Mise à jour optimiste locale pour un retour immédiat à l'écran, même
         // hors ligne — resynchronisée dès que possible.
         this.entries = [
@@ -352,6 +433,7 @@ export const usePointageStore = defineStore('pointage', {
           : { type: 'success', text: confirmation };
 
         hapticSuccess();
+        if (resolvedType === 'out') await this._registerPendingCompteRendu(entry);
         await this._handlePostClocking(resolvedType, site, entry.shift_id, entry.shift_status);
       } catch (e) {
         if (e instanceof ProviderError && e.status === 404) {
@@ -372,9 +454,16 @@ export const usePointageStore = defineStore('pointage', {
             latitude: position?.latitude,
             longitude: position?.longitude,
             clientRef,
+            // Sans ce champ, le commentaire tapé par l'agent était
+            // silencieusement perdu pour tout badge NFC hors ligne : il
+            // n'apparaissait ni dans la file (voir offlineQueue.ts, qui
+            // rejoue exactement ce qu'on lui donne), ni donc plus tard dans
+            // l'historique.
+            comment: this.pendingComment || undefined,
             withTag: true,
           } as unknown as Parameters<typeof enqueue>[0]);
           await this.refreshQueueCount();
+          this.pendingComment = '';
           this.entries = [
             ...this.entries,
             { id: `pending-${recordedAt}`, type, chantier_id: 0, recorded_at: recordedAt, pending: true },
@@ -525,13 +614,19 @@ export const usePointageStore = defineStore('pointage', {
           return;
         }
 
+        const pendingBefore = this.pendingCompteRendus.length;
         this.scanning = true;
         try {
           await this.clockWithTag(uid);
         } finally {
           this.scanning = false;
         }
-        if (router.currentRoute.value.name !== 'pointage') {
+        // Un départ vient d'ajouter un compte-rendu à remplir : on y bascule
+        // directement plutôt que de revenir sur l'écran Pointage — c'est la
+        // seule route pour laquelle ce redirect systématique doit s'effacer.
+        if (this.pendingCompteRendus.length > pendingBefore) {
+          router.push({ name: 'pointage-compte-rendu' });
+        } else if (router.currentRoute.value.name !== 'pointage') {
           router.push({ name: 'pointage' });
         }
       } finally {

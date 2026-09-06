@@ -1,5 +1,6 @@
 import type {
   Chantier,
+  CompteRenduPayload,
   CreateOrderPayload,
   CreateOrderResult,
   CreateTimeEntryPayload,
@@ -131,6 +132,15 @@ export abstract class DataProvider {
    */
   async createTimeEntryWithTag(_payload: CreateTimeEntryWithTagPayload): Promise<TimeEntry> {
     throw notImplemented('createTimeEntryWithTag');
+  }
+
+  /**
+   * Attache le compte-rendu de fin de chantier (texte + activités validées)
+   * à un pointage de départ déjà enregistré (identifié par son clientRef) —
+   * n'en crée jamais un nouveau. Voir CompteRenduPayload.
+   */
+  async submitCompteRendu(_payload: CompteRenduPayload): Promise<void> {
+    throw notImplemented('submitCompteRendu');
   }
 
   // --- Produits / stock ------------------------------------------------------

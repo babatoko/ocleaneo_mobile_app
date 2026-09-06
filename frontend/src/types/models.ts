@@ -27,8 +27,9 @@ export interface Chantier {
  *  côté Odoo, module ocleaneo_mobile_pointage). */
 export type ShiftStatus = 'confirmed' | 'partial' | 'done' | 'cancelled' | string;
 
-/** Une tâche de la checklist d'un chantier (fsm.activity côté Odoo) —
- *  affichage seul pour l'instant, pas encore de coche depuis le mobile. */
+/** Une tâche de la checklist d'un chantier (fsm.activity côté Odoo).
+ *  Affichage seul dans ChantierDetailView (planning) ; cochable en revanche
+ *  dans le compte-rendu de fin de chantier (voir CompteRenduPayload). */
 export interface ShiftActivity {
   id: number;
   name: string;
@@ -176,6 +177,25 @@ export interface CreateTimeEntryWithTagPayload {
   outOfRange?: boolean;
   comment?: string;
   clientRef: string;
+}
+
+/** Un pointage de départ dont le compte-rendu (texte + activités) n'a pas
+ *  encore été soumis — voir stores/pointage.ts, pendingCompteRendus. */
+export interface PendingCompteRendu {
+  clientRef: string;
+  chantierId: number;
+  chantierName: string;
+  activities: ShiftActivity[];
+  recordedAt: string;
+}
+
+/** Soumission du compte-rendu de fin de chantier — écrit a posteriori sur
+ *  le pointage de départ déjà enregistré (identifié par clientRef), jamais
+ *  une nouvelle création. Voir DataProvider.submitCompteRendu. */
+export interface CompteRenduPayload {
+  clientRef: string;
+  commentaire: string;
+  activities?: { id: number; completed: boolean }[];
 }
 
 export interface SubmitInventoryItemPayload {
