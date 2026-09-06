@@ -111,7 +111,17 @@ let listenersReady = false;
 // lecteurs Android, qui créerait sinon deux pointages pour un seul geste.
 let processingTag = false;
 
-type PointageMessage = { type: 'queued' | 'warn'; text: string } | null;
+type PointageMessage = { type: 'queued' | 'warn' | 'success'; text: string } | null;
+
+// Confirmation affichée après un pointage par badge réussi — la demande
+// explicite était de nommer le chantier ("arrivé au chantier CIC" /
+// "départ du chantier CIC"), pas seulement d'afficher son statut.
+function clockingConfirmation(type: TimeEntryType, chantierName: string): string {
+  if (type === 'in') return `Arrivé au chantier ${chantierName}.`;
+  if (type === 'out') return `Départ du chantier ${chantierName}.`;
+  if (type === 'pause_start') return `Pause au chantier ${chantierName}.`;
+  return `Reprise au chantier ${chantierName}.`;
+}
 
 interface PostEntryOptions {
   chantierId?: number;
@@ -326,11 +336,12 @@ export const usePointageStore = defineStore('pointage', {
         // Resolve site info for geofence feedback and notifications.
         const site = this._resolveSiteFromEntry(entry);
         const geo = checkGeofence(position, site);
+        const confirmation = clockingConfirmation(resolvedType, site.name);
         this.lastMessage = !position
-          ? { type: 'warn', text: 'Position non disponible — vérifiez que la localisation est activée. Pointage tout de même enregistré.' }
+          ? { type: 'warn', text: `${confirmation} Position non disponible — vérifiez que la localisation est activée.` }
           : geo && !geo.withinRange
-          ? { type: 'warn', text: `Position à ~${geo.distanceMeters} m du chantier — pointage tout de même enregistré.` }
-          : null;
+          ? { type: 'warn', text: `${confirmation} Position à ~${geo.distanceMeters} m du chantier.` }
+          : { type: 'success', text: confirmation };
 
         hapticSuccess();
         await this._handlePostClocking(resolvedType, site, entry.shift_id, entry.shift_status);

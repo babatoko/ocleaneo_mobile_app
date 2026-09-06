@@ -193,8 +193,43 @@ describe('clockWithTag — position GPS indisponible', () => {
     expect(createTimeEntryWithTag).toHaveBeenCalledTimes(1);
     expect(pointage.lastMessage).toEqual({
       type: 'warn',
-      text: 'Position non disponible — vérifiez que la localisation est activée. Pointage tout de même enregistré.',
+      text: 'Arrivé au chantier Chantier Test. Position non disponible — vérifiez que la localisation est activée.',
     });
+  });
+});
+
+describe('clockWithTag — confirmation nommant le chantier', () => {
+  // navigator est stubbé sans geolocation pour tout ce fichier (voir en tête) :
+  // getPosition() renvoie donc toujours null ici, d'où la branche "warn" —
+  // la confirmation nommant le chantier reste attendue en préfixe dans les
+  // deux cas, c'est ce que ce test verrouille.
+  it("préfixe l'avertissement GPS par \"Arrivé au chantier X\" sur une arrivée", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(pointage.lastMessage?.text).toMatch(/^Arrivé au chantier Chantier Test\./);
+  });
+
+  it("préfixe l'avertissement GPS par \"Départ du chantier X\" sur un départ", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+    createTimeEntryWithTag.mockImplementation((_payload: { type: string; uid: string }) =>
+      Promise.resolve({
+        id: 2,
+        type: 'out' as TimeEntryType,
+        chantier_id: CHANTIER.id,
+        shift_id: undefined as number | undefined,
+        recorded_at: new Date().toISOString(),
+      }),
+    );
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(pointage.lastMessage?.text).toMatch(/^Départ du chantier Chantier Test\./);
   });
 });
 
