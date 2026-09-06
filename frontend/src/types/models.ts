@@ -78,6 +78,10 @@ export interface TimeEntry {
   /** Clé d'idempotence du pointage d'origine (voir CreateTimeEntryPayload.clientRef).
    *  Optionnelle côté lecture : un provider n'est pas tenu de la renvoyer. */
   client_ref?: string;
+  /** Commentaire libre saisi par l'agent sur le terrain (ex. "EI", "chantier
+   *  pas fini", "client demande la facture"). Renvoyé par le backend sous
+   *  `commentaire`. */
+  comment?: string | null;
   /** Renvoyés uniquement par un pointage de type 'out' sur un chantier
    *  (voir Shift.completion_ratio) : permettent à postEntry() de savoir
    *  quel statut réel donner à la vacation au lieu de supposer "terminé". */
@@ -151,6 +155,8 @@ export interface CreateTimeEntryPayload {
   latitude?: number;
   longitude?: number;
   outOfRange?: boolean;
+  /** Commentaire libre saisi par l'agent avant le pointage. */
+  comment?: string;
   /** Généré une fois côté client au moment du pointage (voir stores/pointage.ts,
    *  postEntry) et réutilisé tel quel à chaque tentative — y compris après une
    *  mise en file hors ligne et un rejeu. Sert de clé d'idempotence : si une
@@ -168,6 +174,7 @@ export interface CreateTimeEntryWithTagPayload {
   latitude?: number;
   longitude?: number;
   outOfRange?: boolean;
+  comment?: string;
   clientRef: string;
 }
 

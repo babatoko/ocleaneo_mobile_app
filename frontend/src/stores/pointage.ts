@@ -141,6 +141,9 @@ interface PointageState {
   pendingTagUid: string | null;
   offlineQueueCount: number;
   tick: number;
+  /** Commentaire libre saisi par l'agent avant le prochain pointage. Vide
+   *  après envoi. */
+  pendingComment: string;
   /** Empêche un double-tap sur Pause/Reprendre de poster deux fois avant que
    *  `status` (dérivé de `entries`, mis à jour seulement après la requête)
    *  n'ait eu le temps de refléter la première action. */
@@ -158,6 +161,7 @@ export const usePointageStore = defineStore('pointage', {
     lastMessage: null, // feedback transitoire non bloquant
     pendingTagUid: null, // badge lu avant que le salarié soit authentifié
     offlineQueueCount: 0,
+    pendingComment: '',
     pauseActionPending: false,
     // Horloge réactive : sans elle, weekWorkedHours (un getter) ne se
     // recalculerait jamais, puisqu'un `new Date()` interne n'est pas une
@@ -279,6 +283,7 @@ export const usePointageStore = defineStore('pointage', {
         // panne réseau), le rejeu depuis la file hors ligne portera la même
         // clé — au serveur de reconnaître le doublon plutôt que de le créer.
         clientRef: newClientRef(),
+        comment: this.pendingComment || undefined,
         ...(position || {}),
         ...(geo ? { outOfRange: !geo.withinRange } : {}),
       };
@@ -295,6 +300,7 @@ export const usePointageStore = defineStore('pointage', {
           : geo && !geo.withinRange
           ? { type: 'warn', text: `Position à ~${geo.distanceMeters} m du chantier — pointage tout de même enregistré.` }
           : null;
+        this.pendingComment = '';
         return created;
       } catch (e) {
         if (!(e instanceof ProviderNetworkError)) throw e;
@@ -329,7 +335,9 @@ export const usePointageStore = defineStore('pointage', {
           latitude: position?.latitude,
           longitude: position?.longitude,
           clientRef,
+          comment: this.pendingComment || undefined,
         });
+        this.pendingComment = '';
         await this.loadSafe();
         const resolvedType: TimeEntryType = entry.type || type;
 

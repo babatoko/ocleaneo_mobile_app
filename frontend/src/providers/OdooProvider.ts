@@ -120,6 +120,7 @@ export class OdooProvider extends DataProvider {
       gps_latitude: payload.latitude,
       gps_longitude: payload.longitude,
       client_ref: payload.clientRef,
+      commentaire: payload.comment,
     });
     return {
       id: data.id,
@@ -127,6 +128,7 @@ export class OdooProvider extends DataProvider {
       chantier_id: data.fsm_order_id || payload.chantierId,
       recorded_at: withUtcSuffix(data.datetime),
       client_ref: payload.clientRef,
+      comment: payload.comment || null,
       // Présents seulement sur un 'out' avec fsm_order_id (voir le
       // contrôleur pointage.py) : absents sur une 'arrivee'/pause, d'où le
       // repli sur undefined plutôt que sur un état par défaut trompeur.
@@ -143,6 +145,7 @@ export class OdooProvider extends DataProvider {
       gps_latitude: payload.latitude,
       gps_longitude: payload.longitude,
       client_ref: payload.clientRef,
+      commentaire: payload.comment,
     });
     return {
       id: data.id,
@@ -150,6 +153,7 @@ export class OdooProvider extends DataProvider {
       chantier_id: data.fsm_order_id || 0,
       recorded_at: withUtcSuffix(data.datetime),
       client_ref: payload.clientRef,
+      comment: payload.comment || null,
     };
   }
 }
@@ -263,6 +267,10 @@ interface OdooPointageEntry {
   type: string;
   datetime: string | false;
   fsm_order_id: number | false;
+  fsm_order_name?: string | false;
+  fsm_location_id?: number | false;
+  fsm_location_name?: string | false;
+  commentaire?: string | false;
   client_ref: string | false;
 }
 
@@ -371,8 +379,10 @@ function pointageEntryToTimeEntry(entry: OdooPointageEntry): TimeEntry {
     id: entry.id,
     type: TYPE_TO_FRONTEND[entry.type] || 'in',
     chantier_id: entry.fsm_order_id || 0,
+    chantier_name: entry.fsm_order_name || undefined,
     recorded_at: withUtcSuffix(entry.datetime),
     client_ref: entry.client_ref || undefined,
+    comment: entry.commentaire || null,
   };
 }
 
