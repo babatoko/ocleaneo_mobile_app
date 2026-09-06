@@ -306,6 +306,10 @@ export const usePointageStore = defineStore('pointage', {
         if (!(e instanceof ProviderNetworkError)) throw e;
         await enqueue(payload);
         await this.refreshQueueCount();
+        // Le commentaire est déjà dans `payload` (donc bien conservé pour le
+        // rejeu) : le vider ici évite qu'il ne s'attache par erreur à un
+        // pointage suivant tapé avant que la file ne soit synchronisée.
+        this.pendingComment = '';
         // Mise à jour optimiste locale pour un retour immédiat à l'écran, même
         // hors ligne — resynchronisée dès que possible.
         this.entries = [
@@ -372,9 +376,16 @@ export const usePointageStore = defineStore('pointage', {
             latitude: position?.latitude,
             longitude: position?.longitude,
             clientRef,
+            // Sans ce champ, le commentaire tapé par l'agent était
+            // silencieusement perdu pour tout badge NFC hors ligne : il
+            // n'apparaissait ni dans la file (voir offlineQueue.ts, qui
+            // rejoue exactement ce qu'on lui donne), ni donc plus tard dans
+            // l'historique.
+            comment: this.pendingComment || undefined,
             withTag: true,
           } as unknown as Parameters<typeof enqueue>[0]);
           await this.refreshQueueCount();
+          this.pendingComment = '';
           this.entries = [
             ...this.entries,
             { id: `pending-${recordedAt}`, type, chantier_id: 0, recorded_at: recordedAt, pending: true },

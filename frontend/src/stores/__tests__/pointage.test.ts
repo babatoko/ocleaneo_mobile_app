@@ -57,9 +57,11 @@ vi.mock('../../services/errorLog', () => ({
 }));
 
 const { provider } = await import('../../providers');
+const { ProviderNetworkError } = await import('../../providers/DataProvider');
 const { usePointageStore } = await import('../pointage');
 const { useChantiersStore } = await import('../chantiers');
 const { usePlanningStore } = await import('../planning');
+const { enqueue } = await import('../../services/offlineQueue');
 
 const fetchChantiers = vi.mocked(provider.fetchChantiers);
 const createTimeEntry = vi.mocked(provider.createTimeEntry);
@@ -78,6 +80,7 @@ const CHANTIER = {
 
 beforeEach(() => {
   setActivePinia(createPinia());
+  vi.mocked(enqueue).mockClear();
   fetchChantiers.mockReset();
   fetchTodayTimeEntries.mockReset().mockResolvedValue({ entries: [], status: 'out' });
   fetchShifts.mockReset().mockResolvedValue([]);
@@ -272,6 +275,39 @@ describe('clockWithTag — matching contre le backend NFC (ocleaneo#13 / pointag
     await pointage.clockWithTag('04AABBCCDD0000');
 
     expect(createTimeEntryWithTag.mock.calls[0][0]).toMatchObject({ uid: '04AABBCCDD0000', type: 'in' });
+  });
+});
+
+describe('commentaire — conservé même quand le badge NFC part en file hors ligne', () => {
+  // Régression : la mise en file de clockWithTag() reconstruisait son propre
+  // objet de payload au lieu de réutiliser celui envoyé à
+  // createTimeEntryWithTag(), et oubliait le commentaire au passage — perdu
+  // sans jamais remonter d'erreur, silencieusement, pour tout badge NFC posé
+  // hors ligne.
+  it('inclut pendingComment dans le payload mis en file, puis le vide', async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+    pointage.pendingComment = 'EI';
+    createTimeEntryWithTag.mockRejectedValueOnce(new ProviderNetworkError());
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(enqueue).mock.calls[0][0]).toMatchObject({ comment: 'EI' });
+    expect(pointage.pendingComment).toBe('');
+  });
+
+  it('même chose pour postEntry() (badge indisponible / saisie manuelle)', async () => {
+    const pointage = usePointageStore();
+    pointage.pendingComment = 'Client absent';
+    createTimeEntry.mockRejectedValueOnce(new ProviderNetworkError());
+
+    await pointage.postEntry('in', { chantierId: CHANTIER.id });
+
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(enqueue).mock.calls[0][0]).toMatchObject({ comment: 'Client absent' });
+    expect(pointage.pendingComment).toBe('');
   });
 });
 
