@@ -27,6 +27,7 @@ import {
   chevronForwardOutline,
   cloudOfflineOutline,
   cloudUploadOutline,
+  locationOutline,
   logInOutline,
   logOutOutline,
   pauseOutline,
@@ -176,6 +177,19 @@ const messageIcon = computed(() => {
   return cloudUploadOutline;
 });
 
+// Tant que l'agent est sur un chantier (présent ou en pause), ce bloc
+// remplace le champ commentaire : savoir où on se trouve compte plus que
+// pouvoir taper une note. e.chantier_name n'est pas garanti renseigné par
+// le backend (voir historySubtitle) — on retombe sur le chantier du jour
+// correspondant, puis sur la liste des chantiers, avant d'abandonner.
+const currentChantierName = computed(() => {
+  const lastEntry = pointage.lastEntry as TimeEntry | undefined;
+  if (pointage.status === 'out' || !lastEntry) return null;
+  const shift = pointage.todayShifts.find((s) => s.chantier_id === lastEntry.chantier_id);
+  const chantier = chantiers.list.find((c) => c.id === lastEntry.chantier_id);
+  return lastEntry.chantier_name || shift?.chantier_name || chantier?.name || null;
+});
+
 function fmtOverdue(min: number): string {
   if (min < 60) return `${min} min`;
   return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
@@ -260,8 +274,17 @@ function historySubtitle(e: TimeEntry): string {
     </div>
   </div>
 
+  <!-- Sur un chantier : le nom du chantier prime sur la note libre. -->
+  <div v-if="currentChantierName" class="current-chantier">
+    <ion-icon :icon="locationOutline"></ion-icon>
+    <div>
+      <p class="cc-label">Chantier en cours</p>
+      <p class="cc-name">{{ currentChantierName }}</p>
+    </div>
+  </div>
+
   <!-- Champ commentaire libre pour le prochain pointage -->
-  <div class="comment-input">
+  <div v-else class="comment-input">
     <ion-item lines="none">
       <ion-icon slot="start" :icon="documentTextOutline"></ion-icon>
       <ion-label position="stacked">Note pour le prochain pointage</ion-label>
@@ -613,6 +636,35 @@ function historySubtitle(e: TimeEntry): string {
   align-items: center;
   gap: 2px;
   text-decoration: none;
+}
+
+.current-chantier {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 18px 14px;
+  border-radius: 10px;
+  background: var(--accent-bg);
+  padding: 12px 14px;
+}
+
+.current-chantier ion-icon {
+  font-size: 20px;
+  color: var(--accent-text);
+  flex-shrink: 0;
+}
+
+.current-chantier .cc-label {
+  font-size: 11px;
+  color: var(--accent-text);
+  margin: 0;
+}
+
+.current-chantier .cc-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 2px 0 0;
 }
 
 .comment-input {
