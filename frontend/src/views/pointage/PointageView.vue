@@ -361,9 +361,6 @@ function historySubtitle(e: TimeEntry): string {
     </button>
     <p class="big-time">{{ now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</p>
     <p v-if="pointage.scanError" class="scan-error"><ion-icon :icon="alertCircleOutline"></ion-icon> {{ pointage.scanError }}</p>
-    <p v-else-if="pointage.lastEntry" class="status-line">
-      {{ statusText }} — {{ pointage.lastEntry.chantier_name }}
-    </p>
 
     <div v-if="pointage.status === 'in'" class="pause-actions">
       <ion-button class="pause-btn" fill="solid" :disabled="pointage.pauseActionPending" @click="pointage.startPause()">
