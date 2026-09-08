@@ -88,6 +88,9 @@ export interface TimeEntry {
    *  quel statut réel donner à la vacation au lieu de supposer "terminé". */
   shift_status?: ShiftStatus;
   completion_ratio?: number | null;
+  /** UID du badge NFC utilisé pour ce pointage (utile pour associer un
+   *  pointage sans chantier à sa location). */
+  nfc_tag_id?: string | null;
 }
 
 export interface TodayTimeEntries {

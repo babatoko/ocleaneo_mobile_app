@@ -180,6 +180,7 @@ export class OdooProvider extends DataProvider {
       recorded_at: withUtcSuffix(data.datetime),
       client_ref: payload.clientRef,
       comment: payload.comment || null,
+      nfc_tag_id: data.nfc_tag_id || payload.uid || null,
     };
   }
 
@@ -294,6 +295,7 @@ interface OdooPointageResponse {
    *  completionStateToShiftStatus() plutôt que sur un état par défaut. */
   completion_ratio?: number | false;
   completion_state?: string | false;
+  nfc_tag_id?: string | false;
 }
 
 interface OdooPointageEntry {
@@ -310,6 +312,7 @@ interface OdooPointageEntry {
    *  jour sur ce commit — d'où le repli dans pointageEntryToTimeEntry(). */
   completion_state?: string | false;
   completion_ratio?: number | false;
+  nfc_tag_id?: string | false;
 }
 
 interface OdooPointageMineResult {
@@ -449,6 +452,7 @@ function pointageEntryToTimeEntry(entry: OdooPointageEntry): TimeEntry {
     comment: entry.commentaire || null,
     shift_status: completionStateToShiftStatus(entry.completion_state),
     completion_ratio: entry.completion_ratio === false || entry.completion_ratio == null ? null : entry.completion_ratio,
+    nfc_tag_id: entry.nfc_tag_id || null,
   };
 }
 

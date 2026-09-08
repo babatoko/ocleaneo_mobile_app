@@ -329,6 +329,62 @@ describe('commentaire — conservé même quand le badge NFC part en file hors l
   });
 });
 
+describe('_nextTypeForTag — machine à états du badge NFC', () => {
+  const TAG_UID = '04A1B2C3D4E5F6';
+  const FORMATTED_TAG_UID = '04:A1:B2:C3:D4:E5:F6';
+
+  it("envoie 'in' quand aucun pointage n'existe pour ce badge", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [{ ...CHANTIER, nfc_tag_id: FORMATTED_TAG_UID }];
+    const pointage = usePointageStore();
+
+    await pointage.clockWithTag(TAG_UID);
+
+    expect(createTimeEntryWithTag).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: TAG_UID, type: 'in' }),
+    );
+  });
+
+  it("envoie 'out' quand le dernier pointage de ce badge est une arrivée", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [{ ...CHANTIER, nfc_tag_id: FORMATTED_TAG_UID }];
+    const pointage = usePointageStore();
+    pointage.entries = [
+      { id: 1, type: 'in', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString(), nfc_tag_id: FORMATTED_TAG_UID },
+    ];
+    createTimeEntryWithTag.mockResolvedValueOnce({
+      id: 2,
+      type: 'out' as TimeEntryType,
+      chantier_id: CHANTIER.id,
+      shift_id: undefined as number | undefined,
+      recorded_at: new Date().toISOString(),
+      nfc_tag_id: FORMATTED_TAG_UID,
+    });
+
+    await pointage.clockWithTag(TAG_UID);
+
+    expect(createTimeEntryWithTag).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: TAG_UID, type: 'out' }),
+    );
+  });
+
+  it("envoie 'in' après un départ sur ce badge", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [{ ...CHANTIER, nfc_tag_id: FORMATTED_TAG_UID }];
+    const pointage = usePointageStore();
+    pointage.entries = [
+      { id: 1, type: 'in', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString(), nfc_tag_id: FORMATTED_TAG_UID },
+      { id: 2, type: 'out', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString(), nfc_tag_id: FORMATTED_TAG_UID },
+    ];
+
+    await pointage.clockWithTag(TAG_UID);
+
+    expect(createTimeEntryWithTag).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: TAG_UID, type: 'in' }),
+    );
+  });
+});
+
 describe('pendingCompteRendus — un départ résolu ouvre un compte-rendu à valider', () => {
   const SHIFT_WITH_ACTIVITIES = {
     id: 7,

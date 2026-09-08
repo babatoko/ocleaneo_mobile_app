@@ -500,7 +500,24 @@ export const usePointageStore = defineStore('pointage', {
 
     /** Determine the next clocking type for a tag based on the most recent
      *  entry at the resolved location. Falls back to 'in' when unknown. */
-    _nextTypeForTag(_uid: string): TimeEntryType {
+    _nextTypeForTag(uid: string): TimeEntryType {
+      const normalizedUid = uid.replace(/:/g, '').toUpperCase();
+      const chantiers = useChantiersStore();
+      const site =
+        chantiers.list.find((c) => (c.nfc_tag_id || '').replace(/:/g, '').toUpperCase() === normalizedUid) ||
+        this.todayShifts.find((s) => (s.nfc_tag_id || '').replace(/:/g, '').toUpperCase() === normalizedUid);
+      const siteId = site ? ('id' in site ? (site as { id: number }).id : (site as { chantier_id: number }).chantier_id) : undefined;
+      if (!siteId) return 'in';
+
+      const lastAtSite = [...this.entries].reverse().find((e) => {
+        if (e.nfc_tag_id) {
+          return (e.nfc_tag_id as string).replace(/:/g, '').toUpperCase() === normalizedUid;
+        }
+        return e.chantier_id === siteId;
+      });
+      if (!lastAtSite) return 'in';
+      if (lastAtSite.type === 'in' || lastAtSite.type === 'pause_start') return 'out';
+      if (lastAtSite.type === 'pause_end') return 'out';
       return 'in';
     },
 
