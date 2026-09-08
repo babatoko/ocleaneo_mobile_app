@@ -24,6 +24,7 @@ import { enqueue, queueLength, flushQueue, watchConnectivity } from '../services
 import { Preferences } from '@capacitor/preferences';
 import { startOfWeekIso } from '../utils/week';
 import { todayIso } from '../utils/date';
+import { getCurrentLocation } from '../services/geolocation';
 import { recordError } from '../services/errorLog';
 import type { PendingCompteRendu, Position, Shift, ShiftActivity, ShiftStatus, TimeEntry, TimeEntryType } from '../types/models';
 
@@ -54,14 +55,7 @@ function formatNfcIdWithColons(value: string): string {
 }
 
 function getPosition(): Promise<Position | null> {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 3000 }
-    );
-  });
+  return getCurrentLocation();
 }
 
 // Associe chronologiquement les arrivées/départs (en soustrayant les pauses)
