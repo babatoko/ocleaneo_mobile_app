@@ -5,7 +5,6 @@ import {
   IonButton,
   IonCheckbox,
   IonContent,
-  IonFooter,
   IonIcon,
   IonItem,
   IonLabel,
@@ -112,14 +111,14 @@ async function submit() {
       </div>
     </ion-content>
 
-    <ion-footer v-if="current" class="cr-cta-bar">
+    <div v-if="current" class="cr-cta-bar">
       <ion-button expand="block" :disabled="!commentaire.trim() || submitting" @click="submit">
         Valider
       </ion-button>
       <p v-if="current.activities.length" class="cr-cta-hint">
         Les activités obligatoires non cochées seront signalées à votre responsable.
       </p>
-    </ion-footer>
+    </div>
   </ion-page>
 </template>
 
@@ -210,9 +209,17 @@ async function submit() {
 }
 
 .cr-cta-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
   background: var(--surface-2);
   border-top: 0.5px solid var(--border);
   padding: 12px 18px calc(14px + env(safe-area-inset-bottom));
+  z-index: 100;
 }
 
 .cr-cta-hint {
