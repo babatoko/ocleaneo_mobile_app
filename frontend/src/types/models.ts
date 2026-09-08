@@ -95,6 +95,16 @@ export interface TodayTimeEntries {
   status: PointageStatus;
 }
 
+export interface SyncPointageStateResult {
+  /** Horodatage serveur ISO 8601 — utilisé pour résoudre les conflits. */
+  serverTime: string;
+  entries: TimeEntry[];
+  /** Présences hr.attendance (uniquement si le backend les expose). */
+  attendances?: { id: number; checkIn: string; checkOut?: string }[];
+  /** Lignes de temps (uniquement si le backend les expose). */
+  timesheets?: { id: number; dateTime: string; dateTimeEnd?: string; unitAmount: number }[];
+}
+
 export interface Packaging {
   id: number;
   label: string;

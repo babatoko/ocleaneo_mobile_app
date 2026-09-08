@@ -13,6 +13,7 @@ import type {
   Product,
   Shift,
   SubmitInventoryPayload,
+  SyncPointageStateResult,
   TimeEntry,
   TodayTimeEntries,
 } from '../types/models';
@@ -119,6 +120,16 @@ export abstract class DataProvider {
   /** Pointages sur la période. */
   async fetchTimeEntries(_range: DateRange): Promise<TimeEntry[]> {
     throw notImplemented('fetchTimeEntries');
+  }
+
+  /**
+   * État serveur d'un ouvrier pour une plage de dates : pointages mobiles,
+   * présences et lignes de temps. Le client doit d'abord pousser sa file
+   * offline via createTimeEntry, puis appeler cette méthode pour fusionner
+   * l'état serveur avec son cache local.
+   */
+  async syncPointageState(_range: DateRange): Promise<SyncPointageStateResult> {
+    throw notImplemented('syncPointageState');
   }
 
   async createTimeEntry(_payload: CreateTimeEntryPayload): Promise<TimeEntry> {
