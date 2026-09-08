@@ -27,7 +27,7 @@ export async function getCurrentLocation(): Promise<Position | null> {
       latitude: pos.coords.latitude,
       longitude: pos.coords.longitude,
     };
-  } catch (err) {
+  } catch {
     // Plugin non disponible, permissions refusées, ou erreur native :
     // on tente le fallback navigateur avant d'abandonner.
     return fallbackBrowserPosition();
