@@ -1,3 +1,4 @@
+import { getCurrentLocation } from './geolocation';
 import { ProviderNetworkError } from '../providers/DataProvider';
 import type { Position } from '../types/models';
 
@@ -106,12 +107,7 @@ export async function getOptimizedTrip<T extends TripPoint>(points: T[]): Promis
 }
 
 export function getCurrentPosition(): Promise<Position | null> {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 4000 }
-    );
-  });
+  return getCurrentLocation();
 }
+
+
