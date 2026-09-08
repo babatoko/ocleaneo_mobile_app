@@ -1,0 +1,527 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "hermes-agent",
+  "elements": [
+    {
+      "type": "text",
+      "id": "title",
+      "x": 350,
+      "y": 40,
+      "width": 400,
+      "height": 40,
+      "text": "Machine \u00e0 \u00e9tats du badge NFC Ocleaneo",
+      "fontSize": 24,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "originalText": "Machine \u00e0 \u00e9tats du badge NFC Ocleaneo",
+      "autoResize": false
+    },
+    {
+      "type": "ellipse",
+      "id": "state_out",
+      "x": 200,
+      "y": 120,
+      "width": 180,
+      "height": 120,
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeColor": "#1e1e1e",
+      "roundness": {
+        "type": 3
+      },
+      "boundElements": [
+        {
+          "id": "t_out",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "t_out",
+      "x": 230,
+      "y": 165,
+      "width": 120,
+      "height": 30,
+      "text": "OUT\n(pas en chantier)",
+      "fontSize": 18,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "state_out",
+      "originalText": "OUT\n(pas en chantier)",
+      "autoResize": false
+    },
+    {
+      "type": "ellipse",
+      "id": "state_in",
+      "x": 560,
+      "y": 120,
+      "width": 180,
+      "height": 120,
+      "backgroundColor": "#a5d8ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1e1e1e",
+      "roundness": {
+        "type": 3
+      },
+      "boundElements": [
+        {
+          "id": "t_in",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "t_in",
+      "x": 590,
+      "y": 160,
+      "width": 120,
+      "height": 40,
+      "text": "IN\n(arriv\u00e9e enregistr\u00e9e)",
+      "fontSize": 18,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "state_in",
+      "originalText": "IN\n(arriv\u00e9e enregistr\u00e9e)",
+      "autoResize": false
+    },
+    {
+      "type": "ellipse",
+      "id": "state_paused",
+      "x": 560,
+      "y": 340,
+      "width": 180,
+      "height": 120,
+      "backgroundColor": "#fff3bf",
+      "fillStyle": "solid",
+      "strokeColor": "#1e1e1e",
+      "roundness": {
+        "type": 3
+      },
+      "boundElements": [
+        {
+          "id": "t_paused",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "t_paused",
+      "x": 590,
+      "y": 380,
+      "width": 120,
+      "height": 40,
+      "text": "PAUSED\n(pause d\u00e9marr\u00e9e)",
+      "fontSize": 18,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "state_paused",
+      "originalText": "PAUSED\n(pause d\u00e9marr\u00e9e)",
+      "autoResize": false
+    },
+    {
+      "type": "arrow",
+      "id": "a_out_in",
+      "x": 380,
+      "y": 180,
+      "width": 180,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          180,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "strokeColor": "#1e1e1e",
+      "boundElements": [
+        {
+          "id": "t_arr1",
+          "type": "text"
+        }
+      ],
+      "startBinding": {
+        "elementId": "state_out",
+        "fixedPoint": [
+          1,
+          0.5
+        ]
+      },
+      "endBinding": {
+        "elementId": "state_in",
+        "fixedPoint": [
+          0,
+          0.5
+        ]
+      }
+    },
+    {
+      "type": "text",
+      "id": "t_arr1",
+      "x": 420,
+      "y": 155,
+      "width": 100,
+      "height": 25,
+      "text": "Badge NFC\n(arrivee)",
+      "fontSize": 14,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "a_out_in",
+      "originalText": "Badge NFC\n(arrivee)",
+      "autoResize": false
+    },
+    {
+      "type": "arrow",
+      "id": "a_in_out",
+      "x": 560,
+      "y": 180,
+      "width": -180,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -180,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "strokeColor": "#1e1e1e",
+      "boundElements": [
+        {
+          "id": "t_arr2",
+          "type": "text"
+        }
+      ],
+      "startBinding": {
+        "elementId": "state_in",
+        "fixedPoint": [
+          0,
+          0.5
+        ]
+      },
+      "endBinding": {
+        "elementId": "state_out",
+        "fixedPoint": [
+          1,
+          0.5
+        ]
+      }
+    },
+    {
+      "type": "text",
+      "id": "t_arr2",
+      "x": 460,
+      "y": 195,
+      "width": 100,
+      "height": 25,
+      "text": "Badge NFC\n(depart)",
+      "fontSize": 14,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "a_in_out",
+      "originalText": "Badge NFC\n(depart)",
+      "autoResize": false
+    },
+    {
+      "type": "arrow",
+      "id": "a_in_paused",
+      "x": 650,
+      "y": 240,
+      "width": 0,
+      "height": 100,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "strokeColor": "#1e1e1e",
+      "strokeStyle": "dashed",
+      "boundElements": [
+        {
+          "id": "t_arr3",
+          "type": "text"
+        }
+      ],
+      "startBinding": {
+        "elementId": "state_in",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "elementId": "state_paused",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "type": "text",
+      "id": "t_arr3",
+      "x": 610,
+      "y": 270,
+      "width": 80,
+      "height": 25,
+      "text": "Bouton Pause\n(pause_debut)",
+      "fontSize": 14,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "a_in_paused",
+      "originalText": "Bouton Pause\n(pause_debut)",
+      "autoResize": false
+    },
+    {
+      "type": "arrow",
+      "id": "a_paused_in",
+      "x": 650,
+      "y": 340,
+      "width": 0,
+      "height": -100,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -100
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "strokeColor": "#1e1e1e",
+      "strokeStyle": "dashed",
+      "boundElements": [
+        {
+          "id": "t_arr4",
+          "type": "text"
+        }
+      ],
+      "startBinding": {
+        "elementId": "state_paused",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      },
+      "endBinding": {
+        "elementId": "state_in",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      }
+    },
+    {
+      "type": "text",
+      "id": "t_arr4",
+      "x": 610,
+      "y": 305,
+      "width": 80,
+      "height": 25,
+      "text": "Bouton Reprise\n(pause_fin)",
+      "fontSize": 14,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "a_paused_in",
+      "originalText": "Bouton Reprise\n(pause_fin)",
+      "autoResize": false
+    },
+    {
+      "type": "arrow",
+      "id": "a_paused_out",
+      "x": 740,
+      "y": 400,
+      "width": 100,
+      "height": -220,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          100,
+          0
+        ],
+        [
+          100,
+          -220
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "strokeColor": "#1e1e1e",
+      "strokeStyle": "dotted",
+      "boundElements": [
+        {
+          "id": "t_arr5",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "t_arr5",
+      "x": 800,
+      "y": 260,
+      "width": 90,
+      "height": 25,
+      "text": "Badge NFC\n(pause_fin)",
+      "fontSize": 14,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "a_paused_out",
+      "originalText": "Badge NFC\n(pause_fin)",
+      "autoResize": false
+    },
+    {
+      "type": "rectangle",
+      "id": "note_box",
+      "x": 140,
+      "y": 500,
+      "width": 720,
+      "height": 110,
+      "backgroundColor": "#fff3bf",
+      "fillStyle": "solid",
+      "strokeColor": "#1e1e1e",
+      "roundness": {
+        "type": 3
+      },
+      "boundElements": [
+        {
+          "id": "t_note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "t_note",
+      "x": 160,
+      "y": 515,
+      "width": 680,
+      "height": 80,
+      "text": "R\u00e8gles :\n\u2022 Le badge NFC est un interrupteur : OUT \u2194 IN.\n\u2022 L'application r\u00e9sout le type localement (_nextTypeForTag).\n\u2022 Le backend (pointage/with-tag) r\u00e9sout aussi le type en filet de s\u00e9curit\u00e9.\n\u2022 La pause est actionn\u00e9e manuellement, jamais par le badge.",
+      "fontSize": 14,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": "note_box",
+      "originalText": "R\u00e8gles :\n\u2022 Le badge NFC est un interrupteur : OUT \u2194 IN.\n\u2022 L'application r\u00e9sout le type localement (_nextTypeForTag).\n\u2022 Le backend (pointage/with-tag) r\u00e9sout aussi le type en filet de s\u00e9curit\u00e9.\n\u2022 La pause est actionn\u00e9e manuellement, jamais par le badge.",
+      "autoResize": false
+    },
+    {
+      "type": "rectangle",
+      "id": "legend_0",
+      "x": 140,
+      "y": 630,
+      "width": 20,
+      "height": 20,
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeColor": "#1e1e1e"
+    },
+    {
+      "type": "text",
+      "id": "t_legend_0",
+      "x": 170,
+      "y": 632,
+      "width": 180,
+      "height": 20,
+      "text": "OUT : pas de pointage actif",
+      "fontSize": 12,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "originalText": "OUT : pas de pointage actif",
+      "autoResize": false
+    },
+    {
+      "type": "rectangle",
+      "id": "legend_1",
+      "x": 360,
+      "y": 630,
+      "width": 20,
+      "height": 20,
+      "backgroundColor": "#a5d8ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1e1e1e"
+    },
+    {
+      "type": "text",
+      "id": "t_legend_1",
+      "x": 390,
+      "y": 632,
+      "width": 180,
+      "height": 20,
+      "text": "IN : arriv\u00e9e point\u00e9e",
+      "fontSize": 12,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "originalText": "IN : arriv\u00e9e point\u00e9e",
+      "autoResize": false
+    },
+    {
+      "type": "rectangle",
+      "id": "legend_2",
+      "x": 580,
+      "y": 630,
+      "width": 20,
+      "height": 20,
+      "backgroundColor": "#fff3bf",
+      "fillStyle": "solid",
+      "strokeColor": "#1e1e1e"
+    },
+    {
+      "type": "text",
+      "id": "t_legend_2",
+      "x": 610,
+      "y": 632,
+      "width": 180,
+      "height": 20,
+      "text": "PAUSED : pause en cours",
+      "fontSize": 12,
+      "fontFamily": 1,
+      "strokeColor": "#1e1e1e",
+      "originalText": "PAUSED : pause en cours",
+      "autoResize": false
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff"
+  }
+}

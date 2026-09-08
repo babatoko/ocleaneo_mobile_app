@@ -1,0 +1,10 @@
+```mermaid
+stateDiagram-v2
+    [*] --> OUT
+    OUT --> IN : Badge NFC (arrivee)
+    IN --> OUT : Badge NFC (depart)
+    IN --> PAUSED : Bouton Pause (pause_debut)
+    PAUSED --> IN : Bouton Reprise (pause_fin)
+    PAUSED --> IN : Badge NFC (pause_fin)
+    OUT --> [*]
+```
