@@ -17,6 +17,7 @@ import type {
   Shift,
   ShiftActivity,
   ShiftStatus,
+  SyncPointageStateResult,
   TimeEntry,
   TimeEntryType,
   TodayTimeEntries,
@@ -107,6 +108,30 @@ export class OdooProvider extends DataProvider {
   async fetchTimeEntries({ from, to }: DateRange): Promise<TimeEntry[]> {
     const data = await callMobile<OdooPointageMineResult>('/pointage/mine', { date_from: from, date_to: to });
     return data.entries.map(pointageEntryToTimeEntry);
+  }
+
+  async syncPointageState({ from, to }: DateRange): Promise<SyncPointageStateResult> {
+    const data = await callMobile<OdooSyncPointageStateResult>('/pointage/sync', {
+      date_from: from,
+      date_to: to,
+      include_attendance: true,
+      include_timesheet: true,
+    });
+    return {
+      serverTime: data.server_time,
+      entries: data.entries.map(pointageEntryToTimeEntry),
+      attendances: (data.attendances || []).map((a) => ({
+        id: a.id,
+        checkIn: withUtcSuffix(a.check_in),
+        checkOut: a.check_out ? withUtcSuffix(a.check_out) : undefined,
+      })),
+      timesheets: (data.timesheets || []).map((t) => ({
+        id: t.id,
+        dateTime: withUtcSuffix(t.date_time),
+        dateTimeEnd: t.date_time_end ? withUtcSuffix(t.date_time_end) : undefined,
+        unitAmount: t.unit_amount || 0,
+      })),
+    };
   }
 
   async createTimeEntry(payload: CreateTimeEntryPayload): Promise<TimeEntry> {
@@ -281,11 +306,36 @@ interface OdooPointageEntry {
   fsm_location_name?: string | false;
   commentaire?: string | false;
   client_ref: string | false;
+  /** Absents sur une 'arrivee'/pause, ou sur un backend pas encore mis à
+   *  jour sur ce commit — d'où le repli dans pointageEntryToTimeEntry(). */
+  completion_state?: string | false;
+  completion_ratio?: number | false;
 }
 
 interface OdooPointageMineResult {
   count: number;
   entries: OdooPointageEntry[];
+}
+
+interface OdooSyncAttendance {
+  id: number;
+  check_in: string | false;
+  check_out: string | false;
+}
+
+interface OdooSyncTimesheet {
+  id: number;
+  date_time: string | false;
+  date_time_end: string | false;
+  unit_amount: number | false;
+}
+
+interface OdooSyncPointageStateResult {
+  server_time: string;
+  count: number;
+  entries: OdooPointageEntry[];
+  attendances?: OdooSyncAttendance[];
+  timesheets?: OdooSyncTimesheet[];
 }
 
 // --- Traduction de vocabulaire (voir docs/backend-integration-plan.md) --
@@ -397,6 +447,8 @@ function pointageEntryToTimeEntry(entry: OdooPointageEntry): TimeEntry {
     recorded_at: withUtcSuffix(entry.datetime),
     client_ref: entry.client_ref || undefined,
     comment: entry.commentaire || null,
+    shift_status: completionStateToShiftStatus(entry.completion_state),
+    completion_ratio: entry.completion_ratio === false || entry.completion_ratio == null ? null : entry.completion_ratio,
   };
 }
 

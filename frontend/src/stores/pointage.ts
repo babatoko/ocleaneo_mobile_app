@@ -158,6 +158,8 @@ interface PointageState {
    *  tableau, pas une seule entrée : un agent peut enchaîner deux départs
    *  avant d'avoir traité le premier compte-rendu. */
   pendingCompteRendus: PendingCompteRendu[];
+  /** True pendant un refresh() serveur. */
+  isSyncing: boolean;
 }
 
 export const usePointageStore = defineStore('pointage', {
@@ -174,6 +176,7 @@ export const usePointageStore = defineStore('pointage', {
     pendingComment: '',
     pauseActionPending: false,
     pendingCompteRendus: [],
+    isSyncing: false,
     // Horloge réactive : sans elle, weekWorkedHours (un getter) ne se
     // recalculerait jamais, puisqu'un `new Date()` interne n'est pas une
     // dépendance réactive. Le compteur resterait figé à la valeur du
@@ -238,6 +241,25 @@ export const usePointageStore = defineStore('pointage', {
       ]);
       this.todayShifts = shiftsData;
       this.entries = entriesData.entries;
+    },
+
+    async refresh(): Promise<void> {
+      this.isSyncing = true;
+      try {
+        await this.flushOfflineQueue();
+        const today = todayIso();
+        const serverState = await provider.syncPointageState({ from: today, to: today });
+        const localPending = this.entries.filter((e) => e.pending);
+        const serverEntries = serverState.entries.map((e) => ({ ...e, pending: false }));
+        const serverIds = new Set(serverEntries.map((e) => e.id));
+        const keptPending = localPending.filter((e) => !serverIds.has(e.id));
+        this.entries = [...serverEntries, ...keptPending].sort(
+          (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+        );
+        this.todayShifts = await provider.fetchShifts({ from: today, to: today });
+      } finally {
+        this.isSyncing = false;
+      }
     },
 
     // Comme load(), mais ne fait pas échouer l'appelant hors ligne : on garde

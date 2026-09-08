@@ -1,4 +1,4 @@
-import { DataProvider } from './DataProvider';
+import { DataProvider, ProviderUnsupportedError } from './DataProvider';
 import { addDaysIso, todayIso } from '../utils/date';
 import { startOfWeekIso } from '../utils/week';
 
@@ -21,6 +21,7 @@ import type {
   SubmitInventoryPayload,
   TimeEntry,
   TodayTimeEntries,
+  SyncPointageStateResult,
 } from '../types/models';
 
 const employee: Employee = { id: 1, name: 'Sophie Martin' };
@@ -347,6 +348,10 @@ export class MockProvider extends DataProvider {
       return day >= from && day <= to;
     });
   }
+  async syncPointageState(_range: DateRange): Promise<SyncPointageStateResult> {
+    throw new ProviderUnsupportedError('La synchronisation bidirectionnelle nest pas disponible avec ce provider.');
+  }
+
 
   async createTimeEntry(payload: CreateTimeEntryPayload): Promise<TimeEntry> {
     await delay();

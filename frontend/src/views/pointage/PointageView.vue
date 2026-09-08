@@ -18,6 +18,8 @@ import {
   IonNote,
   IonPage,
   IonProgressBar,
+  IonRefresher,
+  IonRefresherContent,
   IonSpinner,
 } from '@ionic/vue';
 import {
@@ -57,6 +59,13 @@ type DisplayEntry = (TimeEntry & { planned?: false; plannedTime?: undefined }) |
 const router = useRouter();
 const pointage = usePointageStore();
 const chantiers = useChantiersStore();
+
+async function handleRefresh(event: CustomEvent): Promise<void> {
+  await pointage.refresh();
+  const target = event.target as HTMLIonRefresherElement | undefined;
+  await target?.complete();
+}
+
 const now = ref(new Date());
 const nfcSupported = ref<boolean | null>(null); // null = vérification en cours
 // null = non applicable sur cette plateforme (iOS/web, voir services/nfc.ts)
@@ -260,6 +269,11 @@ function historySubtitle(e: TimeEntry): string {
 <template>
   <ion-page>
     <ion-content>
+    <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+      <ion-refresher-content
+        pulling-text="Tirer pour synchroniser"
+        refreshing-text="Synchronisation..."></ion-refresher-content>
+    </ion-refresher>
   <div class="header">
     <div>
       <p class="hello">Pointage</p>

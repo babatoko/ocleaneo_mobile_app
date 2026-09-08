@@ -1,5 +1,5 @@
 import { DEFAULT_BASE_URL, getApiBaseUrl, initApiBaseUrl, restClient, setApiBaseUrl } from './restClient';
-import { DataProvider, ProviderError, ProviderNetworkError } from './DataProvider';
+import { DataProvider, ProviderError, ProviderNetworkError, ProviderUnsupportedError } from './DataProvider';
 import type {
   Chantier,
   CreateOrderPayload,
@@ -16,6 +16,7 @@ import type {
   Shift,
   TimeEntry,
   TodayTimeEntries,
+  SyncPointageStateResult,
 } from '../types/models';
 
 // On distingue par la forme (duck typing) plutôt que par `instanceof
@@ -113,6 +114,10 @@ export class RestProvider extends DataProvider {
       throw normalizeError(e);
     }
   }
+  async syncPointageState(_range: DateRange): Promise<SyncPointageStateResult> {
+    throw new ProviderUnsupportedError('La synchronisation bidirectionnelle nest pas disponible avec ce provider.');
+  }
+
 
   async createTimeEntry(payload: CreateTimeEntryPayload): Promise<TimeEntry> {
     try {
