@@ -26,6 +26,11 @@ export const useAuthStore = defineStore('auth', {
       this.employee = employee;
       await saveToken(token);
     },
+
+    async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+      await provider.changePassword(currentPassword, newPassword);
+      this.logout();
+    },
     async fetchMe(): Promise<void> {
       if (!this.token) return;
       this.employee = await provider.fetchMe();

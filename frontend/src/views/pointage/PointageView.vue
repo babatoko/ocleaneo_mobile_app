@@ -297,24 +297,6 @@ function historySubtitle(e: TimeEntry): string {
     </div>
   </div>
 
-  <!-- Champ commentaire libre pour le prochain pointage -->
-  <div v-else class="comment-input">
-    <ion-item lines="none">
-      <ion-icon slot="start" :icon="documentTextOutline"></ion-icon>
-      <ion-label position="stacked">Note pour le prochain pointage</ion-label>
-      <ion-textarea
-        v-model="pointage.pendingComment"
-        placeholder="Ex: EI, chantier pas fini, client demande la facture..."
-        rows="2"
-        maxlength="500"
-        auto-grow
-      ></ion-textarea>
-    </ion-item>
-    <p v-if="pointage.pendingComment.length > 0" class="comment-hint">
-      Sera envoyée avec le prochain badge.
-    </p>
-  </div>
-
   <ion-item v-if="pointage.offlineQueueCount > 0" class="offline-banner" lines="none">
     <ion-icon slot="start" :icon="cloudOfflineOutline"></ion-icon>
     <ion-label class="ion-text-wrap">{{ pointage.offlineQueueCount }} pointage{{ pointage.offlineQueueCount > 1 ? 's' : '' }} en attente de synchronisation</ion-label>
@@ -676,30 +658,6 @@ function historySubtitle(e: TimeEntry): string {
   font-weight: 600;
   color: var(--text-primary);
   margin: 2px 0 0;
-}
-
-.comment-input {
-  margin: 0 18px 14px;
-  border-radius: 10px;
-  background: var(--surface-1);
-  padding: 8px 0;
-}
-
-.comment-input ion-item {
-  --background: transparent;
-  --padding-start: 12px;
-  --inner-padding-end: 12px;
-}
-
-.comment-input ion-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.comment-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin: 0 12px 8px;
 }
 
 .empty {

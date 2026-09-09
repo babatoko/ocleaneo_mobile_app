@@ -92,6 +92,11 @@ export abstract class DataProvider {
     throw notImplemented('login');
   }
 
+  /** Change the current user's password. */
+  async changePassword(_currentPassword: string, _newPassword: string): Promise<void> {
+    throw notImplemented('changePassword');
+  }
+
   /** L'employé connecté. */
   async fetchMe(): Promise<Employee> {
     throw notImplemented('fetchMe');

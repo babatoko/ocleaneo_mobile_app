@@ -84,6 +84,10 @@ export class OdooProvider extends DataProvider {
     };
   }
 
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await callMobile('/auth/change-password', { current_password: currentPassword, new_password: newPassword });
+  }
+
   async fetchMe(): Promise<Employee> {
     const data = await callMobile<OdooMeResult>('/auth/me');
     return { id: data.employee_id || 0, name: data.employee_name || data.user_name };

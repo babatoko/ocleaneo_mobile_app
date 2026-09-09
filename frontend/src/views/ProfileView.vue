@@ -14,8 +14,13 @@ import {
   IonSegment,
   IonSegmentButton,
   IonToggle,
+  IonModal,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
 } from '@ionic/vue';
-import { logOutOutline } from 'ionicons/icons';
+import { logOutOutline, lockClosedOutline, eyeOutline, eyeOffOutline } from 'ionicons/icons';
 import HelpButton from '../components/HelpButton.vue';
 import { useAuthStore } from '../stores/auth';
 import { useServerUrl } from '../composables/useServerUrl';
@@ -43,6 +48,16 @@ const errorsLogged = ref(0);
 const traceModeEnabled = ref(false);
 const appVersion = ref('');
 const loading = ref(true);
+
+const showPasswordModal = ref(false);
+const currentPassword = ref('');
+const newPassword = ref('');
+const confirmPassword = ref('');
+const showCurrent = ref(false);
+const showNew = ref(false);
+const showConfirm = ref(false);
+const passwordError = ref('');
+const passwordSaving = ref(false);
 
 const {
   defaultServerUrl,
@@ -130,6 +145,66 @@ async function resetServerUrl() {
 async function changeProviderKind(event: CustomEvent) {
   const kind = event.detail.value as ProviderKind;
   if (await selectProviderKind(kind)) logout();
+}
+
+function openPasswordModal() {
+  passwordError.value = '';
+  currentPassword.value = '';
+  newPassword.value = '';
+  confirmPassword.value = '';
+  showCurrent.value = false;
+  showNew.value = false;
+  showConfirm.value = false;
+  showPasswordModal.value = true;
+}
+
+function closePasswordModal() {
+  showPasswordModal.value = false;
+}
+
+function validatePassword(): string | null {
+  if (newPassword.value.length < 12) {
+    return 'Le mot de passe doit contenir au moins 12 caractères.';
+  }
+  if (!/[A-Z]/.test(newPassword.value)) {
+    return 'Le mot de passe doit contenir au moins une majuscule.';
+  }
+  if (!/[a-z]/.test(newPassword.value)) {
+    return 'Le mot de passe doit contenir au moins une minuscule.';
+  }
+  if (!/[0-9]/.test(newPassword.value)) {
+    return 'Le mot de passe doit contenir au moins un chiffre.';
+  }
+  if (!/[^A-Za-z0-9]/.test(newPassword.value)) {
+    return 'Le mot de passe doit contenir au moins un caractère spécial.';
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    return 'Le nouveau mot de passe et la confirmation ne correspondent pas.';
+  }
+  return null;
+}
+
+async function submitPasswordChange() {
+  passwordError.value = '';
+  if (!currentPassword.value) {
+    passwordError.value = 'Veuillez saisir votre mot de passe actuel.';
+    return;
+  }
+  const validation = validatePassword();
+  if (validation) {
+    passwordError.value = validation;
+    return;
+  }
+  passwordSaving.value = true;
+  try {
+    await auth.changePassword(currentPassword.value, newPassword.value);
+    closePasswordModal();
+    router.replace('/login');
+  } catch (e) {
+    passwordError.value = e instanceof Error ? e.message : 'Le changement a échoué.';
+  } finally {
+    passwordSaving.value = false;
+  }
 }
 </script>
 
@@ -302,6 +377,10 @@ async function changeProviderKind(event: CustomEvent) {
 
         <p class="section-title">Compte</p>
         <ion-list class="menu" lines="none">
+          <ion-item class="menu-item" button :detail="false" @click="openPasswordModal">
+            <ion-icon slot="start" :icon="lockClosedOutline"></ion-icon>
+            <ion-label>Changer mon mot de passe</ion-label>
+          </ion-item>
           <ion-item class="menu-item" button :detail="false" color="danger" @click="logout">
             <ion-icon slot="start" :icon="logOutOutline"></ion-icon>
             <ion-label>Déconnexion</ion-label>
@@ -310,6 +389,79 @@ async function changeProviderKind(event: CustomEvent) {
 
         <p v-if="appVersion" class="app-version">v{{ appVersion }}</p>
       </template>
+
+      <!-- Modale changement de mot de passe -->
+      <ion-modal :is-open="showPasswordModal" @did-dismiss="closePasswordModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Changer mon mot de passe</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closePasswordModal">Fermer</ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <ion-list lines="full" class="password-form">
+            <ion-item>
+              <ion-input
+                v-model="currentPassword"
+                :type="showCurrent ? 'text' : 'password'"
+                label="Mot de passe actuel"
+                label-placement="stacked"
+                placeholder="Votre mot de passe actuel"
+                autocomplete="current-password"
+              ></ion-input>
+              <ion-button slot="end" fill="clear" @click="showCurrent = !showCurrent">
+                <ion-icon :icon="showCurrent ? eyeOffOutline : eyeOutline"></ion-icon>
+              </ion-button>
+            </ion-item>
+
+            <ion-item>
+              <ion-input
+                v-model="newPassword"
+                :type="showNew ? 'text' : 'password'"
+                label="Nouveau mot de passe"
+                label-placement="stacked"
+                placeholder="Min. 12 caractères, majuscule, minuscule, chiffre, spécial"
+                autocomplete="new-password"
+              ></ion-input>
+              <ion-button slot="end" fill="clear" @click="showNew = !showNew">
+                <ion-icon :icon="showNew ? eyeOffOutline : eyeOutline"></ion-icon>
+              </ion-button>
+            </ion-item>
+
+            <ion-item>
+              <ion-input
+                v-model="confirmPassword"
+                :type="showConfirm ? 'text' : 'password'"
+                label="Confirmer le nouveau mot de passe"
+                label-placement="stacked"
+                placeholder="Saisissez à nouveau le nouveau mot de passe"
+                autocomplete="new-password"
+              ></ion-input>
+              <ion-button slot="end" fill="clear" @click="showConfirm = !showConfirm">
+                <ion-icon :icon="showConfirm ? eyeOffOutline : eyeOutline"></ion-icon>
+              </ion-button>
+            </ion-item>
+          </ion-list>
+
+          <p v-if="passwordError" class="password-error">{{ passwordError }}</p>
+
+          <div class="password-actions">
+            <ion-button
+              expand="block"
+              class="password-save"
+              :disabled="passwordSaving"
+              @click="submitPasswordChange"
+            >
+              {{ passwordSaving ? 'Enregistrement...' : 'Enregistrer' }}
+            </ion-button>
+            <ion-button expand="block" fill="clear" class="password-cancel" @click="closePasswordModal">
+              Annuler
+            </ion-button>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -470,5 +622,50 @@ async function changeProviderKind(event: CustomEvent) {
   font-size: 12px;
   text-decoration: underline;
   margin: 0;
+}
+
+.password-form {
+  background: transparent;
+  margin-bottom: 12px;
+}
+
+.password-form ion-item {
+  --background: var(--surface-1);
+  --border-color: var(--border);
+  --padding-start: 12px;
+  --inner-padding-end: 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.password-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.password-save {
+  --border-radius: 10px;
+  --background: var(--accent);
+  --color: var(--on-accent);
+  --box-shadow: none;
+  font-weight: 500;
+  font-size: 14px;
+  text-transform: none;
+  margin: 0;
+}
+
+.password-cancel {
+  --color: var(--text-secondary);
+  font-size: 13px;
+  text-transform: none;
+  margin: 0;
+}
+
+.password-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 8px 4px 0;
 }
 </style>
