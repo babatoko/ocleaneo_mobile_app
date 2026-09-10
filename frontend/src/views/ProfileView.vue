@@ -14,7 +14,6 @@ import {
 } from '@ionic/vue';
 import {
   logOutOutline,
-  lockClosedOutline,
   notificationsOutline,
   globeOutline,
   moonOutline,
@@ -28,11 +27,6 @@ import {
 import { useAuthStore } from '../stores/auth';
 import { PROVIDER_KIND_LABELS, useProviderKind } from '../composables/useProviderKind';
 import type { ProviderKind } from '../providers';
-import {
-  clearSavedCredentials,
-  hasSavedCredentials,
-  isBiometricAvailable,
-} from '../services/biometric';
 import { areNotificationsEnabled, setNotificationsEnabled } from '../services/notifications';
 import { failedCount, queueLength } from '../services/offlineQueue';
 import { errorCount, isTraceModeEnabled, setTraceModeEnabled, shareErrorLog } from '../services/errorLog';
@@ -41,8 +35,6 @@ import { getAppVersion } from '../services/appInfo';
 const auth = useAuthStore();
 const router = useRouter();
 
-const biometricAvailable = ref(false);
-const biometricSaved = ref(false);
 const notificationsEnabled = ref(true);
 const pendingCount = ref(0);
 const failedPointages = ref(0);
@@ -66,8 +58,6 @@ const initials = computed(() => {
 
 onMounted(async () => {
   try {
-    biometricAvailable.value = await isBiometricAvailable();
-    if (biometricAvailable.value) biometricSaved.value = await hasSavedCredentials();
     notificationsEnabled.value = await areNotificationsEnabled();
     pendingCount.value = await queueLength();
     failedPointages.value = await failedCount();
@@ -98,11 +88,6 @@ function toggleDarkMode() {
   document.documentElement.setAttribute('data-theme', darkMode.value ? 'dark' : 'light');
 }
 
-async function disableBiometric() {
-  if (!biometricSaved.value) return;
-  await clearSavedCredentials();
-  biometricSaved.value = false;
-}
 
 function logout() {
   auth.logout();
@@ -110,10 +95,6 @@ function logout() {
 }
 
 
-function openPasswordModal() {
-  // TODO: restore password-change modal or navigate to dedicated security screen
-  alert('Changement de mot de passe — à brancher sur l\'écran sécurité');
-}
 </script>
 
 <template>
@@ -123,7 +104,7 @@ function openPasswordModal() {
         <!-- Header -->
         <header class="profile-header">
           <h1 class="profile-title">Profil</h1>
-          <button class="settings-btn" aria-label="Paramètres" @click="openPasswordModal">
+          <button class="settings-btn" aria-label="Paramètres">
             <ion-icon :icon="moonOutline" aria-hidden="true"></ion-icon>
           </button>
         </header>
@@ -197,35 +178,7 @@ function openPasswordModal() {
           <!-- Account -->
           <p class="section-title">Compte</p>
           <ion-list class="grouped-list" lines="full">
-            <ion-item class="grouped-row" :button="false" :detail="false" @click="openPasswordModal">
-              <div slot="start" class="row-icon">
-                <ion-icon :icon="lockClosedOutline" aria-hidden="true"></ion-icon>
-              </div>
-              <ion-label>
-                <p class="row-label">Sécurité &amp; accès</p>
-              </ion-label>
-              <ion-icon slot="end" :icon="chevronForwardOutline" class="row-chevron" aria-hidden="true"></ion-icon>
-            </ion-item>
-
-            <ion-item v-if="biometricAvailable" class="grouped-row">
-              <div slot="start" class="row-icon">
-                <ion-icon :icon="lockClosedOutline" aria-hidden="true"></ion-icon>
-              </div>
-              <ion-label class="ion-text-wrap">
-                <p class="row-label">Connexion biométrique</p>
-                <p class="row-sub">{{ biometricSaved ? 'Activée' : 'Se reconnecter avec le mot de passe pour l’activer' }}</p>
-              </ion-label>
-              <ion-toggle
-                slot="end"
-                class="app-toggle"
-                :checked="biometricSaved"
-                :disabled="!biometricSaved"
-                :aria-label="true"
-                @ion-change="disableBiometric"
-              ></ion-toggle>
-            </ion-item>
-
-            <ion-item class="grouped-row" :button="false" :detail="false">
+            <ion-item class="grouped-row" :button="false" :detail="false" router-link="/securite">
               <div slot="start" class="row-icon">
                 <ion-icon :icon="documentTextOutline" aria-hidden="true"></ion-icon>
               </div>
