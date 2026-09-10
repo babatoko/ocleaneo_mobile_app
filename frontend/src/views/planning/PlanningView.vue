@@ -683,7 +683,9 @@ onUnmounted(() => {
     </div>
     <div class="header-actions">
       <HelpButton />
-      <div class="avatar">{{ initials }}</div>
+      <button class="avatar avatar-btn" aria-label="Mon profil" @click="router.push('/profil')">
+        {{ initials }}
+      </button>
     </div>
   </div>
 

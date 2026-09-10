@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { IonIcon, IonTabBar } from '@ionic/vue';
-import { calendarOutline, timeOutline, cartOutline, receiptOutline, personOutline } from 'ionicons/icons';
+import { calendarOutline, timeOutline, cartOutline, receiptOutline } from 'ionicons/icons';
 
 const items = [
   { to: '/planning', icon: calendarOutline, label: 'Planning' },
   { to: '/pointage', icon: timeOutline, label: 'Pointage' },
   { to: '/commande/catalogue', icon: cartOutline, label: 'Commande' },
   { to: '/historique', icon: receiptOutline, label: 'Historique' },
-  { to: '/profil', icon: personOutline, label: 'Profil' },
 ];
 </script>
 
