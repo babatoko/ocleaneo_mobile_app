@@ -15,8 +15,6 @@ import {
 import {
   logOutOutline,
   lockClosedOutline,
-  chatbubbleOutline,
-  optionsOutline,
   notificationsOutline,
   globeOutline,
   moonOutline,
@@ -111,15 +109,6 @@ function logout() {
   router.replace('/login');
 }
 
-function openAgentChat() {
-  // TODO: wire to actual agent chat screen once available
-  alert("Chat agent — à brancher sur l'écran conversation");
-}
-
-function openAgentSettings() {
-  // TODO: wire to agent customization screen once available
-  alert('Personnalisation agent — à brancher');
-}
 
 function openPasswordModal() {
   // TODO: restore password-change modal or navigate to dedicated security screen
@@ -135,7 +124,7 @@ function openPasswordModal() {
         <header class="profile-header">
           <h1 class="profile-title">Profil</h1>
           <button class="settings-btn" aria-label="Paramètres" @click="openPasswordModal">
-            <ion-icon :icon="optionsOutline" aria-hidden="true"></ion-icon>
+            <ion-icon :icon="moonOutline" aria-hidden="true"></ion-icon>
           </button>
         </header>
 
@@ -154,23 +143,7 @@ function openPasswordModal() {
             Entretien Mâconnais
           </div>
         </section>
-
-        <!-- Agent card -->
-        <section class="agent-card" aria-label="Mon agent">
-          <div class="agent-top">
-            <div class="agent-avatar">
-              <ion-icon :icon="chatbubbleOutline" aria-hidden="true"></ion-icon>
-            </div>
-            <div class="agent-text">
-              <h3>Mon agent</h3>
-              <p>Il connaît ton planning, tes habitudes et ton entreprise.</p>
-            </div>
-          </div>
-          <div class="agent-actions">
-            <ion-button class="agent-primary" expand="block" @click="openAgentChat">Discuter</ion-button>
-            <ion-button class="agent-secondary" expand="block" fill="clear" @click="openAgentSettings">Personnaliser</ion-button>
-          </div>
-        </section>
+        <!-- Agent card hidden until future AI assistant feature (see issue)
 
         <!-- Preferences -->
         <template v-if="!loading">
