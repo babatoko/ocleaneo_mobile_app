@@ -14,6 +14,7 @@ import {
 } from '@ionic/vue';
 import {
   logOutOutline,
+  lockClosedOutline,
   notificationsOutline,
   globeOutline,
   moonOutline,
@@ -179,6 +180,16 @@ function logout() {
           <p class="section-title">Compte</p>
           <ion-list class="grouped-list" lines="full">
             <ion-item class="grouped-row" :button="false" :detail="false" router-link="/securite">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="lockClosedOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label>
+                <p class="row-label">Sécurité &amp; accès</p>
+              </ion-label>
+              <ion-icon slot="end" :icon="chevronForwardOutline" class="row-chevron" aria-hidden="true"></ion-icon>
+            </ion-item>
+
+            <ion-item class="grouped-row" :button="false" :detail="false">
               <div slot="start" class="row-icon">
                 <ion-icon :icon="documentTextOutline" aria-hidden="true"></ion-icon>
               </div>

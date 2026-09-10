@@ -49,10 +49,10 @@ onMounted(async () => {
 });
 
 const canSubmitPassword = computed(() =>
-  currentPassword.value &&
+  Boolean(currentPassword.value &&
   newPassword.value &&
   confirmPassword.value &&
-  !passwordSaving.value,
+  !passwordSaving.value),
 );
 
 function validatePassword(): string | null {
