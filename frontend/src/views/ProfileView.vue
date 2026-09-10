@@ -32,6 +32,9 @@ import { areNotificationsEnabled, setNotificationsEnabled } from '../services/no
 import { failedCount, queueLength } from '../services/offlineQueue';
 import { errorCount, isTraceModeEnabled, setTraceModeEnabled, shareErrorLog } from '../services/errorLog';
 import { getAppVersion } from '../services/appInfo';
+import { usePlanningStore } from '../stores/planning';
+import { usePointageStore } from '../stores/pointage';
+import { useChantiersStore } from '../stores/chantiers';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -90,9 +93,14 @@ function toggleDarkMode() {
 }
 
 
-function logout() {
-  auth.logout();
-  router.replace('/login');
+async function logout() {
+  // Réinitialise d'abord les stores visibles pour que l'écran de connexion
+  // ne réaffiche jamais les données de l'utilisateur précédent.
+  usePlanningStore().$reset();
+  usePointageStore().$reset();
+  useChantiersStore().$reset();
+  await auth.logout();
+  await router.replace('/login');
 }
 
 

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { provider } from '../providers';
+import { clearAllUserData } from '../services/userDataCleanup';
 import { clearToken, currentToken, saveToken } from '../services/tokenStore';
 import type { Employee } from '../types/models';
 
@@ -42,6 +43,10 @@ export const useAuthStore = defineStore('auth', {
       // l'écran. L'effacement disque suit, et rien n'en dépend — le cache
       // mémoire est déjà vidé, donc plus aucune requête ne partira signée.
       void clearToken();
+      // Efface aussi les caches planning/pointage/chantiers, la file hors
+      // ligne et les identifiants biométriques, pour qu'un autre utilisateur
+      // qui se connecte ensuite ne voie jamais les données du précédent.
+      void clearAllUserData();
     },
   },
 });
