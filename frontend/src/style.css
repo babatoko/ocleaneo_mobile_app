@@ -289,6 +289,23 @@ input[type='number'] {
   flex-shrink: 0;
 }
 
+.avatar.avatar-btn {
+  background: var(--accent);
+  color: var(--on-accent, #fff);
+  cursor: pointer;
+  border: 2px solid var(--surface-2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+.avatar.avatar-btn:active {
+  transform: scale(0.96);
+}
+
+.avatar.avatar-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* Regroupe le bouton d'aide discret avec le contenu déjà posé à droite d'un
    .header (avatar, statut de pointage...) sans casser son space-between :
    celui-ci ne doit voir que deux enfants, jamais trois. */
