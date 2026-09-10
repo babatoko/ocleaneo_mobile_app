@@ -5,42 +5,37 @@ import {
   IonButton,
   IonContent,
   IonIcon,
-  IonInput,
   IonItem,
   IonLabel,
   IonList,
   IonNote,
   IonPage,
-  IonSegment,
-  IonSegmentButton,
   IonToggle,
-  IonModal,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonButtons,
 } from '@ionic/vue';
-import { logOutOutline, lockClosedOutline, eyeOutline, eyeOffOutline } from 'ionicons/icons';
-import HelpButton from '../components/HelpButton.vue';
-import { useAuthStore } from '../stores/auth';
-import { useServerUrl } from '../composables/useServerUrl';
-import { PROVIDER_KIND_LABELS, PROVIDER_KINDS, useProviderKind } from '../composables/useProviderKind';
-import type { ProviderKind } from '../providers';
 import {
-  clearSavedCredentials,
-  hasSavedCredentials,
-  isBiometricAvailable,
-} from '../services/biometric';
+  logOutOutline,
+  lockClosedOutline,
+  notificationsOutline,
+  globeOutline,
+  moonOutline,
+  serverOutline,
+  bugOutline,
+  documentTextOutline,
+  helpCircleOutline,
+  chevronForwardOutline,
+  businessOutline,
+} from 'ionicons/icons';
+import { useAuthStore } from '../stores/auth';
+import { PROVIDER_KIND_LABELS, useProviderKind } from '../composables/useProviderKind';
+import type { ProviderKind } from '../providers';
 import { areNotificationsEnabled, setNotificationsEnabled } from '../services/notifications';
 import { failedCount, queueLength } from '../services/offlineQueue';
-import { clearErrorLog, errorCount, isTraceModeEnabled, setTraceModeEnabled, shareErrorLog } from '../services/errorLog';
+import { errorCount, isTraceModeEnabled, setTraceModeEnabled, shareErrorLog } from '../services/errorLog';
 import { getAppVersion } from '../services/appInfo';
 
 const auth = useAuthStore();
 const router = useRouter();
 
-const biometricAvailable = ref(false);
-const biometricSaved = ref(false);
 const notificationsEnabled = ref(true);
 const pendingCount = ref(0);
 const failedPointages = ref(0);
@@ -48,30 +43,9 @@ const errorsLogged = ref(0);
 const traceModeEnabled = ref(false);
 const appVersion = ref('');
 const loading = ref(true);
+const darkMode = ref(false);
 
-const showPasswordModal = ref(false);
-const currentPassword = ref('');
-const newPassword = ref('');
-const confirmPassword = ref('');
-const showCurrent = ref(false);
-const showNew = ref(false);
-const showConfirm = ref(false);
-const passwordError = ref('');
-const passwordSaving = ref(false);
-
-const {
-  defaultServerUrl,
-  serverUrlInput,
-  serverUrlError,
-  savingServerUrl,
-  showServerSetting,
-  serverUrlOverridden,
-  serverUrlChanged,
-  saveServerUrl: saveServerUrlValue,
-  resetServerUrl: resetServerUrlValue,
-} = useServerUrl();
-
-const { providerKind, savingProviderKind, selectProviderKind } = useProviderKind();
+const { providerKind } = useProviderKind();
 
 const initials = computed(() => {
   const name = auth.employee?.name || '';
@@ -85,23 +59,18 @@ const initials = computed(() => {
 
 onMounted(async () => {
   try {
-    biometricAvailable.value = await isBiometricAvailable();
-    if (biometricAvailable.value) biometricSaved.value = await hasSavedCredentials();
     notificationsEnabled.value = await areNotificationsEnabled();
     pendingCount.value = await queueLength();
     failedPointages.value = await failedCount();
     errorsLogged.value = await errorCount();
     traceModeEnabled.value = await isTraceModeEnabled();
     appVersion.value = await getAppVersion();
+    darkMode.value = document.documentElement.getAttribute('data-theme') === 'dark'
+      || window.matchMedia('(prefers-color-scheme: dark)').matches;
   } finally {
     loading.value = false;
   }
 });
-
-async function forgetErrorLog() {
-  await clearErrorLog();
-  errorsLogged.value = 0;
-}
 
 async function toggleNotifications() {
   const next = !notificationsEnabled.value;
@@ -109,439 +78,402 @@ async function toggleNotifications() {
   await setNotificationsEnabled(next);
 }
 
-/** Journalise chaque appel serveur (méthode/chemin/résultat, jamais les
- *  identifiants) — désactivé par défaut, à activer seulement le temps de
- *  reproduire un incident signalé par un agent. */
 async function toggleTraceMode() {
   const next = !traceModeEnabled.value;
   traceModeEnabled.value = next;
   await setTraceModeEnabled(next);
 }
 
-async function disableBiometric() {
-  if (!biometricSaved.value) return; // pas de mot de passe en mémoire pour l'activer depuis cet écran
-  await clearSavedCredentials();
-  biometricSaved.value = false;
+function toggleDarkMode() {
+  darkMode.value = !darkMode.value;
+  document.documentElement.setAttribute('data-theme', darkMode.value ? 'dark' : 'light');
 }
+
 
 function logout() {
   auth.logout();
   router.replace('/login');
 }
 
-// Le jeton de session n'a aucune raison d'être valide sur un autre serveur :
-// tout changement d'URL (y compris le retour à la valeur par défaut)
-// déconnecte, ce que useServerUrl() ne fait pas lui-même (LoginView.vue le
-// réutilise sans session à clore).
-async function saveServerUrl() {
-  if (await saveServerUrlValue()) logout();
-}
 
-async function resetServerUrl() {
-  await resetServerUrlValue();
-  logout();
-}
-
-async function changeProviderKind(event: CustomEvent) {
-  const kind = event.detail.value as ProviderKind;
-  if (await selectProviderKind(kind)) logout();
-}
-
-function openPasswordModal() {
-  passwordError.value = '';
-  currentPassword.value = '';
-  newPassword.value = '';
-  confirmPassword.value = '';
-  showCurrent.value = false;
-  showNew.value = false;
-  showConfirm.value = false;
-  showPasswordModal.value = true;
-}
-
-function closePasswordModal() {
-  showPasswordModal.value = false;
-}
-
-function validatePassword(): string | null {
-  if (newPassword.value.length < 12) {
-    return 'Le mot de passe doit contenir au moins 12 caractères.';
-  }
-  if (!/[A-Z]/.test(newPassword.value)) {
-    return 'Le mot de passe doit contenir au moins une majuscule.';
-  }
-  if (!/[a-z]/.test(newPassword.value)) {
-    return 'Le mot de passe doit contenir au moins une minuscule.';
-  }
-  if (!/[0-9]/.test(newPassword.value)) {
-    return 'Le mot de passe doit contenir au moins un chiffre.';
-  }
-  if (!/[^A-Za-z0-9]/.test(newPassword.value)) {
-    return 'Le mot de passe doit contenir au moins un caractère spécial.';
-  }
-  if (newPassword.value !== confirmPassword.value) {
-    return 'Le nouveau mot de passe et la confirmation ne correspondent pas.';
-  }
-  return null;
-}
-
-async function submitPasswordChange() {
-  passwordError.value = '';
-  if (!currentPassword.value) {
-    passwordError.value = 'Veuillez saisir votre mot de passe actuel.';
-    return;
-  }
-  const validation = validatePassword();
-  if (validation) {
-    passwordError.value = validation;
-    return;
-  }
-  passwordSaving.value = true;
-  try {
-    await auth.changePassword(currentPassword.value, newPassword.value);
-    closePasswordModal();
-    router.replace('/login');
-  } catch (e) {
-    passwordError.value = e instanceof Error ? e.message : 'Le changement a échoué.';
-  } finally {
-    passwordSaving.value = false;
-  }
-}
 </script>
 
 <template>
   <ion-page>
     <ion-content>
-      <div class="profile-header">
-        <HelpButton class="profile-help" />
-        <div class="profile-avatar">{{ initials || '?' }}</div>
-        <p class="profile-name">{{ auth.employee?.name || 'Salarié' }}</p>
-      </div>
+      <div class="profile-page">
+        <!-- Header -->
+        <header class="profile-header">
+          <h1 class="profile-title">Profil</h1>
+          <button class="settings-btn" aria-label="Paramètres">
+            <ion-icon :icon="moonOutline" aria-hidden="true"></ion-icon>
+          </button>
+        </header>
 
-      <template v-if="!loading">
-        <p class="section-title">Paramètres</p>
-        <ion-list class="detail-block settings-list" lines="full">
-          <ion-item class="settings-row">
-            <ion-label class="ion-text-wrap">
-              <p class="srow-label">Notifications</p>
-              <p class="srow-sub">Chantier en cours, rappels de vacation, changements de planning</p>
-            </ion-label>
-            <ion-toggle
-              slot="end"
-              class="app-toggle"
-              :checked="notificationsEnabled"
-              aria-label="Notifications"
-              @ion-change="toggleNotifications"
-            ></ion-toggle>
-          </ion-item>
-
-          <ion-item v-if="biometricAvailable" class="settings-row">
-            <ion-label class="ion-text-wrap">
-              <p class="srow-label">Connexion biométrique</p>
-              <p class="srow-sub">
-                {{ biometricSaved ? 'Activée à la dernière connexion' : 'Reconnectez-vous avec votre mot de passe pour l’activer' }}
-              </p>
-            </ion-label>
-            <ion-toggle
-              slot="end"
-              class="app-toggle"
-              :checked="biometricSaved"
-              :disabled="!biometricSaved"
-              aria-label="Connexion biométrique"
-              @ion-change="disableBiometric"
-            ></ion-toggle>
-          </ion-item>
-        </ion-list>
-
-        <p class="section-title">Hors ligne</p>
-        <ion-list class="detail-block settings-list" lines="full">
-          <ion-item class="settings-row">
-            <ion-label class="ion-text-wrap">
-              <p class="srow-label">File d'attente pointage</p>
-              <p class="srow-sub">Pointages enregistrés localement, en attente d'envoi</p>
-            </ion-label>
-            <ion-note slot="end" class="srow-value">{{ pendingCount }}</ion-note>
-          </ion-item>
-
-          <!-- N'apparaît que s'il y a quelque chose à signaler : une ligne à
-               zéro en permanence ferait du bruit et finirait ignorée — ce qui
-               est exactement ce qu'on veut éviter pour ces pointages-là. -->
-          <ion-item v-if="failedPointages" class="settings-row">
-            <ion-label class="ion-text-wrap">
-              <p class="srow-label">Pointages refusés</p>
-              <p class="srow-sub">
-                Non enregistrés par le serveur, conservés ici — signalez-les à
-                votre responsable pour qu'ils soient repris à la main.
-              </p>
-            </ion-label>
-            <ion-note slot="end" class="srow-value srow-alert">{{ failedPointages }}</ion-note>
-          </ion-item>
-        </ion-list>
-
-        <p class="section-title">Diagnostic</p>
-        <ion-list class="detail-block settings-list" lines="full">
-          <ion-item class="settings-row">
-            <ion-label class="ion-text-wrap">
-              <p class="srow-label">Mode traçage</p>
-              <p class="srow-sub">
-                Journalise chaque appel au serveur (jamais les identifiants) —
-                à activer seulement le temps de reproduire un incident, à la
-                demande de votre responsable.
-              </p>
-            </ion-label>
-            <ion-toggle
-              slot="end"
-              class="app-toggle"
-              :checked="traceModeEnabled"
-              aria-label="Mode traçage"
-              @ion-change="toggleTraceMode"
-            ></ion-toggle>
-          </ion-item>
-
-          <!-- Même principe que les pointages refusés : rien à afficher tant
-               qu'il n'y a rien à signaler. Un plantage était jusqu'ici invisible
-               de bout en bout ; le transmettre depuis ici est aujourd'hui le
-               seul chemin pour qu'il soit corrigé. -->
-          <ion-item v-if="errorsLogged" class="settings-row">
-            <ion-label class="ion-text-wrap">
-              <p class="srow-label">Incidents enregistrés</p>
-              <p class="srow-sub">
-                Anomalies techniques relevées sur cet appareil. Rien n'est
-                envoyé automatiquement — transmettez-les pour qu'elles soient
-                corrigées.
-              </p>
-            </ion-label>
-            <ion-note slot="end" class="srow-value">{{ errorsLogged }}</ion-note>
-          </ion-item>
-        </ion-list>
-        <div v-if="errorsLogged" class="detail-block" style="padding: 0 18px;">
-          <div class="server-url-actions">
-            <ion-button class="server-url-save" expand="block" @click="shareErrorLog">
-              Transmettre le diagnostic
-            </ion-button>
-            <ion-button class="server-url-reset" expand="block" fill="clear" @click="forgetErrorLog">
-              Effacer
-            </ion-button>
-          </div>
-        </div>
-
-        <p class="section-title">Serveur</p>
-        <div class="detail-block" style="padding: 0 18px;">
-          <ion-segment
-            :value="providerKind"
-            :disabled="savingProviderKind"
-            @ion-change="changeProviderKind"
-          >
-            <ion-segment-button v-for="kind in PROVIDER_KINDS" :key="kind" :value="kind">
-              <ion-label>{{ PROVIDER_KIND_LABELS[kind] }}</ion-label>
-            </ion-segment-button>
-          </ion-segment>
-          <p class="srow-sub" style="margin-top: 8px;">Changer de backend vous déconnectera (le jeton de session n'est valable que sur le backend d'origine).</p>
-
-          <div v-if="showServerSetting" class="server-url-field">
-            <ion-input
-              v-model="serverUrlInput"
-              type="url"
-              inputmode="url"
-              fill="outline"
-              placeholder="https://exemple.odoo.com"
-              autocapitalize="none"
-              autocomplete="off"
-            ></ion-input>
-            <p class="srow-sub">
-              Valeur par défaut : {{ defaultServerUrl }}
-              <template v-if="serverUrlOverridden"> · personnalisée actuellement</template>
-            </p>
-            <p v-if="serverUrlError" class="server-url-error">{{ serverUrlError }}</p>
-            <p class="srow-sub">Changer cette valeur vous déconnectera (le jeton de session n'est valable que sur le serveur d'origine).</p>
-            <div class="server-url-actions">
-              <ion-button
-                class="server-url-save"
-                expand="block"
-                :disabled="!serverUrlChanged || savingServerUrl"
-                @click="saveServerUrl"
-              >
-                Enregistrer et se reconnecter
-              </ion-button>
-              <ion-button
-                v-if="serverUrlOverridden"
-                class="server-url-reset"
-                fill="clear"
-                :disabled="savingServerUrl"
-                @click="resetServerUrl"
-              >
-                Revenir à la valeur par défaut
-              </ion-button>
+        <!-- Identity card -->
+        <section class="identity-card">
+          <div class="avatar-wrap">
+            <div class="profile-avatar">{{ initials || '?' }}</div>
+            <div class="avatar-status" aria-label="Actif">
+              <ion-icon :icon="notificationsOutline" aria-hidden="true"></ion-icon>
             </div>
           </div>
-        </div>
+          <h2 class="profile-name">{{ auth.employee?.name || 'Salarié' }}</h2>
+          <p class="profile-role">Responsable d'exploitation</p>
+          <div class="company-pill">
+            <ion-icon :icon="businessOutline" aria-hidden="true"></ion-icon>
+            Entretien Mâconnais
+          </div>
+        </section>
+        <!-- Agent card hidden until future AI assistant feature (see issue #99) -->
 
-        <p class="section-title">Compte</p>
-        <ion-list class="menu" lines="none">
-          <ion-item class="menu-item" button :detail="false" @click="openPasswordModal">
-            <ion-icon slot="start" :icon="lockClosedOutline"></ion-icon>
-            <ion-label>Changer mon mot de passe</ion-label>
-          </ion-item>
-          <ion-item class="menu-item" button :detail="false" color="danger" @click="logout">
-            <ion-icon slot="start" :icon="logOutOutline"></ion-icon>
-            <ion-label>Déconnexion</ion-label>
-          </ion-item>
-        </ion-list>
-
-        <p v-if="appVersion" class="app-version">v{{ appVersion }}</p>
-      </template>
-
-      <!-- Modale changement de mot de passe -->
-      <ion-modal :is-open="showPasswordModal" @did-dismiss="closePasswordModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Changer mon mot de passe</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closePasswordModal">Fermer</ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          <ion-list lines="full" class="password-form">
-            <ion-item>
-              <ion-input
-                v-model="currentPassword"
-                :type="showCurrent ? 'text' : 'password'"
-                label="Mot de passe actuel"
-                label-placement="stacked"
-                placeholder="Votre mot de passe actuel"
-                autocomplete="current-password"
-              ></ion-input>
-              <ion-button slot="end" fill="clear" @click="showCurrent = !showCurrent">
-                <ion-icon :icon="showCurrent ? eyeOffOutline : eyeOutline"></ion-icon>
-              </ion-button>
+        <!-- Preferences -->
+        <template v-if="!loading">
+          <p class="section-title">Préférences</p>
+          <ion-list class="grouped-list" lines="full">
+            <ion-item class="grouped-row">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="notificationsOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label class="ion-text-wrap">
+                <p class="row-label">Notifications</p>
+                <p class="row-sub">Chantier en cours, rappels, changements de planning</p>
+              </ion-label>
+              <ion-toggle
+                slot="end"
+                class="app-toggle"
+                :checked="notificationsEnabled"
+                :aria-label="true"
+                @ion-change="toggleNotifications"
+              ></ion-toggle>
             </ion-item>
 
-            <ion-item>
-              <ion-input
-                v-model="newPassword"
-                :type="showNew ? 'text' : 'password'"
-                label="Nouveau mot de passe"
-                label-placement="stacked"
-                placeholder="Min. 12 caractères, majuscule, minuscule, chiffre, spécial"
-                autocomplete="new-password"
-              ></ion-input>
-              <ion-button slot="end" fill="clear" @click="showNew = !showNew">
-                <ion-icon :icon="showNew ? eyeOffOutline : eyeOutline"></ion-icon>
-              </ion-button>
+            <ion-item class="grouped-row" :button="false" :detail="false" @click="$event.stopPropagation()">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="globeOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label>
+                <p class="row-label">Langue</p>
+              </ion-label>
+              <ion-note slot="end" class="row-value">Français</ion-note>
+              <ion-icon slot="end" :icon="chevronForwardOutline" class="row-chevron" aria-hidden="true"></ion-icon>
             </ion-item>
 
-            <ion-item>
-              <ion-input
-                v-model="confirmPassword"
-                :type="showConfirm ? 'text' : 'password'"
-                label="Confirmer le nouveau mot de passe"
-                label-placement="stacked"
-                placeholder="Saisissez à nouveau le nouveau mot de passe"
-                autocomplete="new-password"
-              ></ion-input>
-              <ion-button slot="end" fill="clear" @click="showConfirm = !showConfirm">
-                <ion-icon :icon="showConfirm ? eyeOffOutline : eyeOutline"></ion-icon>
-              </ion-button>
+            <ion-item class="grouped-row">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="moonOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label class="ion-text-wrap">
+                <p class="row-label">Thème sombre</p>
+              </ion-label>
+              <ion-toggle
+                slot="end"
+                class="app-toggle"
+                :checked="darkMode"
+                :aria-label="true"
+                @ion-change="toggleDarkMode"
+              ></ion-toggle>
             </ion-item>
           </ion-list>
 
-          <p v-if="passwordError" class="password-error">{{ passwordError }}</p>
+          <!-- Account -->
+          <p class="section-title">Compte</p>
+          <ion-list class="grouped-list" lines="full">
+            <ion-item class="grouped-row" :button="false" :detail="false" router-link="/securite">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="lockClosedOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label>
+                <p class="row-label">Sécurité &amp; accès</p>
+              </ion-label>
+              <ion-icon slot="end" :icon="chevronForwardOutline" class="row-chevron" aria-hidden="true"></ion-icon>
+            </ion-item>
 
-          <div class="password-actions">
-            <ion-button
-              expand="block"
-              class="password-save"
-              :disabled="passwordSaving"
-              @click="submitPasswordChange"
-            >
-              {{ passwordSaving ? 'Enregistrement...' : 'Enregistrer' }}
-            </ion-button>
-            <ion-button expand="block" fill="clear" class="password-cancel" @click="closePasswordModal">
-              Annuler
+            <ion-item class="grouped-row" :button="false" :detail="false">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="documentTextOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label>
+                <p class="row-label">Documents personnels</p>
+              </ion-label>
+              <ion-icon slot="end" :icon="chevronForwardOutline" class="row-chevron" aria-hidden="true"></ion-icon>
+            </ion-item>
+
+            <ion-item class="grouped-row" :button="false" :detail="false" router-link="/aide">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="helpCircleOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label>
+                <p class="row-label">Aide &amp; support</p>
+              </ion-label>
+              <ion-icon slot="end" :icon="chevronForwardOutline" class="row-chevron" aria-hidden="true"></ion-icon>
+            </ion-item>
+          </ion-list>
+
+          <!-- Server / diagnostic (advanced) -->
+          <p class="section-title">Avancé</p>
+          <ion-list class="grouped-list" lines="full">
+            <ion-item class="grouped-row">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="serverOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label class="ion-text-wrap">
+                <p class="row-label">Backend</p>
+                <p class="row-sub">{{ PROVIDER_KIND_LABELS[providerKind as ProviderKind] }}</p>
+              </ion-label>
+              <ion-note slot="end" class="row-value">{{ providerKind }}</ion-note>
+            </ion-item>
+
+            <ion-item class="grouped-row">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="bugOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label class="ion-text-wrap">
+                <p class="row-label">Mode traçage</p>
+                <p class="row-sub">Journalise les appels serveur (jamais les identifiants)</p>
+              </ion-label>
+              <ion-toggle
+                slot="end"
+                class="app-toggle"
+                :checked="traceModeEnabled"
+                :aria-label="true"
+                @ion-change="toggleTraceMode"
+              ></ion-toggle>
+            </ion-item>
+
+            <ion-item v-if="errorsLogged" class="grouped-row" :button="false" :detail="false" @click="shareErrorLog">
+              <div slot="start" class="row-icon">
+                <ion-icon :icon="bugOutline" aria-hidden="true"></ion-icon>
+              </div>
+              <ion-label class="ion-text-wrap">
+                <p class="row-label">Incidents enregistrés</p>
+                <p class="row-sub">Transmettre le diagnostic à votre responsable</p>
+              </ion-label>
+              <ion-note slot="end" class="row-value srow-alert">{{ errorsLogged }}</ion-note>
+              <ion-icon slot="end" :icon="chevronForwardOutline" class="row-chevron" aria-hidden="true"></ion-icon>
+            </ion-item>
+          </ion-list>
+
+          <!-- Offline queue -->
+          <p v-if="pendingCount || failedPointages" class="section-title">Hors ligne</p>
+          <ion-list v-if="pendingCount || failedPointages" class="grouped-list" lines="full">
+            <ion-item v-if="pendingCount" class="grouped-row">
+              <ion-label class="ion-text-wrap">
+                <p class="row-label">File d'attente pointage</p>
+                <p class="row-sub">Pointages en attente d'envoi</p>
+              </ion-label>
+              <ion-note slot="end" class="row-value">{{ pendingCount }}</ion-note>
+            </ion-item>
+            <ion-item v-if="failedPointages" class="grouped-row">
+              <ion-label class="ion-text-wrap">
+                <p class="row-label">Pointages refusés</p>
+                <p class="row-sub">Non enregistrés par le serveur</p>
+              </ion-label>
+              <ion-note slot="end" class="row-value srow-alert">{{ failedPointages }}</ion-note>
+            </ion-item>
+          </ion-list>
+
+          <!-- Logout -->
+          <div class="logout-wrap">
+            <ion-button class="logout-btn" expand="block" fill="clear" color="danger" @click="logout">
+              <ion-icon slot="start" :icon="logOutOutline"></ion-icon>
+              Se déconnecter
             </ion-button>
           </div>
-        </ion-content>
-      </ion-modal>
+
+          <p v-if="appVersion" class="app-version">Ocleaneo Mobile · v{{ appVersion }}</p>
+        </template>
+      </div>
     </ion-content>
   </ion-page>
 </template>
 
 <style scoped>
-.profile-header {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px 16px 16px;
+.profile-page {
+  padding: 0 16px calc(24px + env(safe-area-inset-bottom));
 }
 
-.profile-help {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(8px + env(safe-area-inset-top)) 0 10px;
+}
+
+.profile-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.settings-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  display: grid;
+  place-items: center;
+}
+
+.settings-btn ion-icon {
+  font-size: 22px;
+}
+
+.identity-card {
+  background: var(--surface-2);
+  border-radius: 24px;
+  padding: 24px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.avatar-wrap {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  margin: 0 auto 14px;
 }
 
 .profile-avatar {
-  width: 64px;
-  height: 64px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   background: var(--accent-bg);
   color: var(--accent-text);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  font-weight: 500;
-  margin-bottom: 10px;
+  font-size: 36px;
+  font-weight: 600;
+  border: 4px solid var(--surface-2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.avatar-status {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 3px solid var(--surface-2);
+  display: grid;
+  place-items: center;
+}
+
+.avatar-status ion-icon {
+  font-size: 14px;
 }
 
 .profile-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.profile-role {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+.company-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.company-pill ion-icon {
+  font-size: 14px;
+}
+
+
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  margin: 24px 0 8px 6px;
+  padding: 0;
+}
+
+.grouped-list {
+  --ion-item-background: var(--surface-2);
+  background: var(--surface-2);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 12px;
+}
+
+.grouped-row {
+  --background: transparent;
+  --border-color: var(--border);
+  --padding-start: 14px;
+  --inner-padding-end: 14px;
+  --min-height: 52px;
+}
+
+.row-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-1);
+  color: var(--accent);
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.row-icon ion-icon {
+  font-size: 18px;
+}
+
+.row-label {
   font-size: 16px;
   font-weight: 500;
   margin: 0;
+  color: var(--text-primary);
 }
 
-.settings-list {
-  --ion-item-background: transparent;
-  background: transparent;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.settings-row {
-  --background: var(--surface-1);
-  --border-color: var(--border);
-  --padding-start: 18px;
-  --inner-padding-end: 18px;
-}
-
-.srow-label {
-  font-size: 13px;
-  margin: 0;
-}
-
-.srow-sub {
-  font-size: 11px;
+.row-sub {
+  font-size: 12px;
   color: var(--text-secondary);
   margin: 2px 0 0;
 }
 
-.srow-value {
-  font-size: 13px;
+.row-value {
+  font-size: 15px;
   color: var(--text-secondary);
+  margin-right: 4px;
 }
 
-/* Les pointages refusés portent une couleur d'alerte : le compteur voisin
-   (file d'attente) est une information neutre, celui-ci demande une action.
-   Les deux tokens sont redéfinis en thème sombre, donc pas de #hex ici. */
+.row-chevron {
+  font-size: 18px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
 .srow-alert {
   color: var(--danger);
   font-weight: 600;
 }
 
-/* ion-toggle : le comportement (piste, poignée, animation, disabled,
-   `prefers-reduced-motion`) vient d'Ionic — seule la couleur suit la palette
-   Ocleaneo au lieu du bleu par défaut. */
 .app-toggle {
   --track-background: var(--border-strong);
   --track-background-checked: var(--accent);
@@ -550,122 +482,27 @@ async function submitPasswordChange() {
   flex-shrink: 0;
 }
 
-.menu {
-  padding: 0 16px;
-  background: transparent;
+.logout-wrap {
+  margin-top: 16px;
+  background: var(--surface-2);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.menu-item {
-  --background: transparent;
+.logout-btn {
   --color: var(--danger);
-  --padding-start: 4px;
-  --inner-padding-end: 4px;
-  border-radius: 10px;
-  font-size: 14px;
-}
-
-.menu-item ion-icon {
-  color: var(--danger);
+  font-weight: 600;
+  font-size: 15px;
+  text-transform: none;
+  margin: 0;
+  min-height: 52px;
 }
 
 .app-version {
   text-align: center;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 12px;
   margin: 20px 0 0;
-}
-
-.server-url-field {
-  padding: 12px 0;
-}
-
-.server-url-field ion-input {
-  --background: var(--surface-1);
-  --border-color: var(--border);
-  --border-radius: 10px;
-  --color: var(--text-primary);
-  --padding-start: 12px;
-  --padding-end: 12px;
-  font-size: 13px;
-}
-
-.server-url-field .srow-sub {
-  margin: 6px 0 0;
-}
-
-.server-url-error {
-  color: var(--danger);
-  font-size: 11px;
-  margin: 6px 0 0;
-}
-
-.server-url-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.server-url-save {
-  --border-radius: 10px;
-  --background: var(--accent);
-  --color: var(--on-accent);
-  --box-shadow: none;
-  font-weight: 500;
-  font-size: 13px;
-  text-transform: none;
-  margin: 0;
-}
-
-.server-url-reset {
-  --color: var(--text-secondary);
-  font-size: 12px;
-  text-decoration: underline;
-  margin: 0;
-}
-
-.password-form {
-  background: transparent;
-  margin-bottom: 12px;
-}
-
-.password-form ion-item {
-  --background: var(--surface-1);
-  --border-color: var(--border);
-  --padding-start: 12px;
-  --inner-padding-end: 12px;
-  border-radius: 10px;
-  margin-bottom: 10px;
-}
-
-.password-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.password-save {
-  --border-radius: 10px;
-  --background: var(--accent);
-  --color: var(--on-accent);
-  --box-shadow: none;
-  font-weight: 500;
-  font-size: 14px;
-  text-transform: none;
-  margin: 0;
-}
-
-.password-cancel {
-  --color: var(--text-secondary);
-  font-size: 13px;
-  text-transform: none;
-  margin: 0;
-}
-
-.password-error {
-  color: var(--danger);
-  font-size: 12px;
-  margin: 8px 4px 0;
 }
 </style>
