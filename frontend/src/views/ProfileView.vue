@@ -143,7 +143,7 @@ function openPasswordModal() {
             Entretien Mâconnais
           </div>
         </section>
-        <!-- Agent card hidden until future AI assistant feature (see issue)
+        <!-- Agent card hidden until future AI assistant feature (see issue #99) -->
 
         <!-- Preferences -->
         <template v-if="!loading">
@@ -435,100 +435,7 @@ function openPasswordModal() {
   font-size: 14px;
 }
 
-.agent-card {
-  background: var(--accent);
-  color: var(--on-accent);
-  border-radius: 24px;
-  padding: 22px;
-  margin-bottom: 16px;
-  position: relative;
-  overflow: hidden;
-}
 
-.agent-card::before,
-.agent-card::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.agent-card::before {
-  top: -40px;
-  right: -40px;
-  width: 140px;
-  height: 140px;
-}
-
-.agent-card::after {
-  bottom: -50px;
-  left: -30px;
-  width: 120px;
-  height: 120px;
-}
-
-.agent-top {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
-  position: relative;
-  z-index: 1;
-}
-
-.agent-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.agent-avatar ion-icon {
-  font-size: 28px;
-}
-
-.agent-text h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.agent-text p {
-  margin: 4px 0 0;
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-.agent-actions {
-  display: flex;
-  gap: 10px;
-  position: relative;
-  z-index: 1;
-}
-
-.agent-actions ion-button {
-  flex: 1;
-  --border-radius: 12px;
-  --box-shadow: none;
-  font-weight: 600;
-  font-size: 14px;
-  text-transform: none;
-  margin: 0;
-  min-height: 44px;
-}
-
-.agent-primary {
-  --background: var(--on-accent);
-  --color: var(--accent);
-}
-
-.agent-secondary {
-  --background: rgba(255, 255, 255, 0.12);
-  --color: var(--on-accent);
-}
 
 .section-title {
   font-size: 13px;
