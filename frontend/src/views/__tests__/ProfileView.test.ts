@@ -26,6 +26,7 @@ vi.mock('../../services/biometric', () => ({
 vi.mock('../../services/notifications', () => ({
   areNotificationsEnabled: vi.fn(() => Promise.resolve(true)),
   setNotificationsEnabled: vi.fn(() => Promise.resolve()),
+  cancelAllNotifications: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../services/offlineQueue', () => ({
