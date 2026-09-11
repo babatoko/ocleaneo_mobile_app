@@ -159,6 +159,38 @@ export interface DateRange {
 export interface LoginResult {
   token: string;
   employee: Employee;
+  /** Feature flags résolus pour cet utilisateur (peut manquer sur les
+   *  backends qui ne les exposent pas encore — l'app reste alors sans
+   *  écran piloté par flag). */
+  modules?: MobileModuleFlag[];
+}
+
+/** Feature flag renvoyé par le backend (login + /auth/me) — forme du contrat
+ *  `mobile.module.config.to_mobile_dict()` côté Odoo. Ne jamais élargir ce
+ *  type avec des champs de ciblage : ils sont résolus serveur, l'app ne voit
+ *  que les flags qui la concernent. */
+export interface MobileModuleFlag {
+  technical_name: string;
+  label: string;
+  icon: string;
+  route_path: string | null;
+  is_active: boolean;
+  requires_role: string;
+  phase: string;
+  offline_capable: boolean;
+  settings: string;
+}
+
+/** Résultat du commissionnement d'un tag NFC (endpoint /tags/commission). */
+export interface CommissionTagResult {
+  id: number;
+  /** Numéro du tag à marquer sur la pastille (ex. NFC00042). */
+  name: string;
+  uid: string;
+  state: string;
+  /** true : le badge était déjà dans le registre — rien n'a été créé. */
+  existing: boolean;
+  company_id: number;
 }
 
 export interface CreateTimeEntryPayload {

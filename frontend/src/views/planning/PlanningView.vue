@@ -31,10 +31,11 @@ import {
   locationOutline,
   mapOutline,
   navigateOutline,
+  scanCircleOutline,
   sparklesOutline,
   timeOutline,
 } from 'ionicons/icons';
-import { useAuthStore } from '../../stores/auth';
+import { useAuthStore, isModuleActive } from '../../stores/auth';
 import { usePlanningStore } from '../../stores/planning';
 import { getCurrentPosition, getOptimizedTrip, type OptimizedTrip, type TripPoint } from '../../services/osrm';
 import { cacheTrip, readCachedTrip } from '../../services/tripCache';
@@ -150,6 +151,12 @@ const selectedDateLabel = computed(() =>
     day: 'numeric',
     month: 'long',
   })
+);
+
+// Feature flag : carte « Commissionner un tag » visible seulement si le
+// backend a résolu ce flag pour cet utilisateur (actif + ciblage OK).
+const showTagCommissioning = computed(() =>
+  isModuleActive(auth.modules, 'ocleaneo_tag_commissioning'),
 );
 
 const initials = computed(() =>
@@ -696,6 +703,26 @@ onUnmounted(() => {
     <ion-segment-button value="tournee" @click="selectTab('tournee')"><ion-label>Tournée</ion-label></ion-segment-button>
   </ion-segment>
 
+  <!-- Feature flag ocleaneo_tag_commissioning : la carte n'existe pas
+       pour l'agent si le flag est inactif ou hors ciblage (masquage
+       complet, jamais grisée). Le backend reste le verrou réel. -->
+  <button
+    v-if="showTagCommissioning"
+    type="button"
+    class="feature-card"
+    aria-label="Commissionner un tag NFC"
+    @click="router.push('/tag-commissioning')"
+  >
+    <span class="feature-ico" aria-hidden="true">
+      <ion-icon :icon="scanCircleOutline"></ion-icon>
+    </span>
+    <span class="feature-tx">
+      <span class="feature-t">Commissionner un tag</span>
+      <span class="feature-d">Enregistrer une nouvelle pastille NFC</span>
+    </span>
+    <ion-icon class="feature-chev" :icon="chevronForwardOutline" aria-hidden="true"></ion-icon>
+  </button>
+
   <p v-if="exportError" class="export-error"><ion-icon :icon="alertCircleOutline"></ion-icon> {{ exportError }}</p>
   <p v-if="exportSuccess" class="export-success"><ion-icon :icon="checkmarkCircleOutline"></ion-icon> {{ exportSuccess }}</p>
 
@@ -896,6 +923,56 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Carte feature (flag-gated) — accent plein, seule de son genre sur
+   l'écran pour être repérée immédiatement. */
+.feature-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: calc(100% - 36px);
+  margin: 10px 18px 0;
+  background: var(--accent-bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 13px 14px;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(38, 37, 31, 0.05);
+}
+.feature-ico {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(8, 80, 65, 0.15);
+}
+.feature-tx {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.feature-t {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+.feature-d {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.feature-chev {
+  color: var(--accent);
+  flex: none;
+}
+
 .view-toggle.four .opt {
   font-size: 11px;
   padding: 7px 0;

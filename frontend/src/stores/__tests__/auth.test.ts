@@ -126,12 +126,15 @@ describe('store d’authentification', () => {
 
   it('charge l’employé quand un jeton est présent', async () => {
     stored = 'jeton-valide';
-    provider.fetchMe.mockResolvedValue(employee);
+    // Le contrat fetchMe retourne désormais { employee, modules? } depuis
+    // l'ajout des feature flags (modules optionnel : l'employé seul suffit).
+    provider.fetchMe.mockResolvedValue({ employee });
     const auth = await store();
 
     await auth.fetchMe();
 
     expect(auth.employee).toEqual(employee);
+    expect(auth.modules).toEqual([]);
   });
 
   it('laisse remonter l’échec de fetchMe sans toucher au jeton', async () => {
