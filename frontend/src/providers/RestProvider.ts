@@ -2,6 +2,7 @@ import { DEFAULT_BASE_URL, getApiBaseUrl, initApiBaseUrl, restClient, setApiBase
 import { DataProvider, ProviderError, ProviderNetworkError, ProviderUnsupportedError } from './DataProvider';
 import type {
   Chantier,
+  CommissionTagResult,
   CreateOrderPayload,
   CreateOrderResult,
   CreateTimeEntryPayload,
@@ -70,13 +71,22 @@ export class RestProvider extends DataProvider {
     }
   }
 
-  async fetchMe(): Promise<Employee> {
+  async fetchMe(): Promise<{ employee: Employee }> {
     try {
       const { data } = await restClient.get<Employee>('/auth/me');
-      return data;
+      // Ce backend REST historique n'expose pas les flags : modules reste
+      // vide (aucun écran piloté par flag), l'app fonctionne comme avant.
+      return { employee: data };
     } catch (e) {
       throw normalizeError(e);
     }
+  }
+
+  async commissionTag(_uid: string): Promise<CommissionTagResult> {
+    throw new ProviderUnsupportedError(
+      'Le commissionnement de tags n\'est pas disponible avec ce serveur.',
+      'commissionTag',
+    );
   }
 
   async fetchChantiers(): Promise<Chantier[]> {

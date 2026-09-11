@@ -21,6 +21,7 @@ const routes = [
   { path: '/pointage', name: 'pointage', component: () => import('../views/pointage/PointageView.vue') },
   { path: '/pointage/historique', name: 'pointage-historique', component: () => import('../views/pointage/PointageHistoryView.vue') },
   { path: '/pointage/compte-rendu', name: 'pointage-compte-rendu', component: () => import('../views/pointage/CompteRenduView.vue') },
+  { path: '/tag-commissioning', name: 'tag-commissioning', component: () => import('../views/tag/TagCommissioningView.vue') },
 
   { path: '/commande/catalogue', name: 'commande-catalogue', component: () => import('../views/commande/CatalogueView.vue') },
   { path: '/commande/panier', name: 'commande-panier', component: () => import('../views/commande/PanierView.vue') },

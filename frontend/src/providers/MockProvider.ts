@@ -7,6 +7,7 @@ function normalizeNfcId(value: string): string {
 }
 import type {
   Chantier,
+  CommissionTagResult,
   CreateOrderPayload,
   CreateOrderResult,
   CreateTimeEntryPayload,
@@ -15,6 +16,7 @@ import type {
   Employee,
   InventoryLatest,
   LoginResult,
+  MobileModuleFlag,
   Order,
   Product,
   Shift,
@@ -25,6 +27,25 @@ import type {
 } from '../types/models';
 
 const employee: Employee = { id: 1, name: 'Sophie Martin' };
+
+/** Flags de démo : commissionnement actif, pour exercer l'écran. */
+const mockModules: MobileModuleFlag[] = [
+  {
+    technical_name: 'ocleaneo_tag_commissioning',
+    label: 'Commissionner un tag',
+    icon: 'nfc',
+    route_path: '/tag-commissioning',
+    is_active: true,
+    requires_role: 'all',
+    phase: 'mvp',
+    offline_capable: false,
+    settings: '{}',
+  },
+];
+
+/** Registre de démo : uid normalisé -> numéro de tag. */
+const mockTags = new Map<string, string>();
+let mockTagSeq = 0;
 
 const chantiers: Chantier[] = [
   {
@@ -311,12 +332,28 @@ let nextOrderId = orders.length + 1;
 export class MockProvider extends DataProvider {
   async login(username: string): Promise<LoginResult> {
     await delay();
-    return { token: 'mock-token', employee: { ...employee, name: username || employee.name } };
+    return { token: 'mock-token', employee: { ...employee, name: username || employee.name }, modules: mockModules };
   }
 
-  async fetchMe(): Promise<Employee> {
+  async fetchMe(): Promise<{ employee: Employee; modules: MobileModuleFlag[] }> {
     await delay();
-    return employee;
+    return { employee, modules: mockModules };
+  }
+
+  async commissionTag(uid: string): Promise<CommissionTagResult> {
+    await delay();
+    // Démo : un même badge scanne deux fois renvoie le même tag (existing).
+    if (!mockTags.has(normalizeNfcId(uid))) {
+      mockTags.set(normalizeNfcId(uid), `NFC${String(++mockTagSeq).padStart(5, '0')}`);
+    }
+    return {
+      id: mockTags.size,
+      name: mockTags.get(normalizeNfcId(uid)) as string,
+      uid,
+      state: 'draft',
+      existing: mockTags.size > mockTagSeq,
+      company_id: 1,
+    };
   }
 
   async fetchChantiers(): Promise<Chantier[]> {

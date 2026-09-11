@@ -1,6 +1,7 @@
 import type {
   Chantier,
   CompteRenduPayload,
+  CommissionTagResult,
   CreateOrderPayload,
   CreateOrderResult,
   CreateTimeEntryPayload,
@@ -9,6 +10,7 @@ import type {
   Employee,
   InventoryLatest,
   LoginResult,
+  MobileModuleFlag,
   Order,
   Product,
   Shift,
@@ -97,9 +99,21 @@ export abstract class DataProvider {
     throw notImplemented('changePassword');
   }
 
-  /** L'employé connecté. */
-  async fetchMe(): Promise<Employee> {
+  /** L'employé connecté, avec les flags de fonctionnalités résolus. */
+  async fetchMe(): Promise<{ employee: Employee; modules?: MobileModuleFlag[] }> {
     throw notImplemented('fetchMe');
+  }
+
+  // --- Feature flags ---------------------------------------------------------
+
+  /**
+   * Enregistre une pastille NFC scannée (endpoint /tags/commission).
+   * Idempotent côté serveur : re-scan d'un badge connu -> existing=true,
+   * aucune écriture. Le numéro à marquer sur la pastille est retourné par
+   * le serveur — jamais généré localement (pas de file offline ici).
+   */
+  async commissionTag(_uid: string): Promise<CommissionTagResult> {
+    throw notImplemented('commissionTag');
   }
 
   // --- Chantiers -----------------------------------------------------------

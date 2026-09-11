@@ -8,11 +8,13 @@ import type { ProviderFeature } from './DataProvider';
 import type {
   Chantier,
   CompteRenduPayload,
+  CommissionTagResult,
   CreateTimeEntryPayload,
   CreateTimeEntryWithTagPayload,
   DateRange,
   Employee,
   LoginResult,
+  MobileModuleFlag,
   PointageStatus,
   Shift,
   ShiftActivity,
@@ -81,6 +83,7 @@ export class OdooProvider extends DataProvider {
     return {
       token: data.token,
       employee: employeeFromLogin(data),
+      modules: (data.modules || []).map(moduleFlagFromOdoo),
     };
   }
 
@@ -88,9 +91,21 @@ export class OdooProvider extends DataProvider {
     await callMobile('/auth/change-password', { current_password: currentPassword, new_password: newPassword });
   }
 
-  async fetchMe(): Promise<Employee> {
+  async fetchMe(): Promise<{ employee: Employee; modules: MobileModuleFlag[] }> {
     const data = await callMobile<OdooMeResult>('/auth/me');
-    return { id: data.employee_id || 0, name: data.employee_name || data.user_name };
+    // Ancien backend (sans flags) : modules absent -> liste vide, l'écran
+    // piloté par flag reste masqué. Comportement conservateur assumé.
+    return {
+      employee: { id: data.employee_id || 0, name: data.employee_name || data.user_name },
+      modules: (data.modules || []).map(moduleFlagFromOdoo),
+    };
+  }
+
+  async commissionTag(uid: string): Promise<CommissionTagResult> {
+    // L'UID part brut, exactement comme le plugin l'a lu : la normalisation
+    // (casse, séparateurs) est un détail serveur (canonical_nfc_uid), pas un
+    // contrat client à maintenir.
+    return callMobile<CommissionTagResult>('/tags/commission', { uid });
   }
 
   async fetchChantiers(): Promise<Chantier[]> {
@@ -219,6 +234,22 @@ interface OdooLoginResult {
   user_name: string;
   employee_id: number | false;
   employee_name: string | false;
+  /** Feature flags résolus pour cet utilisateur (mobile.module.config). */
+  modules?: OdooModuleFlag[];
+}
+
+/** Forme brute de `mobile.module.config.to_mobile_dict()` — même contrat que
+ *  le type MobileModuleFlag de l'app, en snake_case Odoo. */
+interface OdooModuleFlag {
+  technical_name: string;
+  label: string;
+  icon: string;
+  route_path: string | false;
+  is_active: boolean;
+  requires_role: string;
+  phase: string;
+  offline_capable: boolean;
+  settings: string;
 }
 
 interface OdooMeResult {
@@ -226,6 +257,22 @@ interface OdooMeResult {
   user_name: string;
   employee_id: number | false;
   employee_name: string | false;
+  /** Présent depuis l'ajout des feature flags (même payload que le login). */
+  modules?: OdooModuleFlag[];
+}
+
+function moduleFlagFromOdoo(f: OdooModuleFlag): MobileModuleFlag {
+  return {
+    technical_name: f.technical_name,
+    label: f.label,
+    icon: f.icon,
+    route_path: f.route_path || null,
+    is_active: f.is_active,
+    requires_role: f.requires_role,
+    phase: f.phase,
+    offline_capable: f.offline_capable,
+    settings: f.settings,
+  };
 }
 
 interface OdooChantierOrder {
