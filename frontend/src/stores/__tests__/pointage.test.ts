@@ -71,7 +71,7 @@ vi.mock('../../services/errorLog', () => ({
 }));
 
 const { provider } = await import('../../providers');
-const { ProviderNetworkError } = await import('../../providers/DataProvider');
+const { ProviderError, ProviderNetworkError } = await import('../../providers/DataProvider');
 const { usePointageStore } = await import('../pointage');
 const { useChantiersStore } = await import('../chantiers');
 const { usePlanningStore } = await import('../planning');
@@ -326,6 +326,24 @@ describe('commentaire — conservé même quand le badge NFC part en file hors l
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect(vi.mocked(enqueue).mock.calls[0][0]).toMatchObject({ comment: 'Client absent' });
     expect(pointage.pendingComment).toBe('');
+  });
+});
+
+describe('clockWithTag — badge connu mais pas encore activé (403)', () => {
+  // Gamma Therm, 8 sept : le tag existait dans le registre (créé une minute
+  // avant le scan) mais restait en draft — /pointage/with-tag répond 403
+  // "badge non actif". Avant ce correctif, ce 403 tombait dans le message
+  // générique 404 « Badge non reconnu », poussant le responsable à
+  // re-commissionner une pastille déjà scannée au lieu de l'activer.
+  it("affiche « pas encore activé » sans mettre en file ni marquer l'arrivée", async () => {
+    const pointage = usePointageStore();
+    createTimeEntryWithTag.mockRejectedValueOnce(new ProviderError('badge non actif', 403));
+
+    await pointage.clockWithTag('04AAC1C8780000');
+
+    expect(pointage.scanError).toBe('Badge pas encore activé. Contactez votre responsable.');
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(createTimeEntryWithTag).toHaveBeenCalledTimes(1);
   });
 });
 

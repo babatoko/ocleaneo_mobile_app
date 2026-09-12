@@ -461,6 +461,20 @@ export const usePointageStore = defineStore('pointage', {
           hapticError();
           return;
         }
+        // Un badge du registre mais pas encore activé (403 "badge non
+        // actif", retourné par /pointage/with-tag) est un cas distinct :
+        // le libellé 404 « non reconnu » pousserait le responsable à
+        // re-commissionner une pastille déjà scannée au lieu de
+        // simplement l'activer dans le registre NFC.
+        if (e instanceof ProviderError && e.status === 403) {
+          void recordError(
+            `UID scanné (brut): "${uid}" (format Odoo: "${formatNfcIdWithColons(uid)}")`,
+            'pointage.clockWithTag: badge non actif',
+          );
+          this.scanError = 'Badge pas encore activé. Contactez votre responsable.';
+          hapticError();
+          return;
+        }
         // Network / retryable errors go to the offline queue.
         if (e instanceof ProviderNetworkError) {
           await enqueue({
