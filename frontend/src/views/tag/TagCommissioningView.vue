@@ -23,6 +23,7 @@ import { Capacitor } from '@capacitor/core';
 import { isNfcEnabled, isNfcSupported, openNfcSettings, startIosNfcSession } from '../../services/nfc';
 import { hapticSuccess } from '../../services/haptics';
 import { recordError } from '../../services/errorLog';
+import { normalizeNfcId } from '../../utils/nfc';
 
 /**
  * Commissionner un tag NFC : scan d'une pastille vierge, enregistrement dans
@@ -84,7 +85,7 @@ function onTagRead(data: unknown): void {
   const uid = (data as { string?: () => { tagInfo?: { uid?: string } } } | undefined)
     ?.string?.()?.tagInfo?.uid;
   if (!uid) return;
-  void commission(uid.replace(/:/g, '').trim());
+  void commission(normalizeNfcId(uid));
 }
 
 async function scanNow(): Promise<void> {

@@ -103,7 +103,9 @@ describe('TagCommissioningView', () => {
     const cb = nfcMocks.onRead.mock.calls[0][0] as (d: unknown) => void;
     cb({ string: () => ({ tagInfo: { uid: '04:5A:3B:82:F1:6C:80' } }) });
     await flushPromises();
-    expect(provider.commissionTag).toHaveBeenCalledWith('045A3B82F16C80');
+    // normalizeNfcId (utils/nfc.ts) canonise en hex minuscules — même règle
+    // que canonical_nfc_uid côté registre Odoo (F03, audit 13/09).
+    expect(provider.commissionTag).toHaveBeenCalledWith('045a3b82f16c80');
     expect(wrapper.html()).toContain('NFC00042');
     expect(wrapper.html()).toContain('Commissionner une autre pastille');
   });

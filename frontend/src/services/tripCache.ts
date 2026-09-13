@@ -38,6 +38,33 @@ export async function cacheTrip<T extends TripPoint>(
   trip: OptimizedTrip<T>,
 ): Promise<void> {
   await Preferences.set({ key: cacheKey(dateIso, points), value: JSON.stringify(trip) }).catch(() => {});
+  // F02 (audit 13/09) : une clé par jour+signature, jamais purgée avant la
+  // fermeture de session — croissance non bornée sur un appareil qui reste
+  // connecté. On profite de chaque écriture pour évacuer les itinéraires de
+  // plus de 7 jours : un trajet d'il y a une semaine ne resservira jamais
+  // (la signature d'hier ne matche déjà plus le planning du jour).
+  await evictStaleTrips().catch(() => {});
+}
+
+/** Retire les itinéraires en cache dont le jour date de plus de
+ *  MAX_TRIP_AGE_DAYS. Best effort : toute erreur de stockage est avalée —
+ *  ce nettoyage ne doit jamais casser l'affichage de la Tournée. */
+const MAX_TRIP_AGE_DAYS = 7;
+
+export async function evictStaleTrips(): Promise<void> {
+  const { keys } = await Preferences.keys();
+  const stale: string[] = [];
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - MAX_TRIP_AGE_DAYS);
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+  for (const key of keys) {
+    if (!key.startsWith(CACHE_KEY_PREFIX)) continue;
+    // Clé « ocleaneo_trip_YYYY-MM-JJ_signature » — le préfixe ISO du jour
+    // se compare directement comme chaîne (lexicographique = chronologique).
+    const day = key.slice(CACHE_KEY_PREFIX.length, CACHE_KEY_PREFIX.length + 10);
+    if (day && day < cutoffIso) stale.push(key);
+  }
+  await Promise.all(stale.map((key) => Preferences.remove({ key }).catch(() => {})));
 }
 
 export async function readCachedTrip<T extends TripPoint>(

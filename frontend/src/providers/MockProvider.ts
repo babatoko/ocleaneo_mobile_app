@@ -1,10 +1,8 @@
 import { DataProvider, ProviderUnsupportedError } from './DataProvider';
 import { addDaysIso, todayIso } from '../utils/date';
 import { startOfWeekIso } from '../utils/week';
+import { normalizeNfcId } from '../utils/nfc';
 
-function normalizeNfcId(value: string): string {
-  return value.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
-}
 import type {
   Chantier,
   CommissionTagResult,
