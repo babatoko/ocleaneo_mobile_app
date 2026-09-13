@@ -38,7 +38,7 @@ class CommissioningBase(TransactionCase):
             "user_id": self.agent_user.id,
             "company_id": self.company.id,
         })
-        post_init_hook(self.env)
+        post_init_hook(self.env.cr, None)
         self.Config = self.env["mobile.module.config"].sudo()
         self.flag = self.Config.search([
             ("technical_name", "=", "ocleaneo_tag_commissioning"),
@@ -61,7 +61,7 @@ class TestFlagFromHook(CommissioningBase):
 
     def test_hook_is_idempotent(self):
         before = self.flag.read(["is_active", "route_path"])[0]
-        post_init_hook(self.env)
+        post_init_hook(self.env.cr, None)
         flags = self.Config.search([
             ("technical_name", "=", "ocleaneo_tag_commissioning"),
             ("company_id", "=", self.company.id),
