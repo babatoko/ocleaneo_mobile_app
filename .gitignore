@@ -26,3 +26,4 @@ odoo/addons/**/__pycache__/
 odoo/addons/**/*.pyc
 odoo/addons/**/*.pyo
 odoo/addons/**/.pytest_cache/
+__pycache__/

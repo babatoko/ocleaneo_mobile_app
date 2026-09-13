@@ -11,6 +11,7 @@ badgé now does to its own order's stage (ocleaneo#11).
 
 import json
 from datetime import timedelta
+from unittest.mock import patch
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import mobile_routes
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_time import local_day_bounds_utc, today_local
@@ -119,12 +120,20 @@ class TestMobilePlanningApi(MobilePlanningCommon, HttpCase):
     def test_location_exposes_nfc_tag_id(self):
         """ocleaneo#13 : le scan NFC ne doit pas dépendre uniquement de
         /chantiers/aujourdhui (plafonné à 50, non filtré par date) — /planning
-        doit porter le même identifiant de badge que sa vacation du jour."""
+        doit porter le même identifiant de badge que sa vacation du jour.
+
+        fsm.location n'a plus de champ nfc_tag_id en propre depuis #72 :
+        get_nfc_tag_uid_for_mobile() est la seule source, résolue par
+        ocleaneo_nfc_tag_registry — un module que ocleaneo_mobile_api_planning
+        ne dépend délibérément pas (voir fsm_location.py côté
+        ocleaneo_mobile_pointage), donc pas fiable à installer dans ce test.
+        On vérifie ici uniquement que /planning relaie bien la valeur de
+        cette méthode, sans dépendre de qui la fournit."""
         location, order = self._make_order(self.person)
-        location.nfc_tag_id = "04:17:79:C9:78:00:00"
         order.write({"scheduled_date_start": self.scheduled_start, "scheduled_date_end": self.scheduled_end})
         token = self._login()
 
-        entry = self._order_from_planning(token, order.id)
+        with patch.object(type(location), "get_nfc_tag_uid_for_mobile", return_value="04:17:79:C9:78:00:00"):
+            entry = self._order_from_planning(token, order.id)
 
         self.assertEqual(entry["location"]["nfc_tag_id"], "04:17:79:C9:78:00:00")

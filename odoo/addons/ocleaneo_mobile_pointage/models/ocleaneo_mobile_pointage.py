@@ -102,6 +102,20 @@ class OcleaneoMobilePointage(models.Model):
                 vals["company_id"] = user.company_id.id
         return super(OcleaneoMobilePointage, self).create(vals_list)
 
+    def write(self, vals):
+        res = super(OcleaneoMobilePointage, self).write(vals)
+        if "hr_attendance_id" in vals and vals["hr_attendance_id"]:
+            # hr.attendance's own create()/write() only re-run the reverse
+            # sync (see HrAttendance) at the moment check_out is set — if the
+            # attendance was already closed *before* this arrival got linked
+            # to it (e.g. a backoffice import creating both check_in and
+            # check_out at once, then linking the mobile arrival after the
+            # fact), that sync ran too early and found no arrival to anchor
+            # on. Linking the other way round must not leave the departure
+            # mirror permanently missing just because of ordering.
+            self.hr_attendance_id._ocleaneo_sync_departure_pointage()
+        return res
+
     def action_valider(self):
         self.write({"state": "valide"})
 

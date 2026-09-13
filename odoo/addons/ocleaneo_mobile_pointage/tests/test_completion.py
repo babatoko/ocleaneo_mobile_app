@@ -60,7 +60,7 @@ class TestFsmOrderCompletion(MobileRpcMixin, MobilePointageCommon, HttpCase):
         stage_before = self.order.stage_id
         self._clock(token, "depart", "2026-03-10T08:05:00")
 
-        self.order.invalidate_cache()
+        self.order.refresh()
         self.assertEqual(self.order.completion_state, "not_done")
         self.assertEqual(self.order.stage_id, stage_before)
         self.assertFalse(self.order.stage_id.is_closed)
@@ -72,7 +72,7 @@ class TestFsmOrderCompletion(MobileRpcMixin, MobilePointageCommon, HttpCase):
         stage_before = self.order.stage_id
         self._clock(token, "depart", "2026-03-10T09:00:00")
 
-        self.order.invalidate_cache()
+        self.order.refresh()
         self.assertEqual(self.order.completion_state, "partial")
         self.assertAlmostEqual(self.order.completion_ratio, 0.5, places=2)
         self.assertEqual(
@@ -98,7 +98,7 @@ class TestFsmOrderCompletion(MobileRpcMixin, MobilePointageCommon, HttpCase):
         self._clock(token, "arrivee", "2026-03-10T08:00:00")
         self._clock(token, "depart", "2026-03-10T09:54:00")
 
-        self.order.invalidate_cache()
+        self.order.refresh()
         self.assertEqual(self.order.completion_state, "done")
         self.assertTrue(self.order.stage_id.is_closed)
 
@@ -110,6 +110,6 @@ class TestFsmOrderCompletion(MobileRpcMixin, MobilePointageCommon, HttpCase):
         self._clock(token, "arrivee", "2026-03-10T08:00:00")
         self._clock(token, "depart", "2026-03-10T08:05:00")
 
-        self.order.invalidate_cache()
+        self.order.refresh()
         self.assertEqual(self.order.completion_state, "done")
         self.assertTrue(self.order.stage_id.is_closed)

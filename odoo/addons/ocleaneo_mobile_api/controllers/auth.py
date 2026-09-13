@@ -1,10 +1,10 @@
 # Copyright 2026 Ocleaneo
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-import logging
-from odoo import http
+from odoo.exceptions import AccessDenied, UserError
 from odoo.http import request
-from odoo.exceptions import AccessDenied
+from odoo import http
+import logging
 
 from odoo.addons.ocleaneo_mobile_api.tools.mobile_auth import (
     API_VERSION,
@@ -176,6 +176,52 @@ class MobileAuthController(http.Controller):
         employee.invalidate_mobile_api_token()
         return {"status": "ok"}
 
+    @http.route(mobile_routes("auth/change-password"), type="json", auth="none", methods=["POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
+    def change_password(self, current_password=None, new_password=None, **kwargs):
+        """Allow a mobile user to change their own Odoo password.
+
+        Requires the current password so that a stolen phone alone (with a
+        valid mobile token) cannot silently change the user's credentials.
+        After a successful change, the mobile API token is invalidated so the
+        app has to log back in with the new password.
+        """
+        user, employee = authenticate_mobile_request()
+        if not user:
+            return {"error": "unauthorized", "code": 401}
+
+        current_password = kwargs.get("current_password", current_password)
+        new_password = kwargs.get("new_password", new_password)
+        if not current_password or not new_password:
+            return {"error": "current_password and new_password required", "code": 400}
+
+        env = request.env(user=user.id)
+
+        # Verify the current password using Odoo's own credential check.
+        try:
+            env["res.users"].authenticate(request.db, user.login, current_password, {"interactive": False})
+        except AccessDenied:
+            return {"error": "current password is incorrect", "code": 403}
+        except Exception as e:
+            _logger.exception("Mobile change-password credential check error: %s", e)
+            return {"error": "could not verify current password", "code": 500}
+
+        # Let Odoo validate the new password (complexity, history, etc.).
+        try:
+            user.sudo().write({"password": new_password})
+        except UserError as e:
+            _logger.info("Mobile change-password rejected by Odoo: %s", e.name)
+            return {"error": e.name or "password rejected", "code": 400}
+        except Exception as e:
+            _logger.exception("Mobile change-password write error: %s", e)
+            message = getattr(e, "name", str(e)) or "password rejected"
+            return {"error": message, "code": 400}
+
+        # Invalidate the mobile token so the next API call requires re-login.
+        if employee:
+            employee.invalidate_mobile_api_token()
+
+        return {"status": "ok"}
+
     @http.route(mobile_routes("auth/me"), type="json", auth="none", methods=["GET", "POST"], csrf=False, cors=MOBILE_CORS_ORIGIN)
     def auth_me(self, **kwargs):
         """Return current user/employee profile (used by mobile app on cold start)."""
@@ -183,8 +229,9 @@ class MobileAuthController(http.Controller):
         if not user:
             return {"error": "unauthorized", "code": 401}
 
+        env = request.env
         company = user.company_id
-
+        configs = env["mobile.module.config"].sudo().get_modules_for_user(user)
         return {
             "user_id": user.id,
             "user_login": user.login,
@@ -193,4 +240,8 @@ class MobileAuthController(http.Controller):
             "company_name": company.name,
             "employee_id": employee.id if employee else False,
             "employee_name": employee.name if employee else False,
+            # Same resolved list as the login payload: the app refreshes the
+            # feature flags on cold start (flags toggled by the manager are
+            # picked up on next app launch, without re-login).
+            "modules": [c.to_mobile_dict() for c in configs],
         }

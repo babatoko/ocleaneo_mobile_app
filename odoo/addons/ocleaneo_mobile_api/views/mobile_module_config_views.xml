@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Feature flags: one list + one form. Managers (base.group_system) can
+         toggle features per company and target them by groups/employees. -->
+    <record id="view_mobile_module_config_list" model="ir.ui.view">
+        <field name="name">mobile.module.config.list</field>
+        <field name="model">mobile.module.config</field>
+        <field name="arch" type="xml">
+            <tree string="Feature Flags" decoration-muted="not is_active">
+                <field name="sequence" widget="handle"/>
+                <field name="technical_name"/>
+                <field name="label"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="visible_group_ids" widget="many2many_tags"/>
+                <field name="visible_employee_ids" widget="many2many_tags"/>
+                <field name="is_active" widget="boolean_toggle"/>
+                <field name="phase" optional="hide"/>
+                <field name="route_path" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_mobile_module_config_form" model="ir.ui.view">
+        <field name="name">mobile.module.config.form</field>
+        <field name="model">mobile.module.config</field>
+        <field name="arch" type="xml">
+            <form string="Feature Flag">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="label" placeholder="Ex. Commissionner un tag"/></h1>
+                    </div>
+                    <group>
+                        <group name="definition" string="Définition">
+                            <field name="technical_name"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="route_path"/>
+                            <field name="icon"/>
+                            <field name="phase"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group name="activation" string="Activation">
+                            <field name="is_active" widget="boolean_toggle"/>
+                            <field name="offline_capable"/>
+                            <field name="requires_role"/>
+                            <field name="settings"/>
+                        </group>
+                    </group>
+                    <group string="Ciblage — qui voit cette fonctionnalité ?">
+                        <div colspan="2" class="text-muted" style="margin-bottom:4px;">
+                            Aucun groupe ni employé sélectionné : toute la société voit la fonctionnalité.
+                            Dès qu'un groupe ou un employé est ajouté, seuls ceux-là y ont accès
+                            (un groupe OU un employé suffit).
+                        </div>
+                        <field name="visible_group_ids" widget="many2many_tags"
+                               placeholder="Ajouter des groupes…"/>
+                        <field name="visible_employee_ids" widget="many2many_tags"
+                               placeholder="Ajouter des employés…"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_mobile_module_config" model="ir.actions.act_window">
+        <field name="name">Feature Flags</field>
+        <field name="res_model">mobile.module.config</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Aucune fonctionnalité configurable pour l'instant
+            </p>
+            <p>
+                Chaque module de fonctionnalité de l'app mobile crée ici son
+                entrée à l'installation (ex. « Commissionner un tag »).
+                Activez-la par société et ciblez-la par groupes ou employés.
+            </p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_mobile_app_root"
+        name="App Mobile"
+        web_icon="ocleaneo_mobile_api,static/description/icon.png"
+        sequence="77"
+        groups="base.group_system"/>
+
+    <menuitem
+        id="menu_mobile_app_flags"
+        name="Feature Flags"
+        parent="menu_mobile_app_root"
+        action="action_mobile_module_config"
+        sequence="10"/>
+</odoo>

@@ -24,8 +24,11 @@ class ResUsers(models.Model):
         if self.partner_id:
             FsmPerson = self.env["fsm.person"].sudo()
             person = FsmPerson.search([("partner_id", "=", self.partner_id.id)], limit=1)
-            if person and person.employee_id:
-                return person.employee_id
+            if person:
+                # Odoo 14: fsm.person has no employee_id field; use name match.
+                employee = Employee.search([("name", "ilike", person.name)], limit=1)
+                if employee:
+                    return employee
             # Direct link partner -> employee
             employee = Employee.search([("address_home_id", "=", self.partner_id.id)], limit=1)
             if employee:

@@ -60,55 +60,82 @@ class TestManageHrAttendance(MobilePointageCommon):
         self.assertEqual(len(self._open_attendances()), 1)
 
     def test_arrivee_next_day_with_forgotten_checkout_does_not_raise(self):
-        """The blocking bug: an attendance left open on a PREVIOUS day.
-
-        The guard used to reuse the open attendance only when it started on
-        the server's current date. A worker who forgot to clock out the day
-        before therefore fell through to create(), hit hr.attendance's
-        "only one open record" constraint, and could not clock in at all.
+        """A stale open attendance from a previous day must not be merged
+        with today's clocking, and the request must not raise even though a
+        fresh hr.attendance slice cannot actually be opened while the old
+        one stays open: hr.attendance enforces at most one open record per
+        employee, so _create_attendance's own ValidationError-to-warning
+        conversion applies here too (see its docstring — the mirror falling
+        behind is acceptable, failing the request is not). The old
+        attendance is left untouched for hr_attendance_autoclose (or the
+        reverse-sync from a manual edit) to resolve.
         """
         opened = self._manage("arrivee", self.day1_morning)
         # No "depart": the attendance stays open overnight.
         self.assertEqual(len(self._open_attendances()), 1)
 
-        # Must not raise, and must not try to open a second record.
         next_day = self._manage("arrivee", self.day2_morning)
 
-        self.assertEqual(
-            next_day, opened,
-            "should reuse the stale open attendance rather than create a second one",
-        )
+        self.assertEqual(next_day, [])
         self.assertEqual(len(self._open_attendances()), 1)
+        self.assertEqual(self._open_attendances().id, opened[0])
 
-    # --- pause_fin -------------------------------------------------------
+    def test_arrivee_next_day_with_forgotten_checkout_alerts_manager(self):
+        """When a stale attendance from a previous day is detected at clock-in,
+        a mail.activity is scheduled for the employee's manager.
+        """
+        manager = self.env["res.users"].create({
+            "name": "Manager Test",
+            "login": "manager.test@example.com",
+            "email": "manager.test@example.com",
+            # mail.activity refuses to assign a record the user cannot read
+            # (_check_access_assignation) — hr.employee has no ACL at all for
+            # a plain base.group_user (perm_read=0), so a manager alerted
+            # about a subordinate needs hr.group_hr_user too, same as any
+            # real HR officer would have.
+            "groups_id": [(6, 0, [
+                self.env.ref("base.group_user").id,
+                self.env.ref("hr.group_hr_user").id,
+            ])],
+        })
+        manager_employee = self.env["hr.employee"].create({
+            "name": "Manager Test",
+            "user_id": manager.id,
+        })
+        self.employee.parent_id = manager_employee
 
-    def test_pause_fin_after_pause_debut_opens_new_attendance(self):
-        """Normal flow: pause_debut closed the record, pause_fin reopens."""
+        self._manage("arrivee", self.day1_morning)
+        self._manage("arrivee", self.day2_morning)
+
+        activity = self.env["mail.activity"].search([
+            ("res_model", "=", "hr.employee"),
+            ("res_id", "=", self.employee.id),
+            ("user_id", "=", manager.id),
+        ])
+        self.assertTrue(activity)
+        self.assertEqual(activity.summary, "Présence non clôturée — détectée au pointage mobile")
+
+    def test_arrivee_after_pause_debut_without_pause_fin_starts_new_slice(self):
+        """An arrival following pause_debut (without pause_fin) implicitly
+        ends the pause and opens a new attendance slice.
+        """
         self._manage("arrivee", self.day1_morning)
         self._manage("pause_debut", self.day1_noon)
         self.assertFalse(self._open_attendances())
 
-        ids = self._manage("pause_fin", self.day1_afternoon)
+        ids = self._manage("arrivee", self.day1_afternoon)
 
         self.assertEqual(len(ids), 1)
         attendance = self.Attendance.browse(ids[0])
         self.assertEqual(attendance.check_in, self.day1_afternoon)
-        self.assertEqual(len(self._open_attendances()), 1)
+        self.assertFalse(attendance.check_out)
 
-    def test_pause_fin_without_pause_debut_does_not_raise(self):
-        """The second blocking bug: pause_fin used to create unconditionally.
-
-        Reachable via a double tap, an offline replay arriving out of
-        order, or any app/server state desync — the attendance is still
-        open, so an unguarded create() raised ValidationError.
-        """
-        opened = self._manage("arrivee", self.day1_morning)
-        self.assertEqual(len(self._open_attendances()), 1)
-
-        reused = self._manage("pause_fin", self.day1_afternoon)
-
-        self.assertEqual(reused, opened)
-        self.assertEqual(len(self._open_attendances()), 1)
+        attendances = self.Attendance.search(
+            [("employee_id", "=", self.employee.id)], order="check_in asc"
+        )
+        self.assertEqual(len(attendances), 2)
+        self.assertEqual(attendances[0].check_out, self.day1_noon)
+        self.assertEqual(attendances[1].check_in, self.day1_afternoon)
 
     # --- depart / pause_debut -------------------------------------------
 
@@ -129,6 +156,38 @@ class TestManageHrAttendance(MobilePointageCommon):
         attendance = self.Attendance.browse(ids[0])
         self.assertEqual(attendance.check_in, self.day1_evening)
         self.assertEqual(attendance.check_out, self.day1_evening)
+
+    def test_depart_without_open_attendance_is_logged_as_anomaly(self):
+        """A depart without any open attendance is an anomaly but still creates
+        a zero-length slice to preserve the event.
+        """
+        ids = self._manage("depart", self.day1_evening)
+        self.assertEqual(len(ids), 1)
+
+    def test_pause_fin_after_pause_debut_opens_new_attendance(self):
+        """Normal flow: pause_debut closed the record, pause_fin reopens."""
+        self._manage("arrivee", self.day1_morning)
+        self._manage("pause_debut", self.day1_noon)
+        self.assertFalse(self._open_attendances())
+
+        ids = self._manage("pause_fin", self.day1_afternoon)
+
+        self.assertEqual(len(ids), 1)
+        attendance = self.Attendance.browse(ids[0])
+        self.assertEqual(attendance.check_in, self.day1_afternoon)
+        self.assertEqual(len(self._open_attendances()), 1)
+
+    def test_pause_fin_without_pause_debut_reuses_open_attendance(self):
+        """A pause_fin without a preceding pause_debut should reuse the open
+        attendance rather than create a second one.
+        """
+        opened = self._manage("arrivee", self.day1_morning)
+        self.assertEqual(len(self._open_attendances()), 1)
+
+        reused = self._manage("pause_fin", self.day1_afternoon)
+
+        self.assertEqual(reused, opened)
+        self.assertEqual(len(self._open_attendances()), 1)
 
     def test_full_day_with_pause_produces_two_slices(self):
         """arrivee -> pause_debut -> pause_fin -> depart = 2 attendances."""

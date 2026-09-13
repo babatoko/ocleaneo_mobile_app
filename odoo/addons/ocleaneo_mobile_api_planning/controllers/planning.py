@@ -42,25 +42,17 @@ def _plain_instructions(text):
 
 
 def _order_status(order, cancelled_stage):
-    """'confirmed' / 'partial' / 'done' / 'cancelled' — jamais déduit du seul
-    nom du stage (voir ocleaneo#10 : un `search([("name", "ilike", ...)])`
+    """'confirmed' / 'done' / 'cancelled' — jamais déduit du seul nom du
+    stage (voir ocleaneo#10 : un `search([("name", "ilike", ...)])`
     similaire ne matchait que le libellé anglais et se taisait sur une
     instance traduite). "Completed" et "Cancelled" ont tous deux
     is_closed=True (fieldservice/data/fsm_stage.xml) : is_closed seul ne
     distingue pas une vacation terminée d'une vacation annulée.
-
-    'partial' : un départ a été pointé sans atteindre les 90% du temps
-    prévu (voir fsm_order.update_completion_from_worked_time, module
-    ocleaneo_mobile_pointage) — le stage reste ouvert (ce n'est pas
-    "terminé"), mais la vacation n'est plus "à faire" pour autant : le
-    salarié est déjà reparti.
     """
     if cancelled_stage and order.stage_id == cancelled_stage:
         return "cancelled"
     if order.stage_id and order.stage_id.is_closed:
         return "done"
-    if order.completion_state == "partial":
-        return "partial"
     return "confirmed"
 
 
@@ -132,9 +124,16 @@ class MobilePlanningController(http.Controller):
         # ferait disparaître la vacation du jour même de l'app au lieu de
         # l'afficher terminée. Voir _order_status() pour distinguer
         # terminé/annulé côté client (is_closed seul ne le permet pas).
+        #
+        # Cross-company note: a field worker can be physically sent to a site
+        # owned by a sibling company without being granted full access to that
+        # company. The order is still *his* assignment, so the planning API
+        # exposes it as long as the person_id matches. The company filter is
+        # kept as a preference (worker must be allowed in at least one
+        # company), not as a hard requirement, to avoid silent omissions that
+        # look like a planning bug.
         domain = [
             ("person_id", "=", person.id),
-            ("company_id", "in", user.company_ids.ids or [user.company_id.id]),
             ("scheduled_date_start", "<=", date_end),
             "|",
             ("scheduled_date_end", ">=", date_start),
@@ -176,12 +175,6 @@ class MobilePlanningController(http.Controller):
                 "scheduled_date_end": order.scheduled_date_end.isoformat() if order.scheduled_date_end else False,
                 "date_start": order.date_start.isoformat() if order.date_start else False,
                 "date_end": order.date_end.isoformat() if order.date_end else False,
-                # Absent tant qu'aucun départ n'a encore été pointé sur la
-                # commande (voir fsm_order.update_completion_from_worked_time,
-                # module ocleaneo_mobile_pointage) : completion_state est
-                # alors False, jamais l'un des trois états réels.
-                "completion_ratio": order.completion_ratio or False,
-                "completion_state": order.completion_state or False,
                 "location": {
                     "id": loc.id if loc else False,
                     "name": loc.name if loc else False,
@@ -197,7 +190,7 @@ class MobilePlanningController(http.Controller):
                     # le scan NFC doit pouvoir matcher une vacation du
                     # planning du jour, pas seulement un chantier renvoyé
                     # par la liste plafonnée/non filtrée par date.
-                    "nfc_tag_id": loc.nfc_tag_id if loc else False,
+                    "nfc_tag_id": loc.get_nfc_tag_uid_for_mobile() if loc else False,
                 },
                 "customer": {
                     "id": customer.id if customer else False,
