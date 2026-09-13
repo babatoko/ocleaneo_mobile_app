@@ -9,6 +9,7 @@ client_ref idempotency.
 """
 
 import json
+from datetime import datetime, timedelta
 
 import odoo
 from odoo.addons.ocleaneo_mobile_api.models.mobile_auth_attempt import (
@@ -186,6 +187,9 @@ class TestMobileApi(MobileRpcMixin, MobilePointageCommon, HttpCase):
     # --- ownership (IDOR) ------------------------------------------------
 
     def test_cannot_clock_on_another_workers_order(self):
+        """A pointage against a job assigned to someone else must still be
+        recorded (see ocleaneo#77 — a 403 here used to drop the clocking
+        entirely, a data hole for HR), just not linked to that order."""
         token = self._login()
 
         result = self._result("pointage", {
@@ -194,12 +198,17 @@ class TestMobileApi(MobileRpcMixin, MobilePointageCommon, HttpCase):
             "datetime": "2026-03-10T08:00:00",
         }, token=token)
 
-        self.assertEqual(result["code"], 403)
+        self.assertNotIn("error", result)
+        self.assertFalse(result["fsm_order_id"])
         self.assertFalse(
             self.env["ocleaneo.mobile.pointage"].search([
                 ("fsm_order_id", "=", self.other_order.id),
             ]),
-            "no clocking may be recorded against another worker's job",
+            "no clocking may be linked to another worker's job",
+        )
+        self.assertTrue(
+            self.env["ocleaneo.mobile.pointage"].search([("id", "=", result["id"])]),
+            "the clocking itself must still be recorded",
         )
 
     def test_cannot_close_another_workers_order(self):
@@ -214,6 +223,35 @@ class TestMobileApi(MobileRpcMixin, MobilePointageCommon, HttpCase):
         }, token=token)
 
         self.assertEqual(self.other_order.stage_id, stage_before)
+
+    def test_depart_closes_the_workers_own_order(self):
+        """The positive case test_cannot_close_another_workers_order never
+        checked: depart on your OWN job must actually close it.
+
+        Caught nothing for a while — the stage lookup matched on the literal
+        English name "completed", which never matches on this (French)
+        instance, so the write silently never ran. Assert against is_closed
+        rather than a specific stage: what the app promises the worker is a
+        job leaving the open list, not any particular stage."""
+        token = self._login()
+
+        self._result("pointage", {
+            "type": "depart",
+            "fsm_order_id": self.order.id,
+            "datetime": "2026-03-10T17:00:00",
+        }, token=token)
+
+        # The HTTP call above runs its own cursor — self.order's cached
+        # stage_id is whatever setUp() wrote, regardless of what the server
+        # then did. Without this, the assertion below passes vacuously
+        # whether or not the depart closed anything (see test_record_rules.py
+        # for the same gotcha, caught the same way).
+        self.order.invalidate_cache()
+
+        self.assertTrue(
+            self.order.stage_id.is_closed,
+            "depart must close the worker's own fsm.order",
+        )
 
     def test_clocking_on_own_order_succeeds(self):
         token = self._login()
@@ -330,11 +368,7 @@ class TestMobileApi(MobileRpcMixin, MobilePointageCommon, HttpCase):
         self.assertEqual(result["entries"][0]["fsm_order_id"], self.order.id)
 
     def test_chantiers_returns_own_orders_with_coordinates(self):
-        self.location.write({
-            "partner_latitude": 48.8566,
-            "partner_longitude": 2.3522,
-            "nfc_tag_id": "04A1B2C3",
-        })
+        self.location.write({"partner_latitude": 48.8566, "partner_longitude": 2.3522})
         token = self._login()
 
         result = self._result("chantiers/aujourdhui", token=token)
@@ -344,7 +378,98 @@ class TestMobileApi(MobileRpcMixin, MobilePointageCommon, HttpCase):
         self.assertEqual(order["id"], self.order.id)
         self.assertAlmostEqual(order["location_latitude"], 48.8566, places=4)
         self.assertAlmostEqual(order["location_longitude"], 2.3522, places=4)
-        self.assertEqual(order["nfc_tag_id"], "04A1B2C3")
+
+    def _open_order_at_location(self, scheduled_date_start):
+        """A second open fsm.order at self.location, sharing its nfc_tag_id."""
+        return self.env["fsm.order"].create({
+            "location_id": self.location.id,
+            "person_id": self.person.id,
+            "company_id": self.company.id,
+            "scheduled_date_start": scheduled_date_start,
+        })
+
+    def test_chantiers_ranks_todays_order_before_a_future_recurring_one(self):
+        """A future recurring order at the same site must not outrank today's.
+
+        Reproduced against a live Odoo 14 instance: fieldservice_recurring
+        pre-generates upcoming fsm.order records (scheduled_date_start set,
+        left open/not-closed until their own day), so a worker's NFC badge —
+        shared by every order at that fsm.location — can match several open
+        orders at once. date_start ("Actual Start") stays empty on ALL of
+        them until work actually begins, including on today's order before
+        the worker's very first badge scan of the day. Ranking today's order
+        by "closest to today, past or future" — see chantiers_aujourdhui —
+        must not let a recurring order for next week, generated after
+        today's, win just because it comes later in a naive date ordering.
+        """
+        self.user.tz = "UTC"
+        now = datetime.utcnow().replace(microsecond=0)
+        self.order.scheduled_date_start = now
+        future_order = self._open_order_at_location(now + timedelta(days=7))
+        token = self._login()
+
+        result = self._result("chantiers/aujourdhui", token=token)
+
+        ids = [o["id"] for o in result["orders"]]
+        self.assertIn(future_order.id, ids, "the future order must still be returned (open, same worker)")
+        self.assertEqual(
+            ids[0], self.order.id,
+            "today's order must be the first match for a shared-location NFC badge, not a future one",
+        )
+
+    def test_chantiers_ranks_todays_order_before_a_stale_overdue_one(self):
+        """A forgotten-open order from days ago must not outrank today's either.
+
+        The mirror image of the future-recurring case, seen in real
+        production data auditing issue #6: a worker who never badged
+        "depart" on an earlier job leaves it open (no date_start, no
+        date_end — see the forgotten-checkout reminder feature). Its
+        scheduled_date_start is in the past, so an ordering that simply
+        prefers "soonest scheduled" among not-yet-started orders — the
+        fix for the future-recurring case above — makes this stale order
+        win every time instead, being scheduled earlier than today's.
+        Neither past nor future should beat today.
+        """
+        self.user.tz = "UTC"
+        now = datetime.utcnow().replace(microsecond=0)
+        self.order.scheduled_date_start = now
+        stale_order = self._open_order_at_location(now - timedelta(days=5))
+        token = self._login()
+
+        result = self._result("chantiers/aujourdhui", token=token)
+
+        ids = [o["id"] for o in result["orders"]]
+        self.assertIn(stale_order.id, ids, "the stale order must still be returned (open, same worker)")
+        self.assertEqual(
+            ids[0], self.order.id,
+            "today's order must be the first match for a shared-location NFC badge, not a stale overdue one",
+        )
+
+    def test_pointage_arrivee_over_http_warns_the_manager_on_a_date_mismatch(self):
+        """End-to-end: POST /pointage itself must reach
+        _warn_if_workorder_date_mismatch (see test_workorder_mismatch.py for
+        that method's own coverage), without letting it fail the clocking.
+        """
+        manager_user, manager_employee, _ = self._make_worker(
+            "Manager E2E", "manager.e2e@test.example"
+        )
+        self.employee.parent_id = manager_employee
+        self.order.scheduled_date_start = datetime(2026, 3, 3, 8, 0, 0)
+        token = self._login()
+
+        result = self._result("pointage", {
+            "type": "arrivee",
+            "fsm_order_id": self.order.id,
+            "datetime": "2026-03-24T08:00:00",
+        }, token=token)
+
+        self.assertNotIn("error", result, "a manager alert must never fail the clocking")
+        activity = self.env["mail.activity"].search([
+            ("res_model", "=", "fsm.order"),
+            ("res_id", "=", self.order.id),
+        ])
+        self.assertEqual(len(activity), 1)
+        self.assertEqual(activity.user_id, manager_user)
 
     def test_me_finds_the_current_job_on_a_night_shift(self):
         """GET /api/mobile/me used to lose the job across midnight.

@@ -3,7 +3,7 @@
 {
     "name": "Ocleaneo Mobile API",
     "summary": "REST/JSON API for the employee mobile app: auth, pointage, planning.",
-    "version": "14.0.1.0.10",
+    "version": "14.0.1.0.13",
     "license": "AGPL-3",
     "author": "Ocleaneo",
     "category": "API",
@@ -18,6 +18,8 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "security/mobile_groups.xml",
+        "views/mobile_module_config_views.xml",
     ],
     "installable": True,
     "application": False,

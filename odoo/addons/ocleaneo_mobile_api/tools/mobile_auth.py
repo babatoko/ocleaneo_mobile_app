@@ -23,23 +23,43 @@ _logger = logging.getLogger(__name__)
 # change — the same pattern the frontend uses for its own runtime
 # configuration (see frontend/.env.example and docker-compose.yml).
 #
-# The default is the Vite dev server, which is the right default for the
-# native app: Capacitor calls the API from a WebView, where CORS does not
-# apply at all, so a *narrow* default costs nothing there and keeps a
-# browser from calling this API cross-origin. It is the wrong value for a
-# PWA deployment, where the browser does enforce CORS and the origin must
-# be the site's own — hence the warning below, so an unset variable is
-# noticed in the log rather than discovered as a wall of blocked requests.
-DEV_CORS_ORIGIN = "http://127.0.0.1:5173"
-MOBILE_CORS_ORIGIN = os.environ.get("OCLEANEO_MOBILE_CORS_ORIGIN", DEV_CORS_ORIGIN)
+# odoo/http.py sets Access-Control-Allow-Origin to this cors= value
+# verbatim, with no matching against a list — a deployment can only ever
+# allow ONE of "packaged native app" or "Vite dev server / PWA" without
+# setting this variable, never both at once.
+#
+# The default targets the packaged native app: Capacitor's Android WebView
+# is a real Chromium engine and DOES enforce CORS like any browser (see
+# @capacitor/android's CapConfig.java — default hostname "localhost",
+# androidScheme "https", unchanged by this project's capacitor.config.json),
+# so its origin is exactly https://localhost. An earlier version of this
+# comment claimed the opposite ("a WebView does not enforce CORS at all")
+# and defaulted to the Vite dev origin instead — on any deployment that
+# never set this variable, including production, every preflight from the
+# real app was silently rejected. Nothing about that failure is
+# distinguishable from a genuine network outage on the JS side (see
+# frontend services/errorLog.ts / OdooProvider.ts, where the axios error
+# this produces is the generic ERR_NETWORK), so it went undiagnosed for a
+# while: reachability, DNS and TLS all checked out fine, because the
+# request was never actually rejected by the network — it was rejected by
+# the browser itself, before being sent, on the strength of this exact
+# mismatch.
+#
+# Running the Vite dev server against this backend still needs the
+# variable set explicitly (http://127.0.0.1:5173, or the PWA's own site
+# origin) — the trade-off is deliberate: a developer notices and fixes a
+# blocked dev request at their desk in seconds; a field employee locked
+# out of login has no such feedback loop.
+NATIVE_APP_ORIGIN = "https://localhost"
+MOBILE_CORS_ORIGIN = os.environ.get("OCLEANEO_MOBILE_CORS_ORIGIN", NATIVE_APP_ORIGIN)
 
-if MOBILE_CORS_ORIGIN == DEV_CORS_ORIGIN:
-    logging.getLogger(__name__).info(
-        "OCLEANEO_MOBILE_CORS_ORIGIN is unset; /api/mobile/* allows the dev "
-        "origin %s only. Fine for the Capacitor app (a WebView does not "
-        "enforce CORS) — set it to the site's own origin before serving the "
-        "frontend as a PWA.",
-        DEV_CORS_ORIGIN,
+if MOBILE_CORS_ORIGIN == NATIVE_APP_ORIGIN:
+    logging.getLogger(__name__).warning(
+        "OCLEANEO_MOBILE_CORS_ORIGIN is unset; /api/mobile/* allows the "
+        "packaged native app's origin (%s) only. Set it explicitly to run "
+        "the Vite dev server (http://127.0.0.1:5173) or a PWA (the site's "
+        "own origin) against this backend.",
+        NATIVE_APP_ORIGIN,
     )
 
 

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tags are cross-company: a worker from any Ocleaneo company can scan a tag
+         attached to a location, even if the location itself belongs to a sibling
+         company. The company_id on the tag is kept for accounting but does not
+         restrict read access for field workers. -->
+    <record id="rule_ocleaneo_nfc_tag_company" model="ir.rule">
+        <field name="name">Ocleaneo NFC Tag: multi-company access</field>
+        <field name="model_id" ref="model_ocleaneo_nfc_tag"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="global" eval="True"/>
+        <field name="groups" eval="[(4, ref('fieldservice.group_fsm_user'))]"/>
+    </record>
+
+    <record id="rule_ocleaneo_nfc_tag_manager_edit" model="ir.rule">
+        <field name="name">Ocleaneo NFC Tag: manager can edit own company</field>
+        <field name="model_id" ref="model_ocleaneo_nfc_tag"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+        <field name="groups" eval="[(4, ref('fieldservice.group_fsm_manager'))]"/>
+        <field name="perm_read" eval="0"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
+    </record>
+</odoo>

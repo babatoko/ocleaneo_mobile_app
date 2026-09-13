@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_fsm_location_form_nfc_tag_registry" model="ir.ui.view">
+        <field name="name">fsm.location.form.nfc.tag.registry</field>
+        <field name="model">fsm.location</field>
+        <field name="inherit_id" ref="fieldservice.fsm_location_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='owner_id']" position="after">
+                <field name="nfc_tag_ref_id" options="{'no_create': False}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_fsm_location_tree_nfc_tag" model="ir.ui.view">
+        <field name="name">fsm.location.tree.nfc.tag</field>
+        <field name="model">fsm.location</field>
+        <field name="inherit_id" ref="fieldservice.fsm_location_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <field name="nfc_tag_ref_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

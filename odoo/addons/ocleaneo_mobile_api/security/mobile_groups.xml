@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Business groups for mobile feature targeting. Pure classification:
+         no ir.model.access, no rules — base.group_user is already required
+         for any mobile API usage. Managers assign people once here, then
+         target any feature flag by group in one click. -->
+    <record id="module_category_mobile" model="ir.module.category">
+        <field name="name">Application Mobile</field>
+        <field name="description">Groupes métier de l'application mobile Ocleaneo</field>
+        <field name="sequence">25</field>
+    </record>
+
+    <record id="group_mobile_agent" model="res.groups">
+        <field name="name">Agent terrain</field>
+        <field name="category_id" ref="module_category_mobile"/>
+        <field name="comment">Agent de terrain : pointage, commissionnement de tags, inventaire…</field>
+    </record>
+
+    <record id="group_mobile_chef_equipe" model="res.groups">
+        <field name="name">Chef d'équipe</field>
+        <field name="category_id" ref="module_category_mobile"/>
+        <field name="comment">Chef d'équipe : supervision des agents de son périmètre.</field>
+    </record>
+
+    <record id="group_mobile_responsable" model="res.groups">
+        <field name="name">Responsable exploitation</field>
+        <field name="category_id" ref="module_category_mobile"/>
+        <field name="comment">Responsable d'exploitation : pilotage de la production et de la planification.</field>
+    </record>
+</odoo>

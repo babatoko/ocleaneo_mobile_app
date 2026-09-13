@@ -74,7 +74,8 @@ class FsmOrder(models.Model):
             if not planned_hours or planned_hours <= 0:
                 order.completion_ratio = 0.0
                 order.completion_state = "done"
-                order._close_as_completed()
+                # Caller (controllers/pointage.py) will close unconditionally
+                # for lack of scheduled duration, preserving pre-rule behavior.
                 continue
 
             ratio = worked_hours / planned_hours
@@ -87,29 +88,9 @@ class FsmOrder(models.Model):
                 order._alert_manager_partial_completion(employee, worked_hours, planned_hours, ratio)
             else:
                 order.completion_state = "done"
-                order._close_as_completed()
+                # Closing is handled by the caller (controllers/pointage.py)
+                # once it sees completion_state == "done".
 
-    def _close_as_completed(self):
-        """Move to the closed 'Completed' stage, bypassing the Kanban guard.
-
-        fsm.order.write() (OCA fieldservice) refuses a plain write to the
-        Completed stage ("Cannot move to completed from Kanban") unless
-        is_button=True is set in the very same write — see its source for
-        why: that guard exists to force completion through the button
-        action's own side effects rather than a raw stage_id write from the
-        Kanban view. is_button is reset to False by that same write, so it
-        never lingers as stored state.
-        """
-        self.ensure_one()
-        completed_stage = self.env["fsm.stage"].sudo().search([
-            ("name", "ilike", "completed"),
-            ("is_closed", "=", True),
-        ], limit=1)
-        if completed_stage:
-            try:
-                self.write({"stage_id": completed_stage.id, "is_button": True})
-            except Exception as e:
-                _logger.warning("Could not set FSM order %s to Completed: %s", self.id, e)
 
     def _alert_manager_partial_completion(self, employee, worked_hours, planned_hours, ratio):
         """Post a chatter note on the order and raise an activity for the

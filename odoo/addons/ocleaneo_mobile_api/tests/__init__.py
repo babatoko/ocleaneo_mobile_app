@@ -3,3 +3,5 @@ from . import test_mobile_token
 from . import test_rate_limit
 from . import test_security
 from . import test_api_contract
+from . import test_change_password
+from . import test_module_config_targeting

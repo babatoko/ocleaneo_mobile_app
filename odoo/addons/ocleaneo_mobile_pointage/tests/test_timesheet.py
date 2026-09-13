@@ -13,6 +13,9 @@ stuck at 0 hours — and each is locked down here:
 """
 
 from datetime import datetime, timedelta
+from unittest.mock import patch
+
+from odoo.exceptions import ValidationError
 
 from odoo.addons.ocleaneo_mobile_pointage.controllers.pointage import (
     MobilePointageController,
@@ -187,6 +190,77 @@ class TestManageTimesheet(MobilePointageCommon):
         ids = self._manage("arrivee", datetime(2026, 3, 10, 8, 0, 0))
         line = self.Timesheet.browse(ids[0])
         self.assertEqual(line.partner_id, self.location.owner_id)
+
+
+class TestManageTimesheetCompanyMismatch(MobilePointageCommon):
+    """_manage_timesheet must never lose the clocking itself.
+
+    account.analytic.line can reject a create()/write() over a multi-company
+    inconsistency this module does not control (the 'Pointage chantiers'
+    project's analytic account drifting onto a different company than the
+    project — reachable in practice through data that bypassed the ORM's own
+    multi-company checks, e.g. a historical direct-SQL fix, even though a
+    normal write() through the UI is blocked by Odoo itself). Nothing in
+    pointage() wraps _manage_timesheet, so an uncaught ValidationError here
+    used to roll back the whole request — including the pointage record
+    already created — exactly what _create_attendance was already written to
+    avoid for hr.attendance failures.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.controller = MobilePointageController()
+        self.Timesheet = self.env["account.analytic.line"]
+        self.Pointage = self.env["ocleaneo.mobile.pointage"]
+
+    def _pointage(self, pointage_type, now):
+        return self.Pointage.create({
+            "user_id": self.user.id,
+            "employee_id": self.employee.id,
+            "type": pointage_type,
+            "datetime": now,
+            "fsm_order_id": self.order.id,
+            "fsm_location_id": self.location.id,
+            "company_id": self.company.id,
+        })
+
+    def test_arrivee_survives_a_company_mismatch_on_create(self):
+        start = datetime(2026, 3, 10, 8, 0, 0)
+        pointage = self._pointage("arrivee", start)
+
+        with patch.object(
+            type(self.Timesheet), "create",
+            side_effect=ValidationError("The selected account belongs to another company"),
+        ):
+            ids = self.controller._manage_timesheet(
+                self.env, self.employee, pointage, "arrivee", start
+            )
+
+        self.assertEqual(ids, [])
+        self.assertTrue(pointage.exists(), "the pointage record itself must survive")
+
+    def test_depart_survives_a_company_mismatch_on_close(self):
+        start = datetime(2026, 3, 10, 8, 0, 0)
+        end = datetime(2026, 3, 10, 16, 30, 0)
+        opened = self.controller._manage_timesheet(
+            self.env, self.employee, self._pointage("arrivee", start), "arrivee", start
+        )
+        self.assertEqual(len(opened), 1)
+        depart_pointage = self._pointage("depart", end)
+
+        with patch.object(
+            type(self.Timesheet), "write",
+            side_effect=ValidationError("The selected account belongs to another company"),
+        ):
+            ids = self.controller._manage_timesheet(
+                self.env, self.employee, depart_pointage, "depart", end
+            )
+
+        self.assertEqual(ids, [])
+        self.assertTrue(depart_pointage.exists(), "the pointage record itself must survive")
+        # The line opened by "arrivee" is untouched, still running.
+        line = self.Timesheet.browse(opened[0])
+        self.assertFalse(line.date_time_end)
 
 
 class TestProjectResolution(MobilePointageCommon):

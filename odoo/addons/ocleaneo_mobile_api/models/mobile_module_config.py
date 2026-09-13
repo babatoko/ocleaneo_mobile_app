@@ -17,12 +17,40 @@ class MobileModuleConfig(models.Model):
     icon = fields.Char(string="Icon name", default="apps", help="Material/Ionic icon name")
     route_path = fields.Char(string="Route path", help="Mobile app route path, e.g. /pointage")
     is_active = fields.Boolean(string="Enabled", default=True)
+    visible_group_ids = fields.Many2many(
+        "res.groups",
+        "mobile_module_config_group_rel",
+        "config_id",
+        "group_id",
+        string="Visible groups",
+        help=(
+            "Restrict this feature to these user groups. Empty (together with "
+            "the employees list) = every employee of the company sees it. "
+            "Non-empty = union with the employees list: an employee sees the "
+            "feature if they belong to at least one of these groups OR appear "
+            "in the employees list."
+        ),
+    )
+    visible_employee_ids = fields.Many2many(
+        "hr.employee",
+        "mobile_module_config_employee_rel",
+        "config_id",
+        "employee_id",
+        string="Visible employees",
+        help=(
+            "Restrict this feature to these employees. Empty (together with "
+            "the groups list) = every employee of the company sees it. "
+            "Non-empty = union with the groups list."
+        ),
+    )
     requires_role = fields.Selection([
         ("all", "All"),
         ("agent", "Agent"),
         ("chef_equipe", "Chef d'équipe"),
         ("responsable", "Responsable exploitation"),
-    ], string="Required role", default="all")
+    ], string="Required role", default="all",
+        help="Legacy, superseded by the groups/employees targeting above. "
+             "Kept in the payload for app compatibility; never enforced.")
     phase = fields.Selection([
         ("mvp", "MVP"),
         ("phase2", "Phase 2"),
@@ -50,22 +78,70 @@ class MobileModuleConfig(models.Model):
             "settings": self.settings or "{}",
         }
 
+    def _is_visible_for_employee(self, employee):
+        """Targeting rule for one config row vs one employee.
+
+        Both targeting lists empty -> the feature is company-wide: visible.
+        Otherwise the employee must belong to at least one of the selected
+        groups (via their linked user's groups_id) OR appear in the selected
+        employees list (union, never intersection).
+
+        `self.company_id` is already one of the caller's companies when this
+        is called from get_modules_for_user(); cross-company membership is
+        handled there (one config row per company), not here.
+        """
+        self.ensure_one()
+        if not self.visible_group_ids and not self.visible_employee_ids:
+            return True
+        if employee and employee in self.visible_employee_ids:
+            return True
+        user = employee.user_id if employee else employee
+        if user and user.groups_id & self.visible_group_ids:
+            return True
+        return False
+
     @api.model
     def get_modules_for_user(self, user):
-        """Return active mobile module configs for a given user/company.
+        """Return the mobile module configs resolved FOR one user, company by
+        company, targeting applied.
+
+        This is the single source of truth shared by the login payload, the
+        /auth/me payload and every mobile endpoint that must refuse a
+        disabled feature (403): the app hides screens based on this list and
+        the server re-checks membership in it, so a screen can never be
+        visible while its endpoint refuses.
+
+        Resolution per config row:
+        - the row must be active and enabled (is_active), for one of the
+          user's companies (unchanged from the historical behaviour);
+        - then targeting applies per employee (see _is_visible_for_employee):
+          empty lists = the whole company; non-empty = employee in the
+          employees list OR their user carries one of the groups.
 
         `requires_role` is carried into the payload but NOT filtered on
-        here, and no caller filters on it either — the frontend ignores the
-        `modules` list entirely today (OdooProvider keeps only the token and
-        the employee from the login response). It is declarative metadata
-        for a later phase, never an access control: anything that must
-        actually be denied to a worker has to be denied by the route that
-        serves it, not by leaving an entry out of this list.
+        here — it is legacy, superseded by the explicit groups/employees
+        targeting. Anything that must actually be denied to a worker has to
+        be denied by the route that serves it, not by leaving an entry out
+        of this list.
         """
-        company_id = user.company_id.id
-        domain = [
+        employee = self.env["hr.employee"].sudo().search([
+            ("user_id", "=", user.id),
+        ], limit=1)
+        configs = []
+        for config in self.sudo().search([
             ("active", "=", True),
             ("is_active", "=", True),
-            ("company_id", "in", [company_id] + user.company_ids.ids),
-        ]
-        return self.sudo().search(domain, order="sequence, id")
+            ("company_id", "in", [user.company_id.id] + user.company_ids.ids),
+        ], order="sequence, id"):
+            if config._is_visible_for_employee(employee):
+                configs.append(config)
+        return self.sudo().browse([c.id for c in configs])
+
+    def get_active_flag(self, user, technical_name):
+        """Boolean helper for endpoints: is this feature enabled for this
+        user (company + targeting)? The 403 check of e.g. the tag
+        commissioning route is a membership test on get_modules_for_user(),
+        so the UI and the API can never disagree.
+        """
+        self.ensure_one()
+        return self in self.get_modules_for_user(user)

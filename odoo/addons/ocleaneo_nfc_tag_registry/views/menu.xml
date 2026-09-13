@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sibling of "Locations" under Master Data (parent="fieldservice.data"),
+         PAS un enfant de menu_fsm_fsm_location : ce dernier porte déjà sa
+         propre action (action_fsm_location) et lui donner un sous-menu le
+         transforme en catégorie parente dans la barre de menus — "Locations"
+         cesse alors d'apparaître comme un lien direct cliquable sous Master
+         Data. Reproduit : c'est exactement ce qui s'est produit ici. -->
+    <menuitem id="menu_ocleaneo_nfc_tag_root" name="NFC Tags" parent="fieldservice.data" action="action_ocleaneo_nfc_tag" sequence="25"/>
+</odoo>
