@@ -133,9 +133,17 @@ jobs:
       # Il a déjà dérivé une fois (11 versions de retard, 2 modules manquants,
       # sync 13/09/2026) : ce check compare les manifests et échoue si la copie
       # n'est plus à jour, pour que la divergence ne puisse plus repasser en
-      # silence. Clonage superficiel : seuls les __manifest__.py sont lus.
+      # silence. Le repo backend est privé : cloné via deploy key read-only
+      # (secret OCLEANEO_BACKEND_DEPLOY_KEY, clé posée sur le repo backend).
       - name: Cloner le repo backend (pour le check de sync)
-        run: git clone --depth 1 https://github.com/majavi-software/ocleaneo.git ocleaneo-backend
+        env:
+          BACKEND_KEY: ${{ secrets.OCLEANEO_BACKEND_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$BACKEND_KEY" > ~/.ssh/ocleaneo_backend_key
+          chmod 600 ~/.ssh/ocleaneo_backend_key
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6U0o8mZp+xFwJirDUNVwbbLX9hmpM" > ~/.ssh/known_hosts
+          git clone --depth 1 ssh://git@github.com/majavi-software/ocleaneo.git ocleaneo-backend
 
       - name: Vérifier la synchronisation du backend embarqué
         run: python .github/scripts/check_embedded_backend_sync.py ocleaneo-backend
