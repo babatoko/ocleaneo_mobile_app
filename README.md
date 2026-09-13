@@ -260,7 +260,8 @@ Quatre axes ajoutés au-dessus des vues de base :
 > été installé, ces services n'existent pas.
 > Un second chemin, différent, a depuis été construit et **vérifié en conditions réelles** (Odoo 14 +
 > Postgres, appels HTTP réels, test de bout en bout par navigateur) : des modules Odoo custom
-> (`odoo/addons/ocleaneo_mobile_*`, JSON-RPC natif plutôt que `base_rest`) et **`providers/OdooProvider.ts`**
+> (dans le repo backend [`majavi-software/ocleaneo`](https://github.com/majavi-software/ocleaneo),
+> JSON-RPC natif plutôt que `base_rest`) et **`providers/OdooProvider.ts`**
 > qui les consomme (`VITE_DATA_PROVIDER=odoo`). Voir `odoo/README.md` pour le détail des routes et l'état
 > exact de ce qui est couvert (catalogue produits/inventaire/commandes n'ont pas d'équivalent Odoo
 > aujourd'hui). Si l'instance de production `entretien-maconnais.fr` finit par exposer `base_rest` comme

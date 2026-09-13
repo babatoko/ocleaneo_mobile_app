@@ -43,7 +43,11 @@ services:
       - odoo14-dev-filestore:/var/lib/odoo/filestore:rw
       - ./odoo14-dev.conf:/etc/odoo/odoo.conf:ro
       # Mount OCA/custom addons. Adjust host paths to your local checkout.
-      - ../../odoo/addons:/opt/custom_addons_v14:ro
+      # Les modules Odoo vivent dans le repo backend majavi-software/ocleaneo
+      # (règle du 13/09/2026 — ce repo ne versionne plus aucun module) : le
+      # compose monte un clone local de ce repo, à faire à côté avant `up` :
+      #   cd odoo/dev && git clone git@github.com:majavi-software/ocleaneo.git backend
+      - ./backend:/opt/custom_addons_v14:ro
       # odoo14-dev.conf's addons_path requires /opt/oca_addons_v14 — Odoo
       # will not start without it. Clone the four required 14.0 branches
       # into ./oca-addons (see odoo/README.md § Dépendances OCA), which is
