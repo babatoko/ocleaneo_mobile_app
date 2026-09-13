@@ -143,6 +143,9 @@ jobs:
           echo "$BACKEND_KEY" > ~/.ssh/ocleaneo_backend_key
           chmod 600 ~/.ssh/ocleaneo_backend_key
           echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6U0o8mZp+xFwJirDUNVwbbLX9hmpM" > ~/.ssh/known_hosts
+          # -i + IdentitiesOnly : sans ça, git/ssh n'essaie pas la clé du secret
+          # (vérifié : « Permission denied (publickey) » en CI au run précédent).
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/ocleaneo_backend_key -o IdentitiesOnly=yes"
           git clone --depth 1 ssh://git@github.com/majavi-software/ocleaneo.git ocleaneo-backend
 
       - name: Vérifier la synchronisation du backend embarqué
