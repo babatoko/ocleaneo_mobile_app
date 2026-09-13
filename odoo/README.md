@@ -10,6 +10,8 @@ odoo/
 │   ├── ocleaneo_mobile_api/
 │   ├── ocleaneo_mobile_pointage/
 │   ├── ocleaneo_mobile_api_planning/
+│   ├── ocleaneo_nfc_tag_registry/
+│   ├── ocleaneo_mobile_tag_commissioning/
 │   ├── ocleaneo_fieldservice_timesheet/
 │   └── ocleaneo_timesheet_duration_compute/
 ├── dev/                    # Environnement de développement Docker
@@ -25,8 +27,18 @@ odoo/
 | `ocleaneo_mobile_api` | Authentification, profil utilisateur, configuration modules |
 | `ocleaneo_mobile_pointage` | Pointage mobile, attendance, feuilles de temps, fermeture FSM |
 | `ocleaneo_mobile_api_planning` | Planning des vacations / chantiers |
+| `ocleaneo_nfc_tag_registry` | Registre central des tags NFC : un tag = une fsm.location, UID canonisé |
+| `ocleaneo_mobile_tag_commissioning` | Commissionnement d'un tag NFC depuis l'app (piloté par feature flag) |
 | `ocleaneo_fieldservice_timesheet` | Liaison FSM order ↔ feuilles de temps |
 | `ocleaneo_timesheet_duration_compute` | Calcul automatique des durées de timesheet |
+
+> **Source de vérité** : ces modules sont une **copie synchronisée** de
+> [`majavi-software/ocleaneo`](https://github.com/majavi-software/ocleaneo)
+> (repo backend = ce qui tourne en prod). Toute évolution backend se fait là-bas,
+> puis est resynchronisée ici (voir `.github/scripts/check_embedded_backend_sync`
+> dans la CI). Ne pas modifier les modules directement dans ce repo — la divergence
+> embarqué↔réel est précisément ce que la sync du 13/09/2026 a corrigé (11 versions
+> de retard, 2 modules manquants).
 
 ## Démarrage en dev
 

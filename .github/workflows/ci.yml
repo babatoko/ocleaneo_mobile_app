@@ -128,6 +128,18 @@ jobs:
             git clone --depth 1 --branch 14.0 "https://github.com/OCA/$repo.git" "oca-$repo"
           done
 
+      # Le backend embarqué (odoo/addons/) est une copie du repo backend
+      # majavi-software/ocleaneo — source de vérité de ce qui tourne en prod.
+      # Il a déjà dérivé une fois (11 versions de retard, 2 modules manquants,
+      # sync 13/09/2026) : ce check compare les manifests et échoue si la copie
+      # n'est plus à jour, pour que la divergence ne puisse plus repasser en
+      # silence. Clonage superficiel : seuls les __manifest__.py sont lus.
+      - name: Cloner le repo backend (pour le check de sync)
+        run: git clone --depth 1 https://github.com/majavi-software/ocleaneo.git ocleaneo-backend
+
+      - name: Vérifier la synchronisation du backend embarqué
+        run: python .github/scripts/check_embedded_backend_sync.py ocleaneo-backend
+
       - name: Installer les dépendances Python
         run: |
           # setuptools est épinglé sous 81, pas laissé « --upgrade » : Odoo 14
@@ -165,9 +177,9 @@ jobs:
             -d odoo_ci \
             --db_host=localhost --db_user=odoo --db_password=odoo \
             --addons-path="odoo/addons,odoo/odoo/addons,oca-field-service,oca-project,oca-timesheet,oca-web,ocleaneo/odoo/addons" \
-            -i ocleaneo_mobile_api,ocleaneo_mobile_pointage,ocleaneo_mobile_api_planning,ocleaneo_fieldservice_timesheet,ocleaneo_timesheet_duration_compute \
+            -i ocleaneo_mobile_api,ocleaneo_mobile_pointage,ocleaneo_mobile_api_planning,ocleaneo_fieldservice_timesheet,ocleaneo_timesheet_duration_compute,ocleaneo_nfc_tag_registry,ocleaneo_mobile_tag_commissioning \
             --test-enable \
-            --test-tags '/ocleaneo_mobile_api,/ocleaneo_mobile_pointage,/ocleaneo_mobile_api_planning,/ocleaneo_fieldservice_timesheet,/ocleaneo_timesheet_duration_compute' \
+            --test-tags '/ocleaneo_mobile_api,/ocleaneo_mobile_pointage,/ocleaneo_mobile_api_planning,/ocleaneo_fieldservice_timesheet,/ocleaneo_timesheet_duration_compute,/ocleaneo_nfc_tag_registry,/ocleaneo_mobile_tag_commissioning' \
             --stop-after-init --without-demo=all --log-level=test
           # odoo-bin propage l'échec dans son code retour
           # (service/server.py : rc += 1 si le rapport d'assertions n'est pas
