@@ -149,7 +149,9 @@ jobs:
           git clone --depth 1 ssh://git@github.com/majavi-software/ocleaneo.git ocleaneo-backend
 
       - name: Vérifier la synchronisation du backend embarqué
-        run: python .github/scripts/check_embedded_backend_sync.py ocleaneo-backend
+        # Le checkout de ce repo est monté en `ocleaneo/` (path: du step
+        # checkout) : le script est donc sous ocleaneo/.github/, pas .github/.
+        run: python ocleaneo/.github/scripts/check_embedded_backend_sync.py ocleaneo-backend
 
       - name: Installer les dépendances Python
         run: |
