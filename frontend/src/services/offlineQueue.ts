@@ -16,6 +16,12 @@ interface BaseQueuedEntry {
   longitude?: number;
   outOfRange?: boolean;
   withTag?: boolean;
+  /** Commentaire libre saisi par l'agent avant le pointage. Porté par les
+   *  payloads (CreateTimeEntryPayload.comment) : sans lui ici, une mise en
+   *  file hors ligne perdait le texte au premier rejeu (F01 de l'audit du
+   *  13/09) — le spread de enqueue le conserve au runtime, mais le type
+   *  mentait dessus et setAside() ne le copiait pas non plus. */
+  comment?: string;
 }
 
 interface TimeEntryQueuedEntry extends BaseQueuedEntry {
@@ -139,6 +145,9 @@ export interface FailedEntry {
   uid?: string;
   isCompteRendu?: boolean;
   commentaire?: string;
+  /** F01 : commentaire libre du pointage (pas du compte-rendu), conservé
+   *  au même titre que le motif du refus. */
+  comment?: string;
   failedAt: string;
   reason: string;
 }
@@ -170,6 +179,10 @@ async function setAside(entry: QueuedEntry, reason: string): Promise<void> {
     longitude: entry.longitude,
     outOfRange: entry.outOfRange,
     withTag: entry.withTag,
+    // F01 : le rejeu conservait le commentaire (porté par l'entrée de
+    // file), l'écarté métier le perdait — le responsable ne voyait que le
+    // motif du refus, jamais le contexte saisi par l'agent.
+    comment: entry.comment,
     failedAt: new Date().toISOString(),
     reason,
   };

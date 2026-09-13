@@ -200,6 +200,19 @@ describe('file hors ligne — un refus ne détruit pas le pointage', () => {
     expect(Date.parse(failed.failedAt)).not.toBeNaN();
   });
 
+  it("F01 : conserve le commentaire du pointage écarté (audit 13/09)", async () => {
+    // Le commentaire tapé par l'agent accompagnait le pointage en file, mais
+    // l'écarté métier ne le copiait pas : le responsable ne voyait que le
+    // motif du refus, jamais le contexte saisi sur le terrain.
+    await enqueue({ ...(entry('A') as object), comment: 'EI, chantier pas fini' } as never);
+    createTimeEntry.mockImplementationOnce(() => Promise.reject(new Error('400 refusé')));
+
+    await flushQueue();
+
+    const [failed] = await failedEntries();
+    expect(failed.comment).toBe('EI, chantier pas fini');
+  });
+
   it("ne compte pas un refus réseau comme un refus définitif", async () => {
     await enqueue(entry('A'));
     createTimeEntry.mockImplementationOnce(() => Promise.reject(new ProviderNetworkError()));

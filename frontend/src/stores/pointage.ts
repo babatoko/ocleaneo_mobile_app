@@ -19,6 +19,7 @@ import {
   cancelLateReminder,
 } from '../services/notifications';
 import { hapticSuccess, hapticError, hapticTap } from '../services/haptics';
+import { normalizeNfcId, formatNfcIdWithColons } from '../utils/nfc';
 import { checkGeofence, type GeofenceResult } from '../services/geofence';
 import { enqueue, queueLength, flushQueue, watchConnectivity } from '../services/offlineQueue';
 import { Preferences } from '@capacitor/preferences';
@@ -37,22 +38,8 @@ function newClientRef(): string {
 
 // Le lecteur NFC (@exxili/capacitor-nfc) renvoie un hex concaténé sans
 // séparateur ("041779C9780000"), mais rien ne garantit que le badge a été
-// saisi manuellement dans Odoo sous cette même forme — confirmé sur le
-// terrain : "04:17:79:C9:78:00:00" ne matchait jamais l'UID scanné avant
-// cette normalisation, alors qu'il s'agissait bien du même badge. Ne garder
-// que les caractères hexadécimaux élimine ":", "-", espaces et autres
-// séparateurs quel que soit celui utilisé à la saisie.
-function normalizeNfcId(value: string): string {
-  return value.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
-}
-
-// Reformate un hex brut ("041779C9780000") avec des ":" tous les 2 caractères
-// ("04:17:79:C9:78:00:00"), pour être directement comparable/copiable dans le
-// champ nfc_tag_id d'Odoo, qui est saisi sous cette forme.
-function formatNfcIdWithColons(value: string): string {
-  const hex = normalizeNfcId(value).toUpperCase();
-  return hex.replace(/(.{2})(?=.)/g, '$1:');
-}
+// La normalisation des UID NFC vit dans utils/nfc.ts — source unique partagée
+// avec le registre Odoo (canonical_nfc_uid).
 
 function getPosition(): Promise<Position | null> {
   return getCurrentLocation();
@@ -509,17 +496,19 @@ export const usePointageStore = defineStore('pointage', {
     /** Determine the next clocking type for a tag based on the most recent
      *  entry at the resolved location. Falls back to 'in' when unknown. */
     _nextTypeForTag(uid: string): TimeEntryType {
-      const normalizedUid = uid.replace(/:/g, '').toUpperCase();
+      // normalizeNfcId (utils/nfc.ts) : hex-only + minuscules — l'ancien
+      // replace(/:/g) laissait passer espaces et tirets (F03, audit 13/09).
+      const normalizedUid = normalizeNfcId(uid);
       const chantiers = useChantiersStore();
       const site =
-        chantiers.list.find((c) => (c.nfc_tag_id || '').replace(/:/g, '').toUpperCase() === normalizedUid) ||
-        this.todayShifts.find((s) => (s.nfc_tag_id || '').replace(/:/g, '').toUpperCase() === normalizedUid);
+        chantiers.list.find((c) => normalizeNfcId(c.nfc_tag_id || '') === normalizedUid) ||
+        this.todayShifts.find((s) => normalizeNfcId(s.nfc_tag_id || '') === normalizedUid);
       const siteId = site ? ('id' in site ? (site as { id: number }).id : (site as { chantier_id: number }).chantier_id) : undefined;
       if (!siteId) return 'in';
 
       const lastAtSite = [...this.entries].reverse().find((e) => {
         if (e.nfc_tag_id) {
-          return (e.nfc_tag_id as string).replace(/:/g, '').toUpperCase() === normalizedUid;
+          return normalizeNfcId(e.nfc_tag_id as string) === normalizedUid;
         }
         return e.chantier_id === siteId;
       });
@@ -638,7 +627,7 @@ export const usePointageStore = defineStore('pointage', {
 
       NFC.onRead((data) => {
         const uid = data.string()?.tagInfo?.uid;
-        if (uid) this.handleTagRead(uid.replace(/:/g, '').trim(), router);
+        if (uid) this.handleTagRead(normalizeNfcId(uid), router);
       });
       NFC.onError((err) => {
         this.scanError = err.error || 'Erreur de lecture NFC.';
