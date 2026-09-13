@@ -15,6 +15,7 @@ npm-debug.log*
 odoo/dev/oca-addons/
 odoo/dev/logs/
 odoo/dev/*.log
+odoo/dev/backend/
 
 # OS / editor
 .DS_Store
@@ -22,8 +23,4 @@ odoo/dev/*.log
 .idea/
 
 # Odoo Python
-odoo/addons/**/__pycache__/
-odoo/addons/**/*.pyc
-odoo/addons/**/*.pyo
-odoo/addons/**/.pytest_cache/
 __pycache__/

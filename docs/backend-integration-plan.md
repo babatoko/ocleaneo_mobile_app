@@ -1,5 +1,14 @@
 # Plan d'intégration du backend Odoo 14 dans le repo GitHub
 
+> ⚠️ **Historique — plan partiellement caduc** (13/09/2026). Les modules Odoo
+> vivent désormais dans le repo backend dédié
+> [`majavi-software/ocleaneo`](https://github.com/majavi-software/ocleaneo)
+> (règle de répartition des repos) : ce repo ne versionne plus aucun module,
+> le plan « monorepo avec `odoo/addons/` versionné » ci-dessous ne s'applique
+> plus. Restent pertinents : l'alignement du contrat `DataProvider`, les
+> modules `chantiers`/`stock`/`commandes` encore inexistants, et le compose
+> de dev (qui monte désormais un clone du repo backend — voir `odoo/README.md`).
+
 > Point de friction n°1 : le repo GitHub `babatoko/ocleaneo_mobile_app` ne contient que le frontend. Il faut y intégrer le backend Odoo 14 développé localement.
 
 ## Objectif
