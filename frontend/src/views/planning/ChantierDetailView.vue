@@ -314,12 +314,12 @@ async function refreshFromPull(event: CustomEvent) {
 }
 
 .stock-mini .sname {
-  font-size: 10px;
+  font-size: 11px;
   margin: 4px 0 2px;
 }
 
 .stock-mini .slevel {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
 }
 
@@ -363,7 +363,7 @@ async function refreshFromPull(event: CustomEvent) {
 .activity-required {
   display: inline-block;
   margin-left: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--warn-text);
   text-transform: uppercase;

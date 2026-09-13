@@ -592,7 +592,7 @@ function historySubtitle(e: TimeEntry): string {
 }
 
 .ws-overtime {
-  font-size: 10.5px;
+  font-size: 11px;
 }
 
 .ws-value {

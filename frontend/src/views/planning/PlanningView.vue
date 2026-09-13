@@ -45,6 +45,7 @@ import { exportShiftsToCalendar } from '../../services/calendarExport';
 import { ProviderNetworkError } from '../../providers/DataProvider';
 import { startOfWeekIso, startOfMonthIso, endOfMonthIso } from '../../utils/week';
 import { toLocalIso, todayIso, addDaysIso } from '../../utils/date';
+import { shiftStatusLabel } from '../../utils/statusLabels';
 import { provider } from '../../providers';
 import DataState from '../../components/DataState.vue';
 import HelpButton from '../../components/HelpButton.vue';
@@ -347,15 +348,6 @@ function badgeColor(status: string): string {
   // est encore à venir.
   if (status === 'done') return 'primary';
   return 'medium';
-}
-
-function statusLabel(status: string): string {
-  if (status === 'confirmed') return 'confirmé';
-  if (status === 'modified') return 'modifié';
-  if (status === 'partial') return 'fait partiellement';
-  if (status === 'done') return 'terminé';
-  if (status === 'cancelled') return 'annulé';
-  return status;
 }
 
 function timeRange(shift: Shift): string {
@@ -763,7 +755,7 @@ onUnmounted(() => {
           <ion-card-header>
             <div class="top">
               <span class="time">{{ timeRange(s) }}</span>
-              <ion-badge :color="badgeColor(s.status)">{{ statusLabel(s.status) }}</ion-badge>
+              <ion-badge :color="badgeColor(s.status)">{{ shiftStatusLabel(s.status) }}</ion-badge>
             </div>
             <ion-card-title>{{ s.chantier_name }}</ion-card-title>
             <ion-card-subtitle><ion-icon :icon="locationOutline"></ion-icon> {{ s.chantier_address || s.chantier_name }}</ion-card-subtitle>
@@ -809,7 +801,7 @@ onUnmounted(() => {
         <ion-item v-for="s in planning.weekShiftsByDay[toIso(d)] || []" :key="s.id" class="week-shift" :class="s.status" lines="none">
           <button type="button" class="ws-info" @click="openDetail(s)">
             {{ timeRange(s) }} · {{ s.chantier_name }}
-            <ion-badge v-if="s.status !== 'confirmed'" :color="badgeColor(s.status)" class="ws-badge">{{ statusLabel(s.status) }}</ion-badge>
+            <ion-badge v-if="s.status !== 'confirmed'" :color="badgeColor(s.status)" class="ws-badge">{{ shiftStatusLabel(s.status) }}</ion-badge>
           </button>
           <ion-button
             slot="end"
@@ -1159,7 +1151,7 @@ onUnmounted(() => {
 }
 
 .ws-badge {
-  font-size: 9px;
+  font-size: 11px;
   margin-left: 6px;
 }
 
@@ -1200,7 +1192,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   margin-bottom: 4px;
 }

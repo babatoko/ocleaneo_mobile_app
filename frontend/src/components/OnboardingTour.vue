@@ -149,7 +149,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', measure));
 
 .tour-eyebrow {
   margin: 0;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--accent);
   letter-spacing: 0.06em;

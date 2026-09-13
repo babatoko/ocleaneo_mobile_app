@@ -7,6 +7,7 @@ import { ProviderNetworkError, UNSUPPORTED_MESSAGES } from '../../providers/Data
 import AppHeader from '../../components/AppHeader.vue';
 import DataState from '../../components/DataState.vue';
 import type { Order } from '../../types/models';
+import { orderStatusLabel } from '../../utils/statusLabels';
 
 const router = useRouter();
 
@@ -72,7 +73,7 @@ async function refreshFromPull(event: CustomEvent) {
           >
             <ion-label class="ion-text-wrap">
               <strong>Commande n°{{ o.id }} — {{ o.chantier_name }}</strong>
-              <ion-note>{{ new Date(o.created_at).toLocaleDateString('fr-FR') }} · {{ o.status }}</ion-note>
+              <ion-note>{{ new Date(o.created_at).toLocaleDateString('fr-FR') }} · {{ orderStatusLabel(o.status) }}</ion-note>
             </ion-label>
           </ion-item>
         </ion-list>
