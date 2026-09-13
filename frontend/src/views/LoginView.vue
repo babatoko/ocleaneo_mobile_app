@@ -407,7 +407,7 @@ async function submit() {
 
 .app-version {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 28px;
 }
 

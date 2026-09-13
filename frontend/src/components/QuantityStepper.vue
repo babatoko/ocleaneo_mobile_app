@@ -43,8 +43,11 @@ function step(delta: number) {
 }
 
 .step-btn {
-  width: 32px;
-  height: 32px;
+  /* 44 px = cible tactile HIG/M3 : le stepper est le geste le plus répété
+     du flux commande, souvent avec des gants sur le chantier. 32 px
+     demandait une précision incompatible. */
+  width: 44px;
+  height: 44px;
   --padding-start: 0;
   --padding-end: 0;
   --padding-top: 0;
@@ -57,7 +60,7 @@ function step(delta: number) {
 }
 
 span {
-  min-width: 24px;
+  min-width: 32px;
   text-align: center;
   font-weight: 600;
 }

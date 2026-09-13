@@ -7,7 +7,9 @@
   --border-strong: #d3d1c7;
   --text-primary: #26251f;
   --text-secondary: #6b6a62;
-  --text-muted: #7a7870;
+  /* 4.81:1 sur bg-page (WCAG 1.4.3 AA) — l'ancien #7a7870 faisait 3.98:1,
+     sous le seuil pour les labels secondaires (.dname, .app-version…). */
+  --text-muted: #6d6b63;
   --accent: #0f6e56;
   --accent-bg: #e1f5ee;
   --accent-text: #085041;
@@ -23,6 +25,13 @@
      illisible en mode sombre, où ces deux fonds s'éclaircissent. */
   --on-solid: #ffffff;
   --on-accent: #ffffff;
+  /* Texte posé sur les badges success/warning/danger (ion-badge color=…) :
+     même pattern que --on-solid/--on-accent — sans ces tokens, le contraste
+     #fff du thème clair restait collé sur les fonds pastel du thème sombre
+     (1.77:1 à 2.43:1, illisible — WCAG 1.4.3 exige 4.5:1). */
+  --on-success: #ffffff;
+  --on-warning: #ffffff;
+  --on-danger: #ffffff;
   --radius: 14px;
 
   /* Alias conservés pour les composants les plus anciens. Ne jamais y
@@ -63,17 +72,17 @@
 
   --ion-color-success: var(--success-text);
   --ion-color-success-rgb: 59, 109, 17;
-  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-contrast: var(--on-success);
   --ion-color-success-contrast-rgb: 255, 255, 255;
 
   --ion-color-warning: var(--warn-text);
   --ion-color-warning-rgb: 133, 79, 11;
-  --ion-color-warning-contrast: #ffffff;
+  --ion-color-warning-contrast: var(--on-warning);
   --ion-color-warning-contrast-rgb: 255, 255, 255;
 
   --ion-color-danger: var(--danger);
   --ion-color-danger-rgb: 192, 57, 43;
-  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast: var(--on-danger);
   --ion-color-danger-contrast-rgb: 255, 255, 255;
 }
 
@@ -104,6 +113,9 @@
     --skeleton-sheen: #2a2721;
     --on-solid: #16150f;
     --on-accent: #06231c;
+    --on-success: #16150f;
+    --on-warning: #16150f;
+    --on-danger: #16150f;
 
     --ion-background-color-rgb: 22, 21, 15;
     --ion-text-color-rgb: 240, 238, 230;
@@ -112,6 +124,9 @@
     --ion-color-success-rgb: 169, 207, 110;
     --ion-color-warning-rgb: 227, 180, 101;
     --ion-color-danger-rgb: 240, 138, 124;
+    --ion-color-success-contrast-rgb: 22, 21, 15;
+    --ion-color-warning-contrast-rgb: 22, 21, 15;
+    --ion-color-danger-contrast-rgb: 22, 21, 15;
 
     color-scheme: dark;
   }
@@ -138,6 +153,9 @@
   --skeleton-sheen: #2a2721;
   --on-solid: #16150f;
   --on-accent: #06231c;
+  --on-success: #16150f;
+  --on-warning: #16150f;
+  --on-danger: #16150f;
 
   --ion-background-color-rgb: 22, 21, 15;
   --ion-text-color-rgb: 240, 238, 230;
@@ -146,6 +164,9 @@
   --ion-color-success-rgb: 169, 207, 110;
   --ion-color-warning-rgb: 227, 180, 101;
   --ion-color-danger-rgb: 240, 138, 124;
+  --ion-color-success-contrast-rgb: 22, 21, 15;
+  --ion-color-warning-contrast-rgb: 22, 21, 15;
+  --ion-color-danger-contrast-rgb: 22, 21, 15;
 
   color-scheme: dark;
 }
@@ -361,7 +382,7 @@ input[type='number'] {
 }
 
 .day .dname {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   margin: 0 0 4px;
 }
@@ -556,7 +577,7 @@ input[type='number'] {
 }
 
 .nav-item .lbl {
-  font-size: 10px;
+  font-size: 11px;
   margin: 2px 0 0;
   display: block;
 }

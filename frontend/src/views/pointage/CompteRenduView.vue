@@ -173,7 +173,7 @@ async function submit() {
 .activity-required {
   display: inline-block;
   margin-left: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--warn-text);
   text-transform: uppercase;
@@ -223,7 +223,7 @@ async function submit() {
 }
 
 .cr-cta-hint {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text-muted);
   margin: 8px 0 0;
   text-align: center;

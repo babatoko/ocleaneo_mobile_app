@@ -151,7 +151,7 @@ async function logout() {
                 slot="end"
                 class="app-toggle"
                 :checked="notificationsEnabled"
-                :aria-label="true"
+                aria-label="Notifications"
                 @ion-change="toggleNotifications"
               ></ion-toggle>
             </ion-item>
@@ -178,7 +178,7 @@ async function logout() {
                 slot="end"
                 class="app-toggle"
                 :checked="darkMode"
-                :aria-label="true"
+                aria-label="Thème sombre"
                 @ion-change="toggleDarkMode"
               ></ion-toggle>
             </ion-item>
@@ -244,7 +244,7 @@ async function logout() {
                 slot="end"
                 class="app-toggle"
                 :checked="traceModeEnabled"
-                :aria-label="true"
+                aria-label="Mode traçage"
                 @ion-change="toggleTraceMode"
               ></ion-toggle>
             </ion-item>

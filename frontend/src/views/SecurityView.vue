@@ -203,7 +203,7 @@ function logout() {
               slot="end"
               class="app-toggle"
               :checked="biometricSaved"
-              :aria-label="true"
+              aria-label="Connexion biométrique"
               @ion-change="biometricSaved ? disableBiometric() : null"
             ></ion-toggle>
           </ion-item>
