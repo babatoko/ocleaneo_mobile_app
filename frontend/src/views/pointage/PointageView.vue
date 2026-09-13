@@ -61,9 +61,20 @@ const pointage = usePointageStore();
 const chantiers = useChantiersStore();
 
 async function handleRefresh(event: CustomEvent): Promise<void> {
-  await pointage.refresh();
-  const target = event.target as HTMLIonRefresherElement | undefined;
-  await target?.complete();
+  // refresh() ne replie que la coupure réseau (loadSafe en interne) ; un
+  // 401 (jeton expiré) ou un 500 remontait ici en « promesse non
+  // rattrapée » dans le handler ionRefresh (journal du 12/09, entrée
+  // « vue runtime-6 »). La redirection session-expirée est déjà déclenchée
+  // côté provider — ici on referme juste le refresher avec un message.
+  try {
+    await pointage.refresh();
+  } catch (e) {
+    pointage.scanError =
+      e instanceof Error && e.message ? e.message : 'Synchronisation impossible.';
+  } finally {
+    const target = event.target as HTMLIonRefresherElement | undefined;
+    await target?.complete();
+  }
 }
 
 const now = ref(new Date());

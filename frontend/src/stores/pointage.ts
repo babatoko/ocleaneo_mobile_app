@@ -676,6 +676,23 @@ export const usePointageStore = defineStore('pointage', {
         } else if (router.currentRoute.value.name !== 'pointage') {
           router.push({ name: 'pointage' });
         }
+      } catch (e) {
+        // clockWithTag() gère 404/403/réseau localement (scanError + file
+        // hors ligne) mais RELANCE tout le reste — dont le 401 d'un jeton
+        // expiré. Sans ce catch, l'erreur traversait le listener NFC
+        // (callback « fire and forget » dans initGlobalListener) et
+        // remontait en « promesse non rattrapée » dans le journal de bord,
+        // avec la stack minifiée du provider (journaux du 12/09 :
+        // unauthorized / badge non actif ×3). La redirection vers la
+        // connexion est déjà assurée côté provider (emitSessionExpired) :
+        // ici on ne fait que fermer proprement la promesse et informer.
+        if (e instanceof ProviderError && e.status === 401) {
+          this.scanError = 'Session expirée — reconnectez-vous.';
+        } else {
+          this.scanError = e instanceof Error && e.message ? e.message : 'Le pointage a échoué.';
+        }
+        hapticError();
+        void recordError(String(e instanceof Error ? e.message : e), 'pointage.handleTagRead: erreur non rattrapée (corrigée)');
       } finally {
         processingTag = false;
       }
