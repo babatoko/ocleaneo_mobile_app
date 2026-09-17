@@ -36,6 +36,11 @@ const REMINDER_NOTIFICATION_ID = 1002;
 const REMINDER_DELAY_MIN = 20;
 const CHANNEL_ID = 'pointage';
 
+// Issue #117 : rappel « compte-rendu en attente » après un départ. Id dédié,
+// hors des plages 1001/1002/1004 (pointage) et 200000+ (reminders) — un seul
+// rappel à la fois : le CR le plus ancien, annulé à la soumission.
+const COMPTE_RENDU_NOTIFICATION_ID = 1005;
+
 const PLANNING_CHANNEL_ID = 'planning';
 // + shift.id : plage dédiée, assez loin des autres ids (1001/1002 pour le
 // pointage, 5000-5999 pour les notifications de changement ci-dessous) pour
@@ -133,6 +138,36 @@ export async function showClockedInNotification({ chantierName, arrivalAt, estim
 export async function clearClockedInNotification(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.cancel({ notifications: [{ id: SHIFT_NOTIFICATION_ID }] }).catch(() => {});
+}
+
+/**
+ * Issue #117 : le compte-rendu doit être demandé dans TOUS les cas — y compris
+ * quand le départ a été badgé hors ligne (l'app redirige vers le formulaire,
+ * mais si l'agent la ferme avant de le remplir, ce rappel local persiste,
+ * comme le bandeau de l'écran Pointage). Annulé à la soumission du CR
+ * (succès ou mise en file hors ligne, voir stores/pointage.ts).
+ */
+export async function showCompteRenduReminder(chantierName: string): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!(await areNotificationsEnabled())) return;
+  if (!(await ensurePermission())) return;
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: COMPTE_RENDU_NOTIFICATION_ID,
+        title: 'Compte-rendu en attente',
+        body: `Départ du chantier ${chantierName} enregistré — il reste à remplir le compte-rendu.`,
+        summaryText: 'Pointage',
+        channelId: CHANNEL_ID,
+        autoCancel: true,
+      },
+    ],
+  }).catch(() => {});
+}
+
+export async function cancelCompteRenduReminder(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: COMPTE_RENDU_NOTIFICATION_ID }] }).catch(() => {});
 }
 
 interface DepartureReminderParams {
