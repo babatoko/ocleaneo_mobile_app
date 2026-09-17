@@ -17,6 +17,8 @@ import {
   scheduleEndOfShiftReminder,
   cancelEndOfShiftReminder,
   cancelLateReminder,
+  showCompteRenduReminder,
+  cancelCompteRenduReminder,
 } from '../services/notifications';
 import { hapticSuccess, hapticError, hapticTap } from '../services/haptics';
 import { normalizeNfcId, formatNfcIdWithColons } from '../utils/nfc';
@@ -287,23 +289,51 @@ export const usePointageStore = defineStore('pointage', {
      *  compte-rendus en attente — appelé aussi bien juste après un badge
      *  réussi que depuis le rejeu de la file hors ligne (flushOfflineQueue),
      *  où le type réel n'est connu qu'une fois la synchro effectivement
-     *  aboutie (voir services/offlineQueue.ts, onEntry). */
+     *  aboutie (voir services/offlineQueue.ts, onEntry). Issue #117 : appelé
+     *  AUSSI dès le badge de départ hors ligne (entrée provisional, le type
+     *  deviné dit 'out') pour que la demande de compte-rendu ait lieu dans
+     *  tous les cas — d'où la déduplication par clientRef et la fusion des
+     *  infos serveur quand la confirmation arrive après coup. */
     async _registerPendingCompteRendu(entry: TimeEntry): Promise<void> {
       const shift = entry.shift_id
         ? this.todayShifts.find((s) => s.id === entry.shift_id)
         : this.todayShifts.find((s) => s.chantier_id === entry.chantier_id);
       const site = this._resolveSiteFromEntry(entry) as { id: number; name: string };
+      const clientRef = entry.client_ref || '';
+      // Un CR provisoire (badge hors ligne) peut précéder la confirmation du
+      // flush : jamais deux entrées pour le même départ.
+      const existing = this.pendingCompteRendus.find((p) => p.clientRef === clientRef);
+      if (existing) {
+        if (!existing.provisional) return;
+        // Confirmation par le serveur : le type réel est bien 'out' — on
+        // complète avec les infos fraîches et lève le flag provisoire.
+        this.pendingCompteRendus = this.pendingCompteRendus.map((p) =>
+          p.clientRef === clientRef
+            ? {
+                ...p,
+                chantierId: site.id,
+                chantierName: site.name || p.chantierName,
+                activities: (shift?.activities as ShiftActivity[] | undefined) || p.activities,
+                provisional: false,
+              }
+            : p,
+        );
+        await this._savePendingCompteRendus();
+        return;
+      }
       this.pendingCompteRendus = [
         ...this.pendingCompteRendus,
         {
-          clientRef: entry.client_ref || '',
+          clientRef,
           chantierId: site.id,
           chantierName: site.name,
           activities: (shift?.activities as ShiftActivity[] | undefined) || [],
           recordedAt: entry.recorded_at,
+          provisional: entry.pending === true ? true : undefined,
         },
       ];
       await this._savePendingCompteRendus();
+      await showCompteRenduReminder(site.name);
     },
 
     /** Soumet le compte-rendu d'un départ déjà enregistré (voir
@@ -325,6 +355,10 @@ export const usePointageStore = defineStore('pointage', {
       }
       this.pendingCompteRendus = this.pendingCompteRendus.filter((p) => p.clientRef !== clientRef);
       await this._savePendingCompteRendus();
+      // Issue #117 : le rappel local (notification) disparaît dès que le CR
+      // est traité — succès OU mise en file hors ligne : dans les deux cas la
+      // livraison est garantie par la file, le rappel n'a plus lieu d'être.
+      await cancelCompteRenduReminder();
     },
 
     /** Avance l'horloge du store — appelée par l'écran Pointage tant qu'il est
@@ -340,7 +374,20 @@ export const usePointageStore = defineStore('pointage', {
       // réellement d'un départ. onEntry ne réagit donc qu'une fois la
       // synchro effectivement aboutie, sur le type que le serveur a résolu.
       const { flushed } = await flushQueue((entry) => {
-        if (entry.type === 'out') void this._registerPendingCompteRendu(entry);
+        if (entry.type === 'out') {
+          void this._registerPendingCompteRendu(entry);
+        } else {
+          // Issue #117 : le type deviné ('out', CR provisoire inscrit dès le
+          // badge hors ligne) s'est révélé faux — le serveur a résolu autre
+          // chose. Retirer l'entrée provisoire pour ne pas réclamer un
+          // compte-rendu pour une simple arrivée. Un CR déjà REMPLI n'est pas
+          // touché : la livraison de son contenu reste garantie par la file.
+          const clientRef = entry.client_ref || '';
+          this.pendingCompteRendus = this.pendingCompteRendus.filter(
+            (p) => !(p.clientRef === clientRef && p.provisional),
+          );
+          void this._savePendingCompteRendus();
+        }
       });
       await this.refreshQueueCount();
       if (flushed > 0) await this.loadSafe();
@@ -487,6 +534,36 @@ export const usePointageStore = defineStore('pointage', {
           ];
           this.lastMessage = { type: 'queued', text: 'Hors ligne : pointage enregistré, synchronisation dès que possible.' };
           hapticSuccess();
+          // Issue #117 : le compte-rendu doit être demandé dans TOUS les cas.
+          // Si le type deviné est 'out', on inscrit d'ores et déjà un CR
+          // PROVISOIRE (clientRef déjà généré avant la mise en file) pour que
+          // handleTagRead() redirige vers le formulaire, comme en ligne. Le
+          // rejeu (flushOfflineQueue → onEntry) confirmera ('out') ou retirera
+          // ('in') cette entrée selon le type réellement résolu par le
+          // serveur — voir _registerPendingCompteRendu (dédup par clientRef).
+          if (type === 'out') {
+            // Résolution locale du chantier : le même matching que
+            // _nextTypeForTag (uid normalisé, chantiers d'abord puis shifts
+            // du jour) ; si rien ne matche, l'entrée provisoire porte un id 0
+            // et le nom du chantier sera complété à la confirmation.
+            const normalizedUid = normalizeNfcId(uid);
+            const chantiersStore = useChantiersStore();
+            const matchedSite =
+              chantiersStore.list.find((c) => normalizeNfcId(c.nfc_tag_id || '') === normalizedUid) ||
+              this.todayShifts.find((s) => normalizeNfcId(s.nfc_tag_id || '') === normalizedUid);
+            const chantierIdForOfflineEntry = matchedSite
+              ? 'id' in matchedSite
+                ? (matchedSite as { id: number }).id
+                : (matchedSite as { chantier_id: number }).chantier_id
+              : 0;
+            await this._registerPendingCompteRendu({
+              client_ref: clientRef,
+              type,
+              recorded_at: recordedAt,
+              chantier_id: chantierIdForOfflineEntry,
+              pending: true,
+            } as TimeEntry);
+          }
           return;
         }
         throw e;

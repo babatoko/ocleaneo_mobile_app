@@ -51,6 +51,8 @@ vi.mock('../../services/notifications', () => ({
   scheduleEndOfShiftReminder: vi.fn(async () => {}),
   cancelEndOfShiftReminder: vi.fn(async () => {}),
   cancelLateReminder: vi.fn(async () => {}),
+  showCompteRenduReminder: vi.fn(async () => {}),
+  cancelCompteRenduReminder: vi.fn(async () => {}),
 }));
 
 vi.mock('../../services/haptics', () => ({
@@ -76,6 +78,7 @@ const { usePointageStore } = await import('../pointage');
 const { useChantiersStore } = await import('../chantiers');
 const { usePlanningStore } = await import('../planning');
 const { enqueue, flushQueue } = await import('../../services/offlineQueue');
+const { showCompteRenduReminder, cancelCompteRenduReminder } = await import('../../services/notifications');
 
 const fetchChantiers = vi.mocked(provider.fetchChantiers);
 const createTimeEntry = vi.mocked(provider.createTimeEntry);
@@ -457,19 +460,35 @@ describe('pendingCompteRendus — un départ résolu ouvre un compte-rendu à va
     expect(pointage.pendingCompteRendus).toHaveLength(0);
   });
 
-  it("un départ mis en file hors ligne n'ajoute rien tant que la synchro n'a pas abouti, mais l'ajoute une fois rejoué avec succès", async () => {
+  it('un départ mis en file hors ligne ouvre DÈS MAINTENANT un compte-rendu provisoire (issue #117), confirmé au rejeu', async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
     const pointage = usePointageStore();
     pointage.todayShifts = [SHIFT_WITH_ACTIVITIES];
-    // _nextTypeForTag ne devine que 'in' aujourd'hui (voir pointage.ts) :
-    // impossible de savoir avant la synchro qu'il s'agissait d'un départ.
+    // Une arrivée est déjà connue localement : _nextTypeForTag peut donc
+    // deviner 'out' pour le badge suivant (scénario réaliste : arrivée badgée
+    // en ligne le matin, départ hors ligne dans un sous-sol).
+    pointage.entries = [
+      { id: 'e0', type: 'in', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString() },
+    ];
+    // Le badge est rejeté réseau : il part dans la file avec le type deviné
+    // ('out' ici — la dernière entrée connue du chantier est une arrivée).
+    // Issue #117 : la demande de compte-rendu doit avoir lieu DANS TOUS LES
+    // CAS, dès le badge — le formulaire fonctionne d'ailleurs déjà hors ligne.
     createTimeEntryWithTag.mockRejectedValueOnce(new ProviderNetworkError());
 
     await pointage.clockWithTag('041779C9780000');
-    expect(pointage.pendingCompteRendus).toHaveLength(0);
+    expect(pointage.pendingCompteRendus).toHaveLength(1);
+    expect(pointage.pendingCompteRendus[0]).toMatchObject({
+      chantierName: 'Chantier Test',
+      provisional: true,
+    });
+    const provisionalRef = pointage.pendingCompteRendus[0].clientRef;
+    expect(provisionalRef).toBeTruthy();
 
     // Le rejeu (flushOfflineQueue) reçoit le type réel une fois la requête
-    // effectivement passée — c'est à ce moment, et seulement à ce moment,
-    // que le compte-rendu doit apparaître.
+    // effectivement passée. Le serveur a résolu 'out' : l'entrée provisoire
+    // est CONFIRMÉE (flag levé, infos complétées) — jamais de doublon.
     vi.mocked(flushQueue).mockImplementationOnce(async (onEntry) => {
       onEntry?.({
         id: 9,
@@ -477,15 +496,127 @@ describe('pendingCompteRendus — un départ résolu ouvre un compte-rendu à va
         chantier_id: CHANTIER.id,
         shift_id: SHIFT_WITH_ACTIVITIES.id,
         recorded_at: new Date().toISOString(),
-        client_ref: 'cr-depart-2',
+        client_ref: provisionalRef,
+      });
+      return { flushed: 1, remaining: 0 };
+    });
+    fetchShifts.mockResolvedValueOnce([SHIFT_WITH_ACTIVITIES]);
+
+    await pointage.flushOfflineQueue();
+
+    expect(pointage.pendingCompteRendus).toHaveLength(1);
+    expect(pointage.pendingCompteRendus[0]).toMatchObject({
+      clientRef: provisionalRef,
+      chantierName: 'Chantier Test',
+      provisional: false,
+    });
+  });
+
+  it("le type deviné était faux (serveur résout 'in') : le CR provisoire est retiré au rejeu, pas de formulaire fantôme", async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+    pointage.todayShifts = [SHIFT_WITH_ACTIVITIES];
+    // Store vide d'entrées : _nextTypeForTag ne peut pas savoir qu'une arrivée
+    // était déjà badgée plus tôt — il devine 'in'... ce test simule l'inverse
+    // d'un cas réel : le client devine 'out' (dernière entrée connue = 'in')
+    // mais le serveur tranche 'in' (ex. doublon déjà rejeté/résolu à l'inverse).
+    pointage.entries = [
+      { id: 'e1', type: 'in', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString() },
+    ];
+    createTimeEntryWithTag.mockRejectedValueOnce(new ProviderNetworkError());
+
+    await pointage.clockWithTag('041779C9780000');
+    // 'in' deviné -> dernier pointage du chantier 'in' => type 'out' deviné.
+    expect(pointage.pendingCompteRendus).toHaveLength(1);
+    expect(pointage.pendingCompteRendus[0].provisional).toBe(true);
+    const provisionalRef = pointage.pendingCompteRendus[0].clientRef;
+
+    // ... mais le serveur résout finalement 'in' : le CR provisoire doit
+    // disparaître, sinon l'agent se ferait réclamer un compte-rendu de départ
+    // qui n'existe pas.
+    vi.mocked(flushQueue).mockImplementationOnce(async (onEntry) => {
+      onEntry?.({
+        id: 9,
+        type: 'in',
+        chantier_id: CHANTIER.id,
+        recorded_at: new Date().toISOString(),
+        client_ref: provisionalRef,
       });
       return { flushed: 1, remaining: 0 };
     });
 
     await pointage.flushOfflineQueue();
 
-    expect(pointage.pendingCompteRendus).toHaveLength(1);
-    expect(pointage.pendingCompteRendus[0].clientRef).toBe('cr-depart-2');
+    expect(pointage.pendingCompteRendus).toHaveLength(0);
+  });
+
+  it('handleTagRead redirige vers le formulaire après un départ hors ligne (comme en ligne)', async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+    pointage.todayShifts = [SHIFT_WITH_ACTIVITIES];
+    // Même scénario que le test précédent : arrivée déjà badgée, départ hors
+    // ligne — le CR provisoire doit faire monter le compteur.
+    pointage.entries = [
+      { id: 'e0', type: 'in', chantier_id: CHANTIER.id, recorded_at: new Date().toISOString() },
+    ];
+    createTimeEntryWithTag.mockRejectedValueOnce(new ProviderNetworkError());
+
+    // handleTagRead compare pendingCompteRendus avant/après clockWithTag pour
+    // décider de la redirection : le CR provisoire doit donc faire monter ce
+    // compteur dès le badge hors ligne.
+    const pendingBefore = pointage.pendingCompteRendus.length;
+    await pointage.clockWithTag('041779C9780000');
+    expect(pointage.pendingCompteRendus.length).toBeGreaterThan(pendingBefore);
+  });
+
+  it('un CR rempli hors ligne part dans la file et le rappel local est annulé', async () => {
+    const pointage = usePointageStore();
+    pointage.pendingCompteRendus = [
+      {
+        clientRef: 'cr-off-1',
+        chantierId: CHANTIER.id,
+        chantierName: 'Chantier Test',
+        activities: [],
+        recordedAt: new Date().toISOString(),
+        provisional: true,
+      },
+    ];
+    submitCompteRendu.mockRejectedValueOnce(new ProviderNetworkError());
+
+    await pointage.submitCompteRendu('cr-off-1', 'Tout va bien');
+
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ clientRef: 'cr-off-1', commentaire: 'Tout va bien' }),
+    );
+    expect(pointage.pendingCompteRendus).toHaveLength(0);
+    expect(cancelCompteRenduReminder).toHaveBeenCalledTimes(1);
+  });
+
+  it('la notification de rappel est émise à la création du CR en attente', async () => {
+    const chantiers = useChantiersStore();
+    chantiers.list = [CHANTIER];
+    const pointage = usePointageStore();
+    pointage.todayShifts = [SHIFT_WITH_ACTIVITIES];
+    createTimeEntryWithTag.mockRejectedValueOnce(new ProviderNetworkError());
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(showCompteRenduReminder).toHaveBeenCalledWith('Chantier Test');
+  });
+
+  it("le type deviné 'in' (aucun historique local) n'inscrit pas de CR provisoire : le flush tranchera", async () => {
+    // Cas limite assumé (issue #117) : après un redémarrage, aucune entrée
+    // locale ne permet de deviner 'out' — le badge part en file en 'in', sans
+    // CR provisoire. Le rejeu tranchera avec le type serveur (flux existant).
+    const pointage = usePointageStore();
+    pointage.todayShifts = [SHIFT_WITH_ACTIVITIES];
+    createTimeEntryWithTag.mockRejectedValueOnce(new ProviderNetworkError());
+
+    await pointage.clockWithTag('041779C9780000');
+
+    expect(pointage.pendingCompteRendus).toHaveLength(0);
   });
 });
 

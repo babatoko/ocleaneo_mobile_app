@@ -232,6 +232,12 @@ export interface PendingCompteRendu {
   chantierName: string;
   activities: ShiftActivity[];
   recordedAt: string;
+  /** Issue #117 : inscrit dès le badge de départ HORS LIGNE, avant que le
+   *  serveur n'ait confirmé le type (le type envoyé dans la file est deviné).
+   *  Au rejeu : type résolu 'out' → l'entrée est confirmée (flag retiré,
+   *  infos serveur fusionnées) ; type 'in' → l'entrée est retirée. Un CR
+   *  rempli et mis en file avant confirmation reste livrable tel quel. */
+  provisional?: boolean;
 }
 
 /** Soumission du compte-rendu de fin de chantier — écrit a posteriori sur
